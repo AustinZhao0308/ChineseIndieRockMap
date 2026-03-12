@@ -9,8 +9,7 @@ import { geoCentroid } from "d3-geo";
 import { animate } from "motion/react";
 import { provinceData } from "../data";
 
-const geoUrl =
-  "https://raw.githubusercontent.com/longwosion/geojson-map-china/master/china.json";
+const geoUrl = "/china.json";
 
 interface ChinaMapProps {
   onProvinceClick: (provinceId: string) => void;
