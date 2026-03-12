@@ -1,20 +1,55 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Interactive China Music Map
 
-# Run and deploy your AI Studio app
+A modern, interactive web application that visualizes local bands and music scenes across different provinces in China. Built with React, D3.js, and Tailwind CSS, this project features a highly responsive and atmospheric dark-mode map interface.
 
-This contains everything you need to run your app locally.
+## ✨ Features
 
-View your app in AI Studio: https://ai.studio/apps/c7357bc9-a7a7-4f95-b296-080bff8e6846
+- **Interactive SVG Map**: Custom-rendered map of China using native SVG and `d3-geo`, ensuring high performance and crisp rendering at any scale.
+- **Smooth Navigation**: Fluid zooming and panning mechanics powered by `d3-zoom` and `d3-transition`.
+- **Data Visualization**: Highlights provinces with active music scenes and displays detailed band information upon interaction.
+- **Responsive Design**: Automatically adjusts map centering, zoom levels, and layout offsets for both desktop and mobile devices.
+- **Atmospheric UI**: A sleek, dark-themed interface with radial gradients and modern typography.
 
-## Run Locally
+## 🛠️ Tech Stack
 
-**Prerequisites:**  Node.js
+- **Frontend Framework**: [React 19](https://react.dev/)
+- **Build Tool**: [Vite](https://vitejs.dev/)
+- **Language**: [TypeScript](https://www.typescriptlang.org/)
+- **Styling**: [Tailwind CSS](https://tailwindcss.com/)
+- **Map & Visualization**: [D3.js](https://d3js.org/) (`d3-geo`, `d3-zoom`, `d3-selection`, `d3-transition`)
+- **Animations**: [Framer Motion](https://motion.dev/)
 
+## 🚀 Getting Started
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+### Prerequisites
+
+Make sure you have [Node.js](https://nodejs.org/) installed on your machine.
+
+### Installation
+
+1. Clone the repository and navigate to the project directory.
+2. Install the dependencies:
+
+```bash
+npm install
+```
+
+### Development Server
+
+Start the local development server:
+
+```bash
+npm run dev
+```
+
+Open your browser and visit `http://localhost:3000` to view the application.
+
+## 📦 Build for Production
+
+To create a production-ready build:
+
+```bash
+npm run build
+```
+
+The built files will be output to the `dist` directory.
