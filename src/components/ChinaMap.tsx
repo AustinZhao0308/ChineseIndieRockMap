@@ -1,15 +1,10 @@
-import React, { memo, useState, useEffect, useRef } from "react";
-import {
-  ComposableMap,
-  Geographies,
-  Geography,
-  ZoomableGroup
-} from "react-simple-maps";
-import { geoCentroid } from "d3-geo";
-import { animate } from "motion/react";
+import React, { memo, useState, useEffect, useRef, useMemo } from "react";
+import { geoMercator, geoPath, geoCentroid } from "d3-geo";
+import { select } from "d3-selection";
+import { zoom as d3Zoom, zoomIdentity, ZoomTransform } from "d3-zoom";
+import "d3-transition";
 import { provinceData } from "../data";
-
-const geoUrl = "/china.json";
+import chinaGeoJson from "../../public/china.json";
 
 interface ChinaMapProps {
   onProvinceClick: (provinceId: string) => void;
@@ -17,132 +12,112 @@ interface ChinaMapProps {
 }
 
 const ChinaMap: React.FC<ChinaMapProps> = ({ onProvinceClick, selectedProvinceId }) => {
-  const [position, setPosition] = useState({ coordinates: [104, 38] as [number, number], zoom: 1 });
-  const positionRef = useRef(position);
-  const animationRef = useRef<any>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
+  const [transform, setTransform] = useState<ZoomTransform>(zoomIdentity);
+  const [hoveredProvince, setHoveredProvince] = useState<string | null>(null);
 
-  // Keep ref in sync with state (e.g., when user drags the map)
+  // Set up projection
+  const projection = useMemo(() => {
+    return geoMercator()
+      .scale(650)
+      .center([104, 38])
+      .translate([400, 300]); // Center of 800x600 viewBox
+  }, []);
+
+  const pathGenerator = useMemo(() => geoPath().projection(projection), [projection]);
+
+  // Set up d3-zoom
+  const zoomBehavior = useMemo(() => {
+    return d3Zoom<SVGSVGElement, unknown>()
+      .scaleExtent([1, 4])
+      .on("zoom", (event) => {
+        setTransform(event.transform);
+      });
+  }, []);
+
   useEffect(() => {
-    positionRef.current = position;
-  }, [position]);
+    if (svgRef.current) {
+      select(svgRef.current).call(zoomBehavior);
+    }
+  }, [zoomBehavior]);
 
   const zoomTo = (targetCoordinates: [number, number], targetZoom: number) => {
-    const startCoordinates = positionRef.current.coordinates;
-    const startZoom = positionRef.current.zoom;
-
-    if (
-      startCoordinates[0] === targetCoordinates[0] &&
-      startCoordinates[1] === targetCoordinates[1] &&
-      startZoom === targetZoom
-    ) {
-      return;
-    }
-
-    if (animationRef.current) {
-      animationRef.current.stop();
-    }
-
-    animationRef.current = animate(0, 1, {
-      duration: 0.8,
-      ease: [0.16, 1, 0.3, 1], // Custom ease out for smooth deceleration
-      onUpdate: (progress) => {
-        const newPos = {
-          coordinates: [
-            startCoordinates[0] + (targetCoordinates[0] - startCoordinates[0]) * progress,
-            startCoordinates[1] + (targetCoordinates[1] - startCoordinates[1]) * progress
-          ] as [number, number],
-          zoom: startZoom + (targetZoom - startZoom) * progress
-        };
-        setPosition(newPos);
-        positionRef.current = newPos;
-      }
-    });
+    if (!svgRef.current) return;
+    
+    // Calculate the pixel coordinates of the target center
+    const [x, y] = projection(targetCoordinates) || [400, 300];
+    
+    // Calculate the transform to center (x, y) at the middle of the SVG (400, 300)
+    const tx = 400 - x * targetZoom;
+    const ty = 300 - y * targetZoom;
+    
+    const targetTransform = zoomIdentity.translate(tx, ty).scale(targetZoom);
+    
+    select(svgRef.current)
+      .transition()
+      .duration(800)
+      .call(zoomBehavior.transform, targetTransform);
   };
 
   useEffect(() => {
     if (!selectedProvinceId) {
-      // Shift center slightly north (higher latitude) to move the map down,
-      // making room for the top header text.
+      // Reset to default view
       zoomTo([104, 38], 1);
     }
   }, [selectedProvinceId]);
 
   return (
     <div className="w-full h-full bg-[#0a0502] flex items-center justify-center relative overflow-hidden">
-      <ComposableMap
-        projection="geoMercator"
-        projectionConfig={{
-          scale: 650,
-          center: [104, 38] // Center of China, shifted slightly north
-        }}
+      <svg
+        ref={svgRef}
+        viewBox="0 0 800 600"
         className="w-full h-full outline-none"
+        style={{ width: "100%", height: "100%", touchAction: "none" }}
       >
-        <ZoomableGroup 
-          zoom={position.zoom} 
-          center={position.coordinates}
-          onMoveEnd={(pos) => {
-            setPosition(pos as { coordinates: [number, number], zoom: number });
-          }}
-          minZoom={1} 
-          maxZoom={4}
-        >
-          <Geographies geography={geoUrl}>
-            {({ geographies }) =>
-              geographies.map((geo) => {
-                const provinceName = geo.properties.name;
-                const hasBands = !!provinceData[provinceName];
-                const isSelected = selectedProvinceId === provinceName;
+        <g transform={transform.toString()}>
+          {chinaGeoJson.features.map((geo: any, index: number) => {
+            const provinceName = geo.properties.name;
+            const hasBands = !!provinceData[provinceName];
+            const isSelected = selectedProvinceId === provinceName;
+            const isHovered = hoveredProvince === provinceName;
 
-                return (
-                  <Geography
-                    key={geo.rsmKey}
-                    geography={geo}
-                    onClick={() => {
-                      if (hasBands) {
-                        const centroid = geoCentroid(geo);
-                        
-                        // Calculate offset based on screen width
-                        // If screen is wide enough for the side panel (md breakpoint is 768px),
-                        // shift the map to the left by adding to the longitude.
-                        // If on mobile, shift the map up by subtracting from the latitude.
-                        const isDesktop = window.innerWidth >= 768;
-                        const longitudeOffset = isDesktop ? 6 : 0;
-                        const latitudeOffset = isDesktop ? 0 : -8;
-                        
-                        zoomTo([centroid[0] + longitudeOffset, centroid[1] + latitudeOffset], 2.5);
-                        onProvinceClick(provinceName);
-                      }
-                    }}
-                    style={{
-                      default: {
-                        fill: isSelected ? "#ff4e00" : hasBands ? "#3a1510" : "#1a1a1a",
-                        stroke: "#333333",
-                        strokeWidth: 0.5 / position.zoom,
-                        outline: "none",
-                        transition: "fill 250ms, stroke 250ms"
-                      },
-                      hover: {
-                        fill: hasBands ? "#ff4e00" : "#222222",
-                        stroke: "#555555",
-                        strokeWidth: 1 / position.zoom,
-                        outline: "none",
-                        cursor: hasBands ? "pointer" : "default",
-                        transition: "fill 250ms, stroke 250ms"
-                      },
-                      pressed: {
-                        fill: "#cc3e00",
-                        stroke: "#777777",
-                        strokeWidth: 1 / position.zoom,
-                        outline: "none"
-                      }
-                    }}
-                  />
-                );
-              })
-            }
-          </Geographies>
-        </ZoomableGroup>
-      </ComposableMap>
+            // Determine styles
+            let fill = "#1a1a1a";
+            if (isSelected) fill = "#ff4e00";
+            else if (isHovered && hasBands) fill = "#ff4e00";
+            else if (isHovered && !hasBands) fill = "#222222";
+            else if (hasBands) fill = "#3a1510";
+
+            return (
+              <path
+                key={geo.properties.id || index}
+                d={pathGenerator(geo) || ""}
+                fill={fill}
+                stroke={isHovered ? "#555555" : "#333333"}
+                strokeWidth={(isHovered ? 1 : 0.5) / transform.k}
+                style={{
+                  cursor: hasBands ? "pointer" : "default",
+                  transition: "fill 250ms, stroke 250ms",
+                  outline: "none"
+                }}
+                onMouseEnter={() => setHoveredProvince(provinceName)}
+                onMouseLeave={() => setHoveredProvince(null)}
+                onClick={() => {
+                  if (hasBands) {
+                    const centroid = geoCentroid(geo);
+                    const isDesktop = window.innerWidth >= 768;
+                    const longitudeOffset = isDesktop ? 6 : 0;
+                    const latitudeOffset = isDesktop ? 0 : -8;
+                    
+                    zoomTo([centroid[0] + longitudeOffset, centroid[1] + latitudeOffset], 2.5);
+                    onProvinceClick(provinceName);
+                  }
+                }}
+              />
+            );
+          })}
+        </g>
+      </svg>
       
       {/* Atmosphere effects */}
       <div className="absolute inset-0 pointer-events-none" style={{
