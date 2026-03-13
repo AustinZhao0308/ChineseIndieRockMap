@@ -3,15 +3,20 @@ import { geoMercator, geoPath, geoCentroid } from "d3-geo";
 import { select } from "d3-selection";
 import { zoom as d3Zoom, zoomIdentity, ZoomTransform } from "d3-zoom";
 import "d3-transition";
-import { provinceData } from "../data";
 import chinaGeoJson from "../../public/china.json";
+import { Province } from "../data";
 
 interface ChinaMapProps {
   onProvinceClick: (provinceId: string) => void;
   selectedProvinceId: string | null;
+  provinceData: Record<string, Province>;
 }
 
-const ChinaMap: React.FC<ChinaMapProps> = ({ onProvinceClick, selectedProvinceId }) => {
+const normalizeProvinceName = (name: string) => {
+  return name.replace(/(省|市|维吾尔自治区|壮族自治区|回族自治区|自治区|特别行政区)$/, '');
+};
+
+const ChinaMap: React.FC<ChinaMapProps> = ({ onProvinceClick, selectedProvinceId, provinceData }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const [transform, setTransform] = useState<ZoomTransform>(zoomIdentity);
   const [hoveredProvince, setHoveredProvince] = useState<string | null>(null);
@@ -76,8 +81,13 @@ const ChinaMap: React.FC<ChinaMapProps> = ({ onProvinceClick, selectedProvinceId
       >
         <g transform={transform.toString()}>
           {chinaGeoJson.features.map((geo: any, index: number) => {
-            const provinceName = geo.properties.name;
-            const hasBands = !!provinceData[provinceName];
+            const rawName = geo.properties.name;
+            const provinceName = normalizeProvinceName(rawName);
+            
+            // Check if there are any bands or venues in this province
+            const provData = provinceData[provinceName];
+            const hasBands = provData && provData.cities.some(c => c.bands.length > 0 || (c.venues && c.venues.length > 0));
+            
             const isSelected = selectedProvinceId === provinceName;
             const isHovered = hoveredProvince === provinceName;
 

@@ -1,5 +1,5 @@
-import React from "react";
-import { X, MapPin, Users, Info, Calendar } from "lucide-react";
+import React, { useState } from "react";
+import { X, MapPin, Users, Info, Calendar, Mail } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { Venue } from "../data";
 
@@ -9,6 +9,13 @@ interface VenueModalProps {
 }
 
 const VenueModal: React.FC<VenueModalProps> = ({ venue, onClose }) => {
+  const [showContact, setShowContact] = useState(false);
+
+  // Reset showContact when venue changes
+  React.useEffect(() => {
+    setShowContact(false);
+  }, [venue]);
+
   if (!venue) return null;
 
   return (
@@ -93,6 +100,31 @@ const VenueModal: React.FC<VenueModalProps> = ({ venue, onClose }) => {
                     </div>
                   </div>
                 </div>
+
+                {venue.contactInfo && (
+                  <div className="pt-6 border-t border-white/10">
+                    <h3 className="text-sm text-gray-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+                      <Mail size={16} />
+                      联系方式
+                    </h3>
+                    <div 
+                      onClick={() => setShowContact(!showContact)}
+                      className="bg-white/5 hover:bg-white/10 rounded-xl p-4 border border-white/10 flex items-center gap-3 cursor-pointer transition-colors"
+                    >
+                      <div className="bg-[#ff4e00]/20 p-2 rounded-lg text-[#ff4e00] shrink-0">
+                        <Mail size={20} />
+                      </div>
+                      <div>
+                        <p className="text-white font-medium mb-1">
+                          {showContact ? venue.contactInfo : '点击查看联系方式 (微信/邮箱)'}
+                        </p>
+                        <p className="text-sm text-gray-400">
+                          {showContact ? '请说明来意' : '仅供演出预定及场地合作'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
               
               <div className="space-y-6 border-t md:border-t-0 md:border-l border-white/10 pt-6 md:pt-0 md:pl-8">

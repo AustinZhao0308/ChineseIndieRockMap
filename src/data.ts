@@ -11,6 +11,8 @@ export interface Band {
   imageUrl?: string;
   neteaseUrl?: string;
   xiaohongshuUrl?: string;
+  contactInfo?: string;
+  dbId?: number;
 }
 
 export interface Venue {
@@ -23,6 +25,8 @@ export interface Venue {
   city: string;
   city_zh: string;
   imageUrl?: string;
+  contactInfo?: string;
+  dbId?: number;
 }
 
 export interface City {
@@ -40,14 +44,14 @@ export interface Province {
 }
 
 export const provinceData: Record<string, Province> = {
-  "北京市": {
+  "北京": {
     id: "Beijing",
     name: "Beijing",
     name_zh: "北京",
     cities: [
       {
         name: "Beijing",
-        name_zh: "北京市",
+        name_zh: "北京",
         bands: [
           {
             id: "carsick-cars",
@@ -56,7 +60,7 @@ export const provinceData: Record<string, Province> = {
             genre: "Noise Rock / Indie Rock",
             intro: "成立于2005年的北京，是中国地下摇滚的标志性乐队之一，以其极具破坏性和实验性的噪音吉他音墙闻名。",
             city: "Beijing",
-            city_zh: "北京市",
+            city_zh: "北京",
             imageUrl: "https://picsum.photos/seed/carsick/400/300?grayscale"
           },
           {
@@ -66,7 +70,7 @@ export const provinceData: Record<string, Province> = {
             genre: "Indie Rock / Noise Pop",
             intro: "2005年成立于北京，由主唱/吉他手子健、鼓手石璐和贝斯手一帆组成。他们的音乐充满了青春的躁动与忧郁。",
             city: "Beijing",
-            city_zh: "北京市",
+            city_zh: "北京",
             imageUrl: "https://picsum.photos/seed/hedgehog/400/300?grayscale"
           },
           {
@@ -76,7 +80,7 @@ export const provinceData: Record<string, Province> = {
             genre: "Synth-pop / Punk",
             intro: "中国最具现场活力和创造性偶像摇滚乐队。1996年成立，从朋克到新浪潮，始终引领中国独立音乐的潮流。",
             city: "Beijing",
-            city_zh: "北京市",
+            city_zh: "北京",
             imageUrl: "https://picsum.photos/seed/newpants/400/300?grayscale"
           },
           {
@@ -86,7 +90,7 @@ export const provinceData: Record<string, Province> = {
             genre: "Punk Rock / Indie Rock",
             intro: "2001年成立于北京，是中国最具代表性的朋克乐队之一，以其不羁的台风和浪漫的旋律著称。",
             city: "Beijing",
-            city_zh: "北京市",
+            city_zh: "北京",
             imageUrl: "https://picsum.photos/seed/joyside/400/300?grayscale"
           }
         ],
@@ -99,7 +103,7 @@ export const provinceData: Record<string, Province> = {
             capacity: 200,
             intro: "北京朋克和独立摇滚的圣地，无数年轻乐队从这里起步。",
             city: "Beijing",
-            city_zh: "北京市",
+            city_zh: "北京",
             imageUrl: "https://picsum.photos/seed/schoolbar/400/300?grayscale"
           },
           {
@@ -110,7 +114,7 @@ export const provinceData: Record<string, Province> = {
             capacity: 800,
             intro: "曾经北京最具标志性的Livehouse之一，承载了无数乐迷的青春记忆。",
             city: "Beijing",
-            city_zh: "北京市",
+            city_zh: "北京",
             imageUrl: "https://picsum.photos/seed/yugongyishan/400/300?grayscale"
           },
           {
@@ -121,14 +125,14 @@ export const provinceData: Record<string, Province> = {
             capacity: 600,
             intro: "设备精良的现代化Livehouse，是国内外知名乐队巡演的重要一站。",
             city: "Beijing",
-            city_zh: "北京市",
+            city_zh: "北京",
             imageUrl: "https://picsum.photos/seed/omnispace/400/300?grayscale"
           }
         ]
       }
     ]
   },
-  "河北省": {
+  "河北": {
     id: "Hebei",
     name: "Hebei",
     name_zh: "河北",
@@ -174,7 +178,7 @@ export const provinceData: Record<string, Province> = {
       }
     ]
   },
-  "陕西省": {
+  "陕西": {
     id: "Shaanxi",
     name: "Shaanxi",
     name_zh: "陕西",
@@ -207,7 +211,7 @@ export const provinceData: Record<string, Province> = {
       }
     ]
   },
-  "四川省": {
+  "四川": {
     id: "Sichuan",
     name: "Sichuan",
     name_zh: "四川",
@@ -274,7 +278,7 @@ export const provinceData: Record<string, Province> = {
       }
     ]
   },
-  "广东省": {
+  "广东": {
     id: "Guangdong",
     name: "Guangdong",
     name_zh: "广东",
@@ -353,7 +357,7 @@ export const provinceData: Record<string, Province> = {
       }
     ]
   },
-  "湖北省": {
+  "湖北": {
     id: "Hubei",
     name: "Hubei",
     name_zh: "湖北",
@@ -409,7 +413,7 @@ export const provinceData: Record<string, Province> = {
       }
     ]
   },
-  "台湾省": {
+  "台湾": {
     id: "Taiwan",
     name: "Taiwan",
     name_zh: "台湾",
@@ -476,7 +480,7 @@ export const provinceData: Record<string, Province> = {
       }
     ]
   },
-  "河南省": {
+  "河南": {
     id: "Henan",
     name: "Henan",
     name_zh: "河南",
@@ -499,7 +503,7 @@ export const provinceData: Record<string, Province> = {
       }
     ]
   },
-  "广西壮族自治区": {
+  "广西": {
     id: "Guangxi",
     name: "Guangxi",
     name_zh: "广西",

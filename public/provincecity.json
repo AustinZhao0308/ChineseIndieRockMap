@@ -1,0 +1,634 @@
+{
+  "中国": [
+    {
+      "zh": "北京",
+      "en": "Beijing",
+      "pinyin": "Beijing",
+      "type": "municipality",
+      "cities": [
+        { "zh": "北京", "en": "Beijing", "pinyin": "Beijing", "type": "municipality" }
+      ]
+    },
+    {
+      "zh": "天津",
+      "en": "Tianjin",
+      "pinyin": "Tianjin",
+      "type": "municipality",
+      "cities": [
+        { "zh": "天津", "en": "Tianjin", "pinyin": "Tianjin", "type": "municipality" }
+      ]
+    },
+    {
+      "zh": "上海",
+      "en": "Shanghai",
+      "pinyin": "Shanghai",
+      "type": "municipality",
+      "cities": [
+        { "zh": "上海", "en": "Shanghai", "pinyin": "Shanghai", "type": "municipality" }
+      ]
+    },
+    {
+      "zh": "重庆",
+      "en": "Chongqing",
+      "pinyin": "Chongqing",
+      "type": "municipality",
+      "cities": [
+        { "zh": "重庆", "en": "Chongqing", "pinyin": "Chongqing", "type": "municipality" }
+      ]
+    },
+
+    {
+      "zh": "河北",
+      "en": "Hebei",
+      "pinyin": "Hebei",
+      "type": "province",
+      "cities": [
+        { "zh": "石家庄", "en": "Shijiazhuang", "pinyin": "Shijiazhuang", "type": "prefecture-level city" },
+        { "zh": "唐山", "en": "Tangshan", "pinyin": "Tangshan", "type": "prefecture-level city" },
+        { "zh": "秦皇岛", "en": "Qinhuangdao", "pinyin": "Qinhuangdao", "type": "prefecture-level city" },
+        { "zh": "邯郸", "en": "Handan", "pinyin": "Handan", "type": "prefecture-level city" },
+        { "zh": "邢台", "en": "Xingtai", "pinyin": "Xingtai", "type": "prefecture-level city" },
+        { "zh": "保定", "en": "Baoding", "pinyin": "Baoding", "type": "prefecture-level city" },
+        { "zh": "张家口", "en": "Zhangjiakou", "pinyin": "Zhangjiakou", "type": "prefecture-level city" },
+        { "zh": "承德", "en": "Chengde", "pinyin": "Chengde", "type": "prefecture-level city" },
+        { "zh": "沧州", "en": "Cangzhou", "pinyin": "Cangzhou", "type": "prefecture-level city" },
+        { "zh": "廊坊", "en": "Langfang", "pinyin": "Langfang", "type": "prefecture-level city" },
+        { "zh": "衡水", "en": "Hengshui", "pinyin": "Hengshui", "type": "prefecture-level city" }
+      ]
+    },
+    {
+      "zh": "山西",
+      "en": "Shanxi",
+      "pinyin": "Shanxi",
+      "type": "province",
+      "cities": [
+        { "zh": "太原", "en": "Taiyuan", "pinyin": "Taiyuan", "type": "prefecture-level city" },
+        { "zh": "大同", "en": "Datong", "pinyin": "Datong", "type": "prefecture-level city" },
+        { "zh": "阳泉", "en": "Yangquan", "pinyin": "Yangquan", "type": "prefecture-level city" },
+        { "zh": "长治", "en": "Changzhi", "pinyin": "Changzhi", "type": "prefecture-level city" },
+        { "zh": "晋城", "en": "Jincheng", "pinyin": "Jincheng", "type": "prefecture-level city" },
+        { "zh": "朔州", "en": "Shuozhou", "pinyin": "Shuozhou", "type": "prefecture-level city" },
+        { "zh": "晋中", "en": "Jinzhong", "pinyin": "Jinzhong", "type": "prefecture-level city" },
+        { "zh": "运城", "en": "Yuncheng", "pinyin": "Yuncheng", "type": "prefecture-level city" },
+        { "zh": "忻州", "en": "Xinzhou", "pinyin": "Xinzhou", "type": "prefecture-level city" },
+        { "zh": "临汾", "en": "Linfen", "pinyin": "Linfen", "type": "prefecture-level city" },
+        { "zh": "吕梁", "en": "Lüliang", "pinyin": "Lvliang", "type": "prefecture-level city" }
+      ]
+    },
+    {
+      "zh": "辽宁",
+      "en": "Liaoning",
+      "pinyin": "Liaoning",
+      "type": "province",
+      "cities": [
+        { "zh": "沈阳", "en": "Shenyang", "pinyin": "Shenyang", "type": "prefecture-level city" },
+        { "zh": "大连", "en": "Dalian", "pinyin": "Dalian", "type": "prefecture-level city" },
+        { "zh": "鞍山", "en": "Anshan", "pinyin": "Anshan", "type": "prefecture-level city" },
+        { "zh": "抚顺", "en": "Fushun", "pinyin": "Fushun", "type": "prefecture-level city" },
+        { "zh": "本溪", "en": "Benxi", "pinyin": "Benxi", "type": "prefecture-level city" },
+        { "zh": "丹东", "en": "Dandong", "pinyin": "Dandong", "type": "prefecture-level city" },
+        { "zh": "锦州", "en": "Jinzhou", "pinyin": "Jinzhou", "type": "prefecture-level city" },
+        { "zh": "营口", "en": "Yingkou", "pinyin": "Yingkou", "type": "prefecture-level city" },
+        { "zh": "阜新", "en": "Fuxin", "pinyin": "Fuxin", "type": "prefecture-level city" },
+        { "zh": "辽阳", "en": "Liaoyang", "pinyin": "Liaoyang", "type": "prefecture-level city" },
+        { "zh": "盘锦", "en": "Panjin", "pinyin": "Panjin", "type": "prefecture-level city" },
+        { "zh": "铁岭", "en": "Tieling", "pinyin": "Tieling", "type": "prefecture-level city" },
+        { "zh": "朝阳", "en": "Chaoyang", "pinyin": "Chaoyang", "type": "prefecture-level city" },
+        { "zh": "葫芦岛", "en": "Huludao", "pinyin": "Huludao", "type": "prefecture-level city" }
+      ]
+    },
+    {
+      "zh": "吉林",
+      "en": "Jilin",
+      "pinyin": "Jilin",
+      "type": "province",
+      "cities": [
+        { "zh": "长春", "en": "Changchun", "pinyin": "Changchun", "type": "prefecture-level city" },
+        { "zh": "吉林", "en": "Jilin", "pinyin": "Jilin", "type": "prefecture-level city" },
+        { "zh": "四平", "en": "Siping", "pinyin": "Siping", "type": "prefecture-level city" },
+        { "zh": "辽源", "en": "Liaoyuan", "pinyin": "Liaoyuan", "type": "prefecture-level city" },
+        { "zh": "通化", "en": "Tonghua", "pinyin": "Tonghua", "type": "prefecture-level city" },
+        { "zh": "白山", "en": "Baishan", "pinyin": "Baishan", "type": "prefecture-level city" },
+        { "zh": "松原", "en": "Songyuan", "pinyin": "Songyuan", "type": "prefecture-level city" },
+        { "zh": "白城", "en": "Baicheng", "pinyin": "Baicheng", "type": "prefecture-level city" },
+        { "zh": "延边", "en": "Yanbian", "pinyin": "Yanbian", "type": "autonomous prefecture" }
+      ]
+    },
+    {
+      "zh": "黑龙江",
+      "en": "Heilongjiang",
+      "pinyin": "Heilongjiang",
+      "type": "province",
+      "cities": [
+        { "zh": "哈尔滨", "en": "Harbin", "pinyin": "Haerbin", "type": "prefecture-level city" },
+        { "zh": "齐齐哈尔", "en": "Qiqihar", "pinyin": "Qiqihaer", "type": "prefecture-level city" },
+        { "zh": "鸡西", "en": "Jixi", "pinyin": "Jixi", "type": "prefecture-level city" },
+        { "zh": "鹤岗", "en": "Hegang", "pinyin": "Hegang", "type": "prefecture-level city" },
+        { "zh": "双鸭山", "en": "Shuangyashan", "pinyin": "Shuangyashan", "type": "prefecture-level city" },
+        { "zh": "大庆", "en": "Daqing", "pinyin": "Daqing", "type": "prefecture-level city" },
+        { "zh": "伊春", "en": "Yichun", "pinyin": "Yichun", "type": "prefecture-level city" },
+        { "zh": "佳木斯", "en": "Jiamusi", "pinyin": "Jiamusi", "type": "prefecture-level city" },
+        { "zh": "七台河", "en": "Qitaihe", "pinyin": "Qitaihe", "type": "prefecture-level city" },
+        { "zh": "牡丹江", "en": "Mudanjiang", "pinyin": "Mudanjiang", "type": "prefecture-level city" },
+        { "zh": "黑河", "en": "Heihe", "pinyin": "Heihe", "type": "prefecture-level city" },
+        { "zh": "绥化", "en": "Suihua", "pinyin": "Suihua", "type": "prefecture-level city" },
+        { "zh": "大兴安岭", "en": "Daxing'anling", "pinyin": "Daxinganling", "type": "prefecture" }
+      ]
+    },
+
+    {
+      "zh": "江苏",
+      "en": "Jiangsu",
+      "pinyin": "Jiangsu",
+      "type": "province",
+      "cities": [
+        { "zh": "南京", "en": "Nanjing", "pinyin": "Nanjing", "type": "prefecture-level city" },
+        { "zh": "无锡", "en": "Wuxi", "pinyin": "Wuxi", "type": "prefecture-level city" },
+        { "zh": "徐州", "en": "Xuzhou", "pinyin": "Xuzhou", "type": "prefecture-level city" },
+        { "zh": "常州", "en": "Changzhou", "pinyin": "Changzhou", "type": "prefecture-level city" },
+        { "zh": "苏州", "en": "Suzhou", "pinyin": "Suzhou", "type": "prefecture-level city" },
+        { "zh": "南通", "en": "Nantong", "pinyin": "Nantong", "type": "prefecture-level city" },
+        { "zh": "连云港", "en": "Lianyungang", "pinyin": "Lianyungang", "type": "prefecture-level city" },
+        { "zh": "淮安", "en": "Huai'an", "pinyin": "Huaian", "type": "prefecture-level city" },
+        { "zh": "盐城", "en": "Yancheng", "pinyin": "Yancheng", "type": "prefecture-level city" },
+        { "zh": "扬州", "en": "Yangzhou", "pinyin": "Yangzhou", "type": "prefecture-level city" },
+        { "zh": "镇江", "en": "Zhenjiang", "pinyin": "Zhenjiang", "type": "prefecture-level city" },
+        { "zh": "泰州", "en": "Taizhou", "pinyin": "Taizhou", "type": "prefecture-level city" },
+        { "zh": "宿迁", "en": "Suqian", "pinyin": "Suqian", "type": "prefecture-level city" }
+      ]
+    },
+    {
+      "zh": "浙江",
+      "en": "Zhejiang",
+      "pinyin": "Zhejiang",
+      "type": "province",
+      "cities": [
+        { "zh": "杭州", "en": "Hangzhou", "pinyin": "Hangzhou", "type": "prefecture-level city" },
+        { "zh": "宁波", "en": "Ningbo", "pinyin": "Ningbo", "type": "prefecture-level city" },
+        { "zh": "温州", "en": "Wenzhou", "pinyin": "Wenzhou", "type": "prefecture-level city" },
+        { "zh": "嘉兴", "en": "Jiaxing", "pinyin": "Jiaxing", "type": "prefecture-level city" },
+        { "zh": "湖州", "en": "Huzhou", "pinyin": "Huzhou", "type": "prefecture-level city" },
+        { "zh": "绍兴", "en": "Shaoxing", "pinyin": "Shaoxing", "type": "prefecture-level city" },
+        { "zh": "金华", "en": "Jinhua", "pinyin": "Jinhua", "type": "prefecture-level city" },
+        { "zh": "衢州", "en": "Quzhou", "pinyin": "Quzhou", "type": "prefecture-level city" },
+        { "zh": "舟山", "en": "Zhoushan", "pinyin": "Zhoushan", "type": "prefecture-level city" },
+        { "zh": "台州", "en": "Taizhou", "pinyin": "Taizhou", "type": "prefecture-level city" },
+        { "zh": "丽水", "en": "Lishui", "pinyin": "Lishui", "type": "prefecture-level city" }
+      ]
+    },
+    {
+      "zh": "安徽",
+      "en": "Anhui",
+      "pinyin": "Anhui",
+      "type": "province",
+      "cities": [
+        { "zh": "合肥", "en": "Hefei", "pinyin": "Hefei", "type": "prefecture-level city" },
+        { "zh": "芜湖", "en": "Wuhu", "pinyin": "Wuhu", "type": "prefecture-level city" },
+        { "zh": "蚌埠", "en": "Bengbu", "pinyin": "Bengbu", "type": "prefecture-level city" },
+        { "zh": "淮南", "en": "Huainan", "pinyin": "Huainan", "type": "prefecture-level city" },
+        { "zh": "马鞍山", "en": "Ma'anshan", "pinyin": "Maanshan", "type": "prefecture-level city" },
+        { "zh": "淮北", "en": "Huaibei", "pinyin": "Huaibei", "type": "prefecture-level city" },
+        { "zh": "铜陵", "en": "Tongling", "pinyin": "Tongling", "type": "prefecture-level city" },
+        { "zh": "安庆", "en": "Anqing", "pinyin": "Anqing", "type": "prefecture-level city" },
+        { "zh": "黄山", "en": "Huangshan", "pinyin": "Huangshan", "type": "prefecture-level city" },
+        { "zh": "滁州", "en": "Chuzhou", "pinyin": "Chuzhou", "type": "prefecture-level city" },
+        { "zh": "阜阳", "en": "Fuyang", "pinyin": "Fuyang", "type": "prefecture-level city" },
+        { "zh": "宿州", "en": "Suzhou", "pinyin": "Suzhou", "type": "prefecture-level city" },
+        { "zh": "六安", "en": "Lu'an", "pinyin": "Luan", "type": "prefecture-level city" },
+        { "zh": "亳州", "en": "Bozhou", "pinyin": "Bozhou", "type": "prefecture-level city" },
+        { "zh": "池州", "en": "Chizhou", "pinyin": "Chizhou", "type": "prefecture-level city" },
+        { "zh": "宣城", "en": "Xuancheng", "pinyin": "Xuancheng", "type": "prefecture-level city" }
+      ]
+    },
+    {
+      "zh": "福建",
+      "en": "Fujian",
+      "pinyin": "Fujian",
+      "type": "province",
+      "cities": [
+        { "zh": "福州", "en": "Fuzhou", "pinyin": "Fuzhou", "type": "prefecture-level city" },
+        { "zh": "厦门", "en": "Xiamen", "pinyin": "Xiamen", "type": "prefecture-level city" },
+        { "zh": "莆田", "en": "Putian", "pinyin": "Putian", "type": "prefecture-level city" },
+        { "zh": "三明", "en": "Sanming", "pinyin": "Sanming", "type": "prefecture-level city" },
+        { "zh": "泉州", "en": "Quanzhou", "pinyin": "Quanzhou", "type": "prefecture-level city" },
+        { "zh": "漳州", "en": "Zhangzhou", "pinyin": "Zhangzhou", "type": "prefecture-level city" },
+        { "zh": "南平", "en": "Nanping", "pinyin": "Nanping", "type": "prefecture-level city" },
+        { "zh": "龙岩", "en": "Longyan", "pinyin": "Longyan", "type": "prefecture-level city" },
+        { "zh": "宁德", "en": "Ningde", "pinyin": "Ningde", "type": "prefecture-level city" }
+      ]
+    },
+    {
+      "zh": "江西",
+      "en": "Jiangxi",
+      "pinyin": "Jiangxi",
+      "type": "province",
+      "cities": [
+        { "zh": "南昌", "en": "Nanchang", "pinyin": "Nanchang", "type": "prefecture-level city" },
+        { "zh": "景德镇", "en": "Jingdezhen", "pinyin": "Jingdezhen", "type": "prefecture-level city" },
+        { "zh": "萍乡", "en": "Pingxiang", "pinyin": "Pingxiang", "type": "prefecture-level city" },
+        { "zh": "九江", "en": "Jiujiang", "pinyin": "Jiujiang", "type": "prefecture-level city" },
+        { "zh": "新余", "en": "Xinyu", "pinyin": "Xinyu", "type": "prefecture-level city" },
+        { "zh": "鹰潭", "en": "Yingtan", "pinyin": "Yingtan", "type": "prefecture-level city" },
+        { "zh": "赣州", "en": "Ganzhou", "pinyin": "Ganzhou", "type": "prefecture-level city" },
+        { "zh": "吉安", "en": "Ji'an", "pinyin": "Jian", "type": "prefecture-level city" },
+        { "zh": "宜春", "en": "Yichun", "pinyin": "Yichun", "type": "prefecture-level city" },
+        { "zh": "抚州", "en": "Fuzhou", "pinyin": "Fuzhou", "type": "prefecture-level city" },
+        { "zh": "上饶", "en": "Shangrao", "pinyin": "Shangrao", "type": "prefecture-level city" }
+      ]
+    },
+
+    {
+      "zh": "山东",
+      "en": "Shandong",
+      "pinyin": "Shandong",
+      "type": "province",
+      "cities": [
+        { "zh": "济南", "en": "Jinan", "pinyin": "Jinan", "type": "prefecture-level city" },
+        { "zh": "青岛", "en": "Qingdao", "pinyin": "Qingdao", "type": "prefecture-level city" },
+        { "zh": "淄博", "en": "Zibo", "pinyin": "Zibo", "type": "prefecture-level city" },
+        { "zh": "枣庄", "en": "Zaozhuang", "pinyin": "Zaozhuang", "type": "prefecture-level city" },
+        { "zh": "东营", "en": "Dongying", "pinyin": "Dongying", "type": "prefecture-level city" },
+        { "zh": "烟台", "en": "Yantai", "pinyin": "Yantai", "type": "prefecture-level city" },
+        { "zh": "潍坊", "en": "Weifang", "pinyin": "Weifang", "type": "prefecture-level city" },
+        { "zh": "济宁", "en": "Jining", "pinyin": "Jining", "type": "prefecture-level city" },
+        { "zh": "泰安", "en": "Tai'an", "pinyin": "Taian", "type": "prefecture-level city" },
+        { "zh": "威海", "en": "Weihai", "pinyin": "Weihai", "type": "prefecture-level city" },
+        { "zh": "日照", "en": "Rizhao", "pinyin": "Rizhao", "type": "prefecture-level city" },
+        { "zh": "临沂", "en": "Linyi", "pinyin": "Linyi", "type": "prefecture-level city" },
+        { "zh": "德州", "en": "Dezhou", "pinyin": "Dezhou", "type": "prefecture-level city" },
+        { "zh": "聊城", "en": "Liaocheng", "pinyin": "Liaocheng", "type": "prefecture-level city" },
+        { "zh": "滨州", "en": "Binzhou", "pinyin": "Binzhou", "type": "prefecture-level city" },
+        { "zh": "菏泽", "en": "Heze", "pinyin": "Heze", "type": "prefecture-level city" }
+      ]
+    },
+    {
+      "zh": "河南",
+      "en": "Henan",
+      "pinyin": "Henan",
+      "type": "province",
+      "cities": [
+        { "zh": "郑州", "en": "Zhengzhou", "pinyin": "Zhengzhou", "type": "prefecture-level city" },
+        { "zh": "开封", "en": "Kaifeng", "pinyin": "Kaifeng", "type": "prefecture-level city" },
+        { "zh": "洛阳", "en": "Luoyang", "pinyin": "Luoyang", "type": "prefecture-level city" },
+        { "zh": "平顶山", "en": "Pingdingshan", "pinyin": "Pingdingshan", "type": "prefecture-level city" },
+        { "zh": "安阳", "en": "Anyang", "pinyin": "Anyang", "type": "prefecture-level city" },
+        { "zh": "鹤壁", "en": "Hebi", "pinyin": "Hebi", "type": "prefecture-level city" },
+        { "zh": "新乡", "en": "Xinxiang", "pinyin": "Xinxiang", "type": "prefecture-level city" },
+        { "zh": "焦作", "en": "Jiaozuo", "pinyin": "Jiaozuo", "type": "prefecture-level city" },
+        { "zh": "濮阳", "en": "Puyang", "pinyin": "Puyang", "type": "prefecture-level city" },
+        { "zh": "许昌", "en": "Xuchang", "pinyin": "Xuchang", "type": "prefecture-level city" },
+        { "zh": "漯河", "en": "Luohe", "pinyin": "Luohe", "type": "prefecture-level city" },
+        { "zh": "三门峡", "en": "Sanmenxia", "pinyin": "Sanmenxia", "type": "prefecture-level city" },
+        { "zh": "南阳", "en": "Nanyang", "pinyin": "Nanyang", "type": "prefecture-level city" },
+        { "zh": "商丘", "en": "Shangqiu", "pinyin": "Shangqiu", "type": "prefecture-level city" },
+        { "zh": "信阳", "en": "Xinyang", "pinyin": "Xinyang", "type": "prefecture-level city" },
+        { "zh": "周口", "en": "Zhoukou", "pinyin": "Zhoukou", "type": "prefecture-level city" },
+        { "zh": "驻马店", "en": "Zhumadian", "pinyin": "Zhumadian", "type": "prefecture-level city" },
+        { "zh": "济源", "en": "Jiyuan", "pinyin": "Jiyuan", "type": "sub-prefecture-level city" }
+      ]
+    },
+    {
+      "zh": "湖北",
+      "en": "Hubei",
+      "pinyin": "Hubei",
+      "type": "province",
+      "cities": [
+        { "zh": "武汉", "en": "Wuhan", "pinyin": "Wuhan", "type": "prefecture-level city" },
+        { "zh": "黄石", "en": "Huangshi", "pinyin": "Huangshi", "type": "prefecture-level city" },
+        { "zh": "十堰", "en": "Shiyan", "pinyin": "Shiyan", "type": "prefecture-level city" },
+        { "zh": "宜昌", "en": "Yichang", "pinyin": "Yichang", "type": "prefecture-level city" },
+        { "zh": "襄阳", "en": "Xiangyang", "pinyin": "Xiangyang", "type": "prefecture-level city" },
+        { "zh": "鄂州", "en": "Ezhou", "pinyin": "Ezhou", "type": "prefecture-level city" },
+        { "zh": "荆门", "en": "Jingmen", "pinyin": "Jingmen", "type": "prefecture-level city" },
+        { "zh": "孝感", "en": "Xiaogan", "pinyin": "Xiaogan", "type": "prefecture-level city" },
+        { "zh": "荆州", "en": "Jingzhou", "pinyin": "Jingzhou", "type": "prefecture-level city" },
+        { "zh": "黄冈", "en": "Huanggang", "pinyin": "Huanggang", "type": "prefecture-level city" },
+        { "zh": "咸宁", "en": "Xianning", "pinyin": "Xianning", "type": "prefecture-level city" },
+        { "zh": "随州", "en": "Suizhou", "pinyin": "Suizhou", "type": "prefecture-level city" },
+        { "zh": "恩施", "en": "Enshi", "pinyin": "Enshi", "type": "autonomous prefecture" }
+      ]
+    },
+    {
+      "zh": "湖南",
+      "en": "Hunan",
+      "pinyin": "Hunan",
+      "type": "province",
+      "cities": [
+        { "zh": "长沙", "en": "Changsha", "pinyin": "Changsha", "type": "prefecture-level city" },
+        { "zh": "株洲", "en": "Zhuzhou", "pinyin": "Zhuzhou", "type": "prefecture-level city" },
+        { "zh": "湘潭", "en": "Xiangtan", "pinyin": "Xiangtan", "type": "prefecture-level city" },
+        { "zh": "衡阳", "en": "Hengyang", "pinyin": "Hengyang", "type": "prefecture-level city" },
+        { "zh": "邵阳", "en": "Shaoyang", "pinyin": "Shaoyang", "type": "prefecture-level city" },
+        { "zh": "岳阳", "en": "Yueyang", "pinyin": "Yueyang", "type": "prefecture-level city" },
+        { "zh": "常德", "en": "Changde", "pinyin": "Changde", "type": "prefecture-level city" },
+        { "zh": "张家界", "en": "Zhangjiajie", "pinyin": "Zhangjiajie", "type": "prefecture-level city" },
+        { "zh": "益阳", "en": "Yiyang", "pinyin": "Yiyang", "type": "prefecture-level city" },
+        { "zh": "郴州", "en": "Chenzhou", "pinyin": "Chenzhou", "type": "prefecture-level city" },
+        { "zh": "永州", "en": "Yongzhou", "pinyin": "Yongzhou", "type": "prefecture-level city" },
+        { "zh": "怀化", "en": "Huaihua", "pinyin": "Huaihua", "type": "prefecture-level city" },
+        { "zh": "娄底", "en": "Loudi", "pinyin": "Loudi", "type": "prefecture-level city" },
+        { "zh": "湘西", "en": "Xiangxi", "pinyin": "Xiangxi", "type": "autonomous prefecture" }
+      ]
+    },
+
+    {
+      "zh": "广东",
+      "en": "Guangdong",
+      "pinyin": "Guangdong",
+      "type": "province",
+      "cities": [
+        { "zh": "广州", "en": "Guangzhou", "pinyin": "Guangzhou", "type": "prefecture-level city" },
+        { "zh": "深圳", "en": "Shenzhen", "pinyin": "Shenzhen", "type": "prefecture-level city" },
+        { "zh": "珠海", "en": "Zhuhai", "pinyin": "Zhuhai", "type": "prefecture-level city" },
+        { "zh": "汕头", "en": "Shantou", "pinyin": "Shantou", "type": "prefecture-level city" },
+        { "zh": "佛山", "en": "Foshan", "pinyin": "Foshan", "type": "prefecture-level city" },
+        { "zh": "韶关", "en": "Shaoguan", "pinyin": "Shaoguan", "type": "prefecture-level city" },
+        { "zh": "湛江", "en": "Zhanjiang", "pinyin": "Zhanjiang", "type": "prefecture-level city" },
+        { "zh": "肇庆", "en": "Zhaoqing", "pinyin": "Zhaoqing", "type": "prefecture-level city" },
+        { "zh": "江门", "en": "Jiangmen", "pinyin": "Jiangmen", "type": "prefecture-level city" },
+        { "zh": "茂名", "en": "Maoming", "pinyin": "Maoming", "type": "prefecture-level city" },
+        { "zh": "惠州", "en": "Huizhou", "pinyin": "Huizhou", "type": "prefecture-level city" },
+        { "zh": "梅州", "en": "Meizhou", "pinyin": "Meizhou", "type": "prefecture-level city" },
+        { "zh": "汕尾", "en": "Shanwei", "pinyin": "Shanwei", "type": "prefecture-level city" },
+        { "zh": "河源", "en": "Heyuan", "pinyin": "Heyuan", "type": "prefecture-level city" },
+        { "zh": "阳江", "en": "Yangjiang", "pinyin": "Yangjiang", "type": "prefecture-level city" },
+        { "zh": "清远", "en": "Qingyuan", "pinyin": "Qingyuan", "type": "prefecture-level city" },
+        { "zh": "东莞", "en": "Dongguan", "pinyin": "Dongguan", "type": "prefecture-level city" },
+        { "zh": "中山", "en": "Zhongshan", "pinyin": "Zhongshan", "type": "prefecture-level city" },
+        { "zh": "潮州", "en": "Chaozhou", "pinyin": "Chaozhou", "type": "prefecture-level city" },
+        { "zh": "揭阳", "en": "Jieyang", "pinyin": "Jieyang", "type": "prefecture-level city" },
+        { "zh": "云浮", "en": "Yunfu", "pinyin": "Yunfu", "type": "prefecture-level city" }
+      ]
+    },
+    {
+      "zh": "广西",
+      "en": "Guangxi",
+      "pinyin": "Guangxi",
+      "type": "autonomous region",
+      "cities": [
+        { "zh": "南宁", "en": "Nanning", "pinyin": "Nanning", "type": "prefecture-level city" },
+        { "zh": "柳州", "en": "Liuzhou", "pinyin": "Liuzhou", "type": "prefecture-level city" },
+        { "zh": "桂林", "en": "Guilin", "pinyin": "Guilin", "type": "prefecture-level city" },
+        { "zh": "梧州", "en": "Wuzhou", "pinyin": "Wuzhou", "type": "prefecture-level city" },
+        { "zh": "北海", "en": "Beihai", "pinyin": "Beihai", "type": "prefecture-level city" },
+        { "zh": "防城港", "en": "Fangchenggang", "pinyin": "Fangchenggang", "type": "prefecture-level city" },
+        { "zh": "钦州", "en": "Qinzhou", "pinyin": "Qinzhou", "type": "prefecture-level city" },
+        { "zh": "贵港", "en": "Guigang", "pinyin": "Guigang", "type": "prefecture-level city" },
+        { "zh": "玉林", "en": "Yulin", "pinyin": "Yulin", "type": "prefecture-level city" },
+        { "zh": "百色", "en": "Baise", "pinyin": "Baise", "type": "prefecture-level city" },
+        { "zh": "贺州", "en": "Hezhou", "pinyin": "Hezhou", "type": "prefecture-level city" },
+        { "zh": "河池", "en": "Hechi", "pinyin": "Hechi", "type": "prefecture-level city" },
+        { "zh": "来宾", "en": "Laibin", "pinyin": "Laibin", "type": "prefecture-level city" },
+        { "zh": "崇左", "en": "Chongzuo", "pinyin": "Chongzuo", "type": "prefecture-level city" }
+      ]
+    },
+    {
+      "zh": "海南",
+      "en": "Hainan",
+      "pinyin": "Hainan",
+      "type": "province",
+      "cities": [
+        { "zh": "海口", "en": "Haikou", "pinyin": "Haikou", "type": "prefecture-level city" },
+        { "zh": "三亚", "en": "Sanya", "pinyin": "Sanya", "type": "prefecture-level city" },
+        { "zh": "三沙", "en": "Sansha", "pinyin": "Sansha", "type": "prefecture-level city" },
+        { "zh": "儋州", "en": "Danzhou", "pinyin": "Danzhou", "type": "prefecture-level city" }
+      ]
+    },
+
+    {
+      "zh": "四川",
+      "en": "Sichuan",
+      "pinyin": "Sichuan",
+      "type": "province",
+      "cities": [
+        { "zh": "成都", "en": "Chengdu", "pinyin": "Chengdu", "type": "prefecture-level city" },
+        { "zh": "自贡", "en": "Zigong", "pinyin": "Zigong", "type": "prefecture-level city" },
+        { "zh": "攀枝花", "en": "Panzhihua", "pinyin": "Panzhihua", "type": "prefecture-level city" },
+        { "zh": "泸州", "en": "Luzhou", "pinyin": "Luzhou", "type": "prefecture-level city" },
+        { "zh": "德阳", "en": "Deyang", "pinyin": "Deyang", "type": "prefecture-level city" },
+        { "zh": "绵阳", "en": "Mianyang", "pinyin": "Mianyang", "type": "prefecture-level city" },
+        { "zh": "广元", "en": "Guangyuan", "pinyin": "Guangyuan", "type": "prefecture-level city" },
+        { "zh": "遂宁", "en": "Suining", "pinyin": "Suining", "type": "prefecture-level city" },
+        { "zh": "内江", "en": "Neijiang", "pinyin": "Neijiang", "type": "prefecture-level city" },
+        { "zh": "乐山", "en": "Leshan", "pinyin": "Leshan", "type": "prefecture-level city" },
+        { "zh": "南充", "en": "Nanchong", "pinyin": "Nanchong", "type": "prefecture-level city" },
+        { "zh": "眉山", "en": "Meishan", "pinyin": "Meishan", "type": "prefecture-level city" },
+        { "zh": "宜宾", "en": "Yibin", "pinyin": "Yibin", "type": "prefecture-level city" },
+        { "zh": "广安", "en": "Guang'an", "pinyin": "Guangan", "type": "prefecture-level city" },
+        { "zh": "达州", "en": "Dazhou", "pinyin": "Dazhou", "type": "prefecture-level city" },
+        { "zh": "雅安", "en": "Ya'an", "pinyin": "Yaan", "type": "prefecture-level city" },
+        { "zh": "巴中", "en": "Bazhong", "pinyin": "Bazhong", "type": "prefecture-level city" },
+        { "zh": "资阳", "en": "Ziyang", "pinyin": "Ziyang", "type": "prefecture-level city" },
+        { "zh": "阿坝", "en": "Aba", "pinyin": "Aba", "type": "autonomous prefecture" },
+        { "zh": "甘孜", "en": "Garze", "pinyin": "Ganzi", "type": "autonomous prefecture" },
+        { "zh": "凉山", "en": "Liangshan", "pinyin": "Liangshan", "type": "autonomous prefecture" }
+      ]
+    },
+    {
+      "zh": "贵州",
+      "en": "Guizhou",
+      "pinyin": "Guizhou",
+      "type": "province",
+      "cities": [
+        { "zh": "贵阳", "en": "Guiyang", "pinyin": "Guiyang", "type": "prefecture-level city" },
+        { "zh": "六盘水", "en": "Liupanshui", "pinyin": "Liupanshui", "type": "prefecture-level city" },
+        { "zh": "遵义", "en": "Zunyi", "pinyin": "Zunyi", "type": "prefecture-level city" },
+        { "zh": "安顺", "en": "Anshun", "pinyin": "Anshun", "type": "prefecture-level city" },
+        { "zh": "毕节", "en": "Bijie", "pinyin": "Bijie", "type": "prefecture-level city" },
+        { "zh": "铜仁", "en": "Tongren", "pinyin": "Tongren", "type": "prefecture-level city" },
+        { "zh": "黔西南", "en": "Qianxinan", "pinyin": "Qianxinan", "type": "autonomous prefecture" },
+        { "zh": "黔东南", "en": "Qiandongnan", "pinyin": "Qiandongnan", "type": "autonomous prefecture" },
+        { "zh": "黔南", "en": "Qiannan", "pinyin": "Qiannan", "type": "autonomous prefecture" }
+      ]
+    },
+    {
+      "zh": "云南",
+      "en": "Yunnan",
+      "pinyin": "Yunnan",
+      "type": "province",
+      "cities": [
+        { "zh": "昆明", "en": "Kunming", "pinyin": "Kunming", "type": "prefecture-level city" },
+        { "zh": "曲靖", "en": "Qujing", "pinyin": "Qujing", "type": "prefecture-level city" },
+        { "zh": "玉溪", "en": "Yuxi", "pinyin": "Yuxi", "type": "prefecture-level city" },
+        { "zh": "保山", "en": "Baoshan", "pinyin": "Baoshan", "type": "prefecture-level city" },
+        { "zh": "昭通", "en": "Zhaotong", "pinyin": "Zhaotong", "type": "prefecture-level city" },
+        { "zh": "丽江", "en": "Lijiang", "pinyin": "Lijiang", "type": "prefecture-level city" },
+        { "zh": "普洱", "en": "Pu'er", "pinyin": "Puer", "type": "prefecture-level city" },
+        { "zh": "临沧", "en": "Lincang", "pinyin": "Lincang", "type": "prefecture-level city" },
+        { "zh": "楚雄", "en": "Chuxiong", "pinyin": "Chuxiong", "type": "autonomous prefecture" },
+        { "zh": "红河", "en": "Honghe", "pinyin": "Honghe", "type": "autonomous prefecture" },
+        { "zh": "文山", "en": "Wenshan", "pinyin": "Wenshan", "type": "autonomous prefecture" },
+        { "zh": "西双版纳", "en": "Xishuangbanna", "pinyin": "Xishuangbanna", "type": "autonomous prefecture" },
+        { "zh": "大理", "en": "Dali", "pinyin": "Dali", "type": "autonomous prefecture" },
+        { "zh": "德宏", "en": "Dehong", "pinyin": "Dehong", "type": "autonomous prefecture" },
+        { "zh": "怒江", "en": "Nujiang", "pinyin": "Nujiang", "type": "autonomous prefecture" },
+        { "zh": "迪庆", "en": "Diqing", "pinyin": "Diqing", "type": "autonomous prefecture" }
+      ]
+    },
+
+    {
+      "zh": "陕西",
+      "en": "Shaanxi",
+      "pinyin": "Shaanxi",
+      "type": "province",
+      "cities": [
+        { "zh": "西安", "en": "Xi'an", "pinyin": "Xian", "type": "prefecture-level city" },
+        { "zh": "铜川", "en": "Tongchuan", "pinyin": "Tongchuan", "type": "prefecture-level city" },
+        { "zh": "宝鸡", "en": "Baoji", "pinyin": "Baoji", "type": "prefecture-level city" },
+        { "zh": "咸阳", "en": "Xianyang", "pinyin": "Xianyang", "type": "prefecture-level city" },
+        { "zh": "渭南", "en": "Weinan", "pinyin": "Weinan", "type": "prefecture-level city" },
+        { "zh": "延安", "en": "Yan'an", "pinyin": "Yanan", "type": "prefecture-level city" },
+        { "zh": "汉中", "en": "Hanzhong", "pinyin": "Hanzhong", "type": "prefecture-level city" },
+        { "zh": "榆林", "en": "Yulin", "pinyin": "Yulin", "type": "prefecture-level city" },
+        { "zh": "安康", "en": "Ankang", "pinyin": "Ankang", "type": "prefecture-level city" },
+        { "zh": "商洛", "en": "Shangluo", "pinyin": "Shangluo", "type": "prefecture-level city" }
+      ]
+    },
+    {
+      "zh": "甘肃",
+      "en": "Gansu",
+      "pinyin": "Gansu",
+      "type": "province",
+      "cities": [
+        { "zh": "兰州", "en": "Lanzhou", "pinyin": "Lanzhou", "type": "prefecture-level city" },
+        { "zh": "嘉峪关", "en": "Jiayuguan", "pinyin": "Jiayuguan", "type": "prefecture-level city" },
+        { "zh": "金昌", "en": "Jinchang", "pinyin": "Jinchang", "type": "prefecture-level city" },
+        { "zh": "白银", "en": "Baiyin", "pinyin": "Baiyin", "type": "prefecture-level city" },
+        { "zh": "天水", "en": "Tianshui", "pinyin": "Tianshui", "type": "prefecture-level city" },
+        { "zh": "武威", "en": "Wuwei", "pinyin": "Wuwei", "type": "prefecture-level city" },
+        { "zh": "张掖", "en": "Zhangye", "pinyin": "Zhangye", "type": "prefecture-level city" },
+        { "zh": "平凉", "en": "Pingliang", "pinyin": "Pingliang", "type": "prefecture-level city" },
+        { "zh": "酒泉", "en": "Jiuquan", "pinyin": "Jiuquan", "type": "prefecture-level city" },
+        { "zh": "庆阳", "en": "Qingyang", "pinyin": "Qingyang", "type": "prefecture-level city" },
+        { "zh": "定西", "en": "Dingxi", "pinyin": "Dingxi", "type": "prefecture-level city" },
+        { "zh": "陇南", "en": "Longnan", "pinyin": "Longnan", "type": "prefecture-level city" },
+        { "zh": "临夏", "en": "Linxia", "pinyin": "Linxia", "type": "autonomous prefecture" },
+        { "zh": "甘南", "en": "Gannan", "pinyin": "Gannan", "type": "autonomous prefecture" }
+      ]
+    },
+    {
+      "zh": "青海",
+      "en": "Qinghai",
+      "pinyin": "Qinghai",
+      "type": "province",
+      "cities": [
+        { "zh": "西宁", "en": "Xining", "pinyin": "Xining", "type": "prefecture-level city" },
+        { "zh": "海东", "en": "Haidong", "pinyin": "Haidong", "type": "prefecture-level city" },
+        { "zh": "海北", "en": "Haibei", "pinyin": "Haibei", "type": "autonomous prefecture" },
+        { "zh": "黄南", "en": "Huangnan", "pinyin": "Huangnan", "type": "autonomous prefecture" },
+        { "zh": "海南", "en": "Hainan Tibetan", "pinyin": "Hainan", "type": "autonomous prefecture" },
+        { "zh": "果洛", "en": "Golog", "pinyin": "Guoluo", "type": "autonomous prefecture" },
+        { "zh": "玉树", "en": "Yushu", "pinyin": "Yushu", "type": "autonomous prefecture" },
+        { "zh": "海西", "en": "Haixi", "pinyin": "Haixi", "type": "autonomous prefecture" }
+      ]
+    },
+    {
+      "zh": "宁夏",
+      "en": "Ningxia",
+      "pinyin": "Ningxia",
+      "type": "autonomous region",
+      "cities": [
+        { "zh": "银川", "en": "Yinchuan", "pinyin": "Yinchuan", "type": "prefecture-level city" },
+        { "zh": "石嘴山", "en": "Shizuishan", "pinyin": "Shizuishan", "type": "prefecture-level city" },
+        { "zh": "吴忠", "en": "Wuzhong", "pinyin": "Wuzhong", "type": "prefecture-level city" },
+        { "zh": "固原", "en": "Guyuan", "pinyin": "Guyuan", "type": "prefecture-level city" },
+        { "zh": "中卫", "en": "Zhongwei", "pinyin": "Zhongwei", "type": "prefecture-level city" }
+      ]
+    },
+    {
+      "zh": "新疆",
+      "en": "Xinjiang",
+      "pinyin": "Xinjiang",
+      "type": "autonomous region",
+      "cities": [
+        { "zh": "乌鲁木齐", "en": "Ürümqi", "pinyin": "Wulumuqi", "type": "prefecture-level city" },
+        { "zh": "克拉玛依", "en": "Karamay", "pinyin": "Kelamayi", "type": "prefecture-level city" },
+        { "zh": "吐鲁番", "en": "Turpan", "pinyin": "Tulufan", "type": "prefecture-level city" },
+        { "zh": "哈密", "en": "Hami", "pinyin": "Hami", "type": "prefecture-level city" },
+        { "zh": "昌吉", "en": "Changji", "pinyin": "Changji", "type": "autonomous prefecture" },
+        { "zh": "博尔塔拉", "en": "Bortala", "pinyin": "Boertala", "type": "autonomous prefecture" },
+        { "zh": "巴音郭楞", "en": "Bayingolin", "pinyin": "Bayinguoleng", "type": "autonomous prefecture" },
+        { "zh": "阿克苏", "en": "Aksu", "pinyin": "Akesu", "type": "prefecture" },
+        { "zh": "克孜勒苏", "en": "Kizilsu", "pinyin": "Kezilesu", "type": "autonomous prefecture" },
+        { "zh": "喀什", "en": "Kashgar", "pinyin": "Kashi", "type": "prefecture" },
+        { "zh": "和田", "en": "Hotan", "pinyin": "Hetian", "type": "prefecture" },
+        { "zh": "伊犁", "en": "Ili", "pinyin": "Yili", "type": "autonomous prefecture" },
+        { "zh": "塔城", "en": "Tacheng", "pinyin": "Tacheng", "type": "prefecture" },
+        { "zh": "阿勒泰", "en": "Altay", "pinyin": "Aletai", "type": "prefecture" }
+      ]
+    },
+
+    {
+      "zh": "西藏",
+      "en": "Xizang",
+      "pinyin": "Xizang",
+      "type": "autonomous region",
+      "cities": [
+        { "zh": "拉萨", "en": "Lhasa", "pinyin": "Lasa", "type": "prefecture-level city" },
+        { "zh": "日喀则", "en": "Shigatse", "pinyin": "Rikaze", "type": "prefecture-level city" },
+        { "zh": "昌都", "en": "Qamdo", "pinyin": "Changdu", "type": "prefecture-level city" },
+        { "zh": "林芝", "en": "Nyingchi", "pinyin": "Linzhi", "type": "prefecture-level city" },
+        { "zh": "山南", "en": "Shannan", "pinyin": "Shannan", "type": "prefecture-level city" },
+        { "zh": "那曲", "en": "Nagqu", "pinyin": "Naqu", "type": "prefecture-level city" },
+        { "zh": "阿里", "en": "Ngari", "pinyin": "Ali", "type": "prefecture" }
+      ]
+    },
+    {
+      "zh": "内蒙古",
+      "en": "Inner Mongolia",
+      "pinyin": "Neimenggu",
+      "type": "autonomous region",
+      "cities": [
+        { "zh": "呼和浩特", "en": "Hohhot", "pinyin": "Huhehaote", "type": "prefecture-level city" },
+        { "zh": "包头", "en": "Baotou", "pinyin": "Baotou", "type": "prefecture-level city" },
+        { "zh": "乌海", "en": "Wuhai", "pinyin": "Wuhai", "type": "prefecture-level city" },
+        { "zh": "赤峰", "en": "Chifeng", "pinyin": "Chifeng", "type": "prefecture-level city" },
+        { "zh": "通辽", "en": "Tongliao", "pinyin": "Tongliao", "type": "prefecture-level city" },
+        { "zh": "鄂尔多斯", "en": "Ordos", "pinyin": "Eerduosi", "type": "prefecture-level city" },
+        { "zh": "呼伦贝尔", "en": "Hulunbuir", "pinyin": "Hulunbeier", "type": "prefecture-level city" },
+        { "zh": "巴彦淖尔", "en": "Bayannur", "pinyin": "Bayannaoer", "type": "prefecture-level city" },
+        { "zh": "乌兰察布", "en": "Ulanqab", "pinyin": "Wulanchabu", "type": "prefecture-level city" },
+        { "zh": "兴安盟", "en": "Hinggan League", "pinyin": "Xing'an Meng", "type": "league" },
+        { "zh": "锡林郭勒盟", "en": "Xilin Gol League", "pinyin": "Xilinguole Meng", "type": "league" },
+        { "zh": "阿拉善盟", "en": "Alxa League", "pinyin": "Alashan Meng", "type": "league" }
+      ]
+    },
+
+    {
+      "zh": "台湾",
+      "en": "Taiwan",
+      "pinyin": "Taiwan",
+      "type": "province",
+      "cities": [
+        { "zh": "台北", "en": "Taipei", "pinyin": "Taibei", "type": "municipality" },
+        { "zh": "新北", "en": "New Taipei", "pinyin": "Xinbei", "type": "municipality" },
+        { "zh": "桃园", "en": "Taoyuan", "pinyin": "Taoyuan", "type": "municipality" },
+        { "zh": "台中", "en": "Taichung", "pinyin": "Taizhong", "type": "municipality" },
+        { "zh": "台南", "en": "Tainan", "pinyin": "Tainan", "type": "municipality" },
+        { "zh": "高雄", "en": "Kaohsiung", "pinyin": "Gaoxiong", "type": "municipality" },
+        { "zh": "基隆", "en": "Keelung", "pinyin": "Jilong", "type": "provincial city" },
+        { "zh": "新竹", "en": "Hsinchu", "pinyin": "Xinzhu", "type": "provincial city" },
+        { "zh": "嘉义", "en": "Chiayi", "pinyin": "Jiayi", "type": "provincial city" }
+      ]
+    },
+
+    {
+      "zh": "香港",
+      "en": "Hong Kong",
+      "pinyin": "Xianggang",
+      "type": "special administrative region",
+      "cities": [
+        { "zh": "香港", "en": "Hong Kong", "pinyin": "Xianggang", "type": "special administrative region" }
+      ]
+    },
+    {
+      "zh": "澳门",
+      "en": "Macau",
+      "pinyin": "Aomen",
+      "type": "special administrative region",
+      "cities": [
+        { "zh": "澳门", "en": "Macau", "pinyin": "Aomen", "type": "special administrative region" }
+      ]
+    }
+  ]
+}
