@@ -31,47 +31,48 @@ const BandModal: React.FC<BandModalProps> = ({ band, onClose }) => {
           animate={{ scale: 1, y: 0, opacity: 1 }}
           exit={{ scale: 0.95, y: 20, opacity: 0 }}
           transition={{ type: "spring", stiffness: 300, damping: 30 }}
-          className="relative w-full max-w-3xl bg-[#151619] rounded-2xl overflow-hidden shadow-2xl border border-white/10"
+          className="relative w-full max-w-3xl max-h-[90vh] flex flex-col bg-[#151619] rounded-2xl overflow-hidden shadow-2xl border border-white/10"
         >
-          {/* Header Image Area */}
-          <div className="relative h-64 md:h-80 w-full overflow-hidden">
-            <img
-              src={band.imageUrl || `https://picsum.photos/seed/${band.id}/800/400?grayscale`}
-              alt={band.name_zh}
-              className="w-full h-full object-cover opacity-60"
-              referrerPolicy="no-referrer"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-[#151619] via-[#151619]/50 to-transparent" />
-            
-            <button
-              onClick={onClose}
-              className="absolute top-4 right-4 p-2 rounded-full bg-black/50 hover:bg-[#ff4e00] transition-colors text-white backdrop-blur-md z-10"
-            >
-              <X size={24} />
-            </button>
+          <button
+            onClick={onClose}
+            className="absolute top-4 right-4 p-2 rounded-full bg-black/50 hover:bg-[#ff4e00] transition-colors text-white backdrop-blur-md z-50"
+          >
+            <X size={24} />
+          </button>
 
-            <div className="absolute bottom-6 left-6 right-6">
-              <div className="flex items-end justify-between">
-                <div>
-                  <span className="inline-block px-3 py-1 bg-[#ff4e00]/20 text-[#ff4e00] border border-[#ff4e00]/30 rounded-full text-xs font-medium uppercase tracking-widest mb-3">
-                    {band.genre}
-                  </span>
-                  <span className="inline-block px-3 py-1 bg-white/10 text-gray-300 border border-white/20 rounded-full text-xs font-medium tracking-widest mb-3 ml-2">
-                    {band.city_zh}
-                  </span>
-                  <h2 className="text-4xl md:text-5xl font-serif text-white tracking-tight mb-1">
-                    {band.name_zh}
-                  </h2>
-                  <p className="text-lg text-gray-300 font-mono tracking-wider">
-                    {band.name}
-                  </p>
+          <div className="overflow-y-auto flex-1 custom-scrollbar">
+            {/* Header Image Area */}
+            <div className="relative h-64 md:h-80 w-full shrink-0 overflow-hidden">
+              <img
+                src={band.imageUrl || `https://picsum.photos/seed/${band.id}/800/400?grayscale`}
+                alt={band.name_zh}
+                className="w-full h-full object-cover opacity-60"
+                referrerPolicy="no-referrer"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#151619] via-[#151619]/50 to-transparent" />
+
+              <div className="absolute bottom-6 left-6 right-6">
+                <div className="flex items-end justify-between">
+                  <div>
+                    <span className="inline-block px-3 py-1 bg-[#ff4e00]/20 text-[#ff4e00] border border-[#ff4e00]/30 rounded-full text-xs font-medium uppercase tracking-widest mb-3">
+                      {band.genre}
+                    </span>
+                    <span className="inline-block px-3 py-1 bg-white/10 text-gray-300 border border-white/20 rounded-full text-xs font-medium tracking-widest mb-3 ml-2">
+                      {band.city_zh}
+                    </span>
+                    <h2 className="text-4xl md:text-5xl font-serif text-white tracking-tight mb-1">
+                      {band.name_zh}
+                    </h2>
+                    <p className="text-lg text-gray-300 font-mono tracking-wider">
+                      {band.name}
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          {/* Content Area */}
-          <div className="p-6 md:p-8">
+            {/* Content Area */}
+            <div className="p-6 md:p-8">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               <div className="md:col-span-2 space-y-6">
                 <div>
@@ -79,7 +80,7 @@ const BandModal: React.FC<BandModalProps> = ({ band, onClose }) => {
                     <Disc size={16} />
                     乐队介绍
                   </h3>
-                  <p className="text-gray-300 leading-relaxed text-lg font-serif">
+                  <p className="text-gray-300 leading-relaxed text-lg font-serif whitespace-pre-wrap">
                     {band.intro}
                   </p>
                 </div>
@@ -157,6 +158,7 @@ const BandModal: React.FC<BandModalProps> = ({ band, onClose }) => {
                 </div>
               </div>
             </div>
+          </div>
           </div>
         </motion.div>
       </motion.div>

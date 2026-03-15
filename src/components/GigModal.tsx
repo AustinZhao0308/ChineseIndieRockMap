@@ -119,6 +119,7 @@ const GigModal: React.FC<GigModalProps> = ({ isOpen, onClose }) => {
                   </div>
                   <ul className="space-y-3 text-sm text-gray-300">
                     <li className="font-medium text-white">used to be sad</li>
+                    <li>if we could stay</li>
                     <li>奶盖儿</li>
                     <li>Tiny Time</li>
                     <li>Hello Franky</li>

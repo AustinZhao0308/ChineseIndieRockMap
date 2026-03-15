@@ -15,6 +15,9 @@ const ProvincePanel: React.FC<ProvincePanelProps> = ({ province, onClose, onBand
     typeof window !== "undefined" ? window.innerWidth < 768 : false
   );
   const [activeTab, setActiveTab] = React.useState<'bands' | 'venues'>('bands');
+  const [isExpanded, setIsExpanded] = React.useState(false);
+  const touchStartY = React.useRef(0);
+  const scrollTopAtStart = React.useRef(0);
 
   React.useEffect(() => {
     const handleResize = () => {
@@ -27,22 +30,56 @@ const ProvincePanel: React.FC<ProvincePanelProps> = ({ province, onClose, onBand
   React.useEffect(() => {
     if (province) {
       setActiveTab('bands');
+      setIsExpanded(false);
     }
   }, [province]);
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    if (isMobile) {
+      if (e.currentTarget.scrollTop > 10 && !isExpanded) {
+        setIsExpanded(true);
+      }
+    }
+  };
+
+  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (isMobile) {
+      touchStartY.current = e.touches[0].clientY;
+      scrollTopAtStart.current = e.currentTarget.scrollTop;
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (isMobile && isExpanded) {
+      const touchEndY = e.changedTouches[0].clientY;
+      const deltaY = touchEndY - touchStartY.current;
+
+      // Only collapse if we started at the top and swiped down significantly
+      if (scrollTopAtStart.current <= 0 && deltaY > 50) {
+        setIsExpanded(false);
+      }
+    }
+  };
 
   return (
     <AnimatePresence>
       {province && (
         <motion.div
-          initial={isMobile ? { y: "100%", opacity: 0 } : { x: "100%", opacity: 0 }}
-          animate={isMobile ? { y: 0, opacity: 1 } : { x: 0, opacity: 1 }}
-          exit={isMobile ? { y: "100%", opacity: 0 } : { x: "100%", opacity: 0 }}
+          initial={isMobile ? { y: "100%", opacity: 0, height: "55vh" } : { x: "100%", opacity: 0, height: "100%" }}
+          animate={isMobile ? { y: 0, opacity: 1, height: isExpanded ? "85vh" : "55vh" } : { x: 0, opacity: 1, height: "100%" }}
+          exit={isMobile ? { y: "100%", opacity: 0, height: isExpanded ? "85vh" : "55vh" } : { x: "100%", opacity: 0, height: "100%" }}
           transition={{ type: "spring", stiffness: 300, damping: 30 }}
-          className="absolute bottom-0 md:top-0 right-0 w-full md:w-[400px] h-[55vh] md:h-full bg-[#151619]/90 backdrop-blur-xl border-t md:border-t-0 md:border-l border-white/10 shadow-[0_-10px_40px_rgba(0,0,0,0.5)] md:shadow-2xl z-20 overflow-y-auto scrollbar-hide rounded-t-3xl md:rounded-none"
+          onScroll={handleScroll}
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+          className="absolute bottom-0 md:top-0 right-0 w-full md:w-[400px] bg-[#151619]/90 backdrop-blur-xl border-t md:border-t-0 md:border-l border-white/10 shadow-[0_-10px_40px_rgba(0,0,0,0.5)] md:shadow-2xl z-40 overflow-y-auto scrollbar-hide rounded-t-3xl md:rounded-none"
         >
           <div className="p-6">
             {/* Mobile drag indicator */}
-            <div className="w-12 h-1.5 bg-white/20 rounded-full mx-auto mb-6 md:hidden" />
+            <div 
+              className="w-12 h-1.5 bg-white/20 rounded-full mx-auto mb-6 md:hidden cursor-pointer" 
+              onClick={() => setIsExpanded(!isExpanded)}
+            />
             
             <div className="flex justify-between items-center mb-6">
               <div>

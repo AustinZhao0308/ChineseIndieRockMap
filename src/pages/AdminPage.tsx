@@ -29,6 +29,8 @@ export default function AdminPage() {
     // Band specific
     band_id: '',
     genre: '',
+    netease_url: '',
+    xiaohongshu_url: '',
     // Venue specific
     venue_id: '',
     address: '',
@@ -192,6 +194,8 @@ export default function AdminPage() {
       name: item.name,
       name_zh: item.name_zh,
       genre: item.genre || '',
+      netease_url: item.netease_url || '',
+      xiaohongshu_url: item.xiaohongshu_url || '',
       address: item.address || '',
       capacity: item.capacity ? item.capacity.toString() : '',
       intro: item.intro,
@@ -206,6 +210,7 @@ export default function AdminPage() {
     setFormData({
       province_id: '', province_zh: '', city_id: '', city_zh: '',
       band_id: '', venue_id: '', name: '', name_zh: '', genre: '', 
+      netease_url: '', xiaohongshu_url: '',
       address: '', capacity: '', intro: '', image_url: '', contact_info: ''
     });
   };
@@ -301,12 +306,18 @@ export default function AdminPage() {
               )}
 
               <div className="grid grid-cols-2 gap-4">
-                <input required placeholder="Name (EN)" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-full" />
-                <input required placeholder="Name (ZH)" value={formData.name_zh} onChange={e => setFormData({...formData, name_zh: e.target.value})} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-full" />
+                <input required placeholder="Name (副标题)" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-full" />
+                <input required placeholder="Name (主标题)" value={formData.name_zh} onChange={e => setFormData({...formData, name_zh: e.target.value})} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-full" />
               </div>
 
               {activeTab === 'bands' ? (
-                <input required placeholder="Genre (e.g. Indie Rock)" value={formData.genre} onChange={e => setFormData({...formData, genre: e.target.value})} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-full" />
+                <>
+                  <input required placeholder="Genre (e.g. Indie Rock)" value={formData.genre} onChange={e => setFormData({...formData, genre: e.target.value})} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-full" />
+                  <div className="grid grid-cols-2 gap-4">
+                    <input placeholder="NetEase Cloud Music URL" value={formData.netease_url} onChange={e => setFormData({...formData, netease_url: e.target.value})} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-full" />
+                    <input placeholder="Xiaohongshu URL" value={formData.xiaohongshu_url} onChange={e => setFormData({...formData, xiaohongshu_url: e.target.value})} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-full" />
+                  </div>
+                </>
               ) : (
                 <>
                   <input required placeholder="Address" value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-full" />

@@ -62,6 +62,8 @@ export function useProvinceData() {
             city_zh: cityZh,
             imageUrl: b.image_url,
             contactInfo: b.contact_info,
+            neteaseUrl: b.netease_url,
+            xiaohongshuUrl: b.xiaohongshu_url,
             dbId: b.id
           });
         });
