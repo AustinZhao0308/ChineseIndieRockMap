@@ -3,7 +3,7 @@ import { geoMercator, geoPath, geoCentroid } from "d3-geo";
 import { select } from "d3-selection";
 import { zoom as d3Zoom, zoomIdentity, ZoomTransform } from "d3-zoom";
 import "d3-transition";
-import chinaGeoJson from "../../public/china.json";
+import chinaGeoJson from "../china.json";
 import { Province } from "../data";
 
 interface ChinaMapProps {
