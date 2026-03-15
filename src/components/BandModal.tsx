@@ -120,40 +120,44 @@ const BandModal: React.FC<BandModalProps> = ({ band, onClose }) => {
                   
                   <div className="flex flex-col gap-4">
                     {/* NetEase Cloud Music Link */}
-                    <a 
-                      href={band.neteaseUrl || `https://music.163.com/#/search/m/?s=${encodeURIComponent(band.name_zh)}&type=100`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="group flex items-center gap-4 bg-[#C20C0C]/10 hover:bg-[#C20C0C]/20 rounded-xl p-4 border border-[#C20C0C]/30 transition-all duration-300"
-                    >
-                      <div className="w-12 h-12 rounded-full bg-[#C20C0C] flex items-center justify-center text-white shadow-[0_0_15px_rgba(194,12,12,0.4)] group-hover:scale-110 transition-transform duration-300 shrink-0">
-                        <Music size={20} />
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="text-white font-medium text-sm mb-0.5">网易云音乐</span>
-                        <span className="text-xs text-gray-400 group-hover:text-gray-300 transition-colors">
-                          主页试听
-                        </span>
-                      </div>
-                    </a>
+                    {band.neteaseUrl && (
+                      <a 
+                        href={band.neteaseUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="group flex items-center gap-4 bg-[#C20C0C]/10 hover:bg-[#C20C0C]/20 rounded-xl p-4 border border-[#C20C0C]/30 transition-all duration-300"
+                      >
+                        <div className="w-12 h-12 rounded-full bg-[#C20C0C] flex items-center justify-center text-white shadow-[0_0_15px_rgba(194,12,12,0.4)] group-hover:scale-110 transition-transform duration-300 shrink-0">
+                          <Music size={20} />
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-white font-medium text-sm mb-0.5">网易云音乐</span>
+                          <span className="text-xs text-gray-400 group-hover:text-gray-300 transition-colors">
+                            主页试听
+                          </span>
+                        </div>
+                      </a>
+                    )}
 
                     {/* Xiaohongshu Link */}
-                    <a 
-                      href={band.xiaohongshuUrl || `https://www.xiaohongshu.com/search_result?keyword=${encodeURIComponent(band.name_zh)}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="group flex items-center gap-4 bg-[#ff2442]/10 hover:bg-[#ff2442]/20 rounded-xl p-4 border border-[#ff2442]/30 transition-all duration-300"
-                    >
-                      <div className="w-12 h-12 rounded-full bg-[#ff2442] flex items-center justify-center text-white shadow-[0_0_15px_rgba(255,36,66,0.4)] group-hover:scale-110 transition-transform duration-300 shrink-0">
-                        <BookHeart size={20} />
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="text-white font-medium text-sm mb-0.5">小红书</span>
-                        <span className="text-xs text-gray-400 group-hover:text-gray-300 transition-colors">
-                          查看动态
-                        </span>
-                      </div>
-                    </a>
+                    {band.xiaohongshuUrl && (
+                      <a 
+                        href={band.xiaohongshuUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="group flex items-center gap-4 bg-[#ff2442]/10 hover:bg-[#ff2442]/20 rounded-xl p-4 border border-[#ff2442]/30 transition-all duration-300"
+                      >
+                        <div className="w-12 h-12 rounded-full bg-[#ff2442] flex items-center justify-center text-white shadow-[0_0_15px_rgba(255,36,66,0.4)] group-hover:scale-110 transition-transform duration-300 shrink-0">
+                          <BookHeart size={20} />
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-white font-medium text-sm mb-0.5">小红书</span>
+                          <span className="text-xs text-gray-400 group-hover:text-gray-300 transition-colors">
+                            查看动态
+                          </span>
+                        </div>
+                      </a>
+                    )}
                   </div>
                 </div>
               </div>

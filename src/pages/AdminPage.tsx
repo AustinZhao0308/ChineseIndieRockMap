@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Lock, LogOut, Plus, Trash2, Edit2, Music, MapPin } from 'lucide-react';
+import { Lock, LogOut, Plus, Trash2, Edit2, Music, MapPin, X } from 'lucide-react';
 
 export default function AdminPage() {
   const [token, setToken] = useState(localStorage.getItem('adminToken'));
@@ -104,6 +104,64 @@ export default function AdminPage() {
   const handleLogout = () => {
     setToken(null);
     localStorage.removeItem('adminToken');
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 1024 * 1024) {
+      showMessage('File size exceeds 1MB limit', 'error');
+      return;
+    }
+
+    const uploadData = new FormData();
+    uploadData.append('image', file);
+
+    try {
+      showMessage('Uploading image...', 'success');
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: uploadData
+      });
+      
+      const data = await res.json();
+      if (res.ok) {
+        setFormData(prev => ({ ...prev, image_url: data.url }));
+        showMessage('Image uploaded successfully', 'success');
+      } else {
+        showMessage(data.error || 'Failed to upload image');
+      }
+    } catch (err) {
+      showMessage('Network error during upload');
+    }
+  };
+
+  const handleRemoveImage = async () => {
+    const currentUrl = formData.image_url;
+    if (!currentUrl) return;
+
+    // If it's a local upload, delete it from server
+    if (currentUrl.startsWith('/uploads/')) {
+      try {
+        await fetch('/api/upload', {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ url: currentUrl })
+        });
+      } catch (err) {
+        console.error('Failed to delete image from server', err);
+      }
+    }
+
+    // Clear the form data
+    setFormData(prev => ({ ...prev, image_url: '' }));
   };
 
   const handleProvinceChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -326,7 +384,28 @@ export default function AdminPage() {
               )}
 
               <textarea required placeholder="Introduction" value={formData.intro} onChange={e => setFormData({...formData, intro: e.target.value})} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-full h-24 resize-none" />
-              <input placeholder="Image URL (optional)" value={formData.image_url} onChange={e => setFormData({...formData, image_url: e.target.value})} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-full" />
+              
+              <div className="space-y-2">
+                <label className="text-sm text-gray-400 block">Image (Max 1MB)</label>
+                <div className="flex gap-2">
+                  <input type="file" accept="image/*" onChange={handleImageUpload} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm flex-1 file:mr-4 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:bg-white/10 file:text-white hover:file:bg-white/20" />
+                  <input placeholder="Or enter Image URL" value={formData.image_url} onChange={e => setFormData({...formData, image_url: e.target.value})} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm flex-1" />
+                </div>
+                {formData.image_url && (
+                  <div className="mt-2 relative inline-block">
+                    <img src={formData.image_url} alt="Preview" className="h-20 w-auto rounded border border-white/10 object-cover" />
+                    <button
+                      type="button"
+                      onClick={handleRemoveImage}
+                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 shadow-lg transition-colors"
+                      title="Remove Image"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                )}
+              </div>
+
               <input placeholder="Contact Info (WeChat/Email) (optional)" value={formData.contact_info} onChange={e => setFormData({...formData, contact_info: e.target.value})} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-full" />
               
               <div className="flex gap-3 pt-4">

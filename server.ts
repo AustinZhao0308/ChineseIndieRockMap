@@ -3,6 +3,8 @@ import Database from 'better-sqlite3';
 import jwt from 'jsonwebtoken';
 import dotenv from 'dotenv';
 import path from 'path';
+import fs from 'fs';
+import multer from 'multer';
 import { createServer as createViteServer } from 'vite';
 
 dotenv.config();
@@ -13,6 +15,39 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
 const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_jwt_key_for_indie_rock_map';
 
 app.use(express.json());
+
+// Ensure uploads directory exists
+const uploadsDir = path.join(process.cwd(), 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
+// Serve uploaded files statically
+app.use('/uploads', express.static(uploadsDir));
+
+// Configure multer for image uploads (max 1MB)
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, uploadsDir);
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const ext = path.extname(file.originalname);
+    cb(null, file.fieldname + '-' + uniqueSuffix + ext);
+  }
+});
+
+const upload = multer({ 
+  storage: storage,
+  limits: { fileSize: 1024 * 1024 }, // 1MB limit
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Not an image! Please upload an image.'));
+    }
+  }
+});
 
 // Initialize SQLite Database
 const db = new Database('bands.db');
@@ -151,6 +186,60 @@ app.post('/api/login', (req, res) => {
   }
 });
 
+// Helper to delete local image
+const deleteLocalImage = (imageUrl: string) => {
+  if (imageUrl && imageUrl.startsWith('/uploads/')) {
+    const filename = path.basename(imageUrl);
+    const filepath = path.join(uploadsDir, filename);
+    // Basic security check to prevent directory traversal
+    if (filepath.startsWith(uploadsDir) && fs.existsSync(filepath)) {
+      try {
+        fs.unlinkSync(filepath);
+      } catch (err) {
+        console.error('Failed to delete image file:', err);
+      }
+    }
+  }
+};
+
+// Image Upload API
+app.post('/api/upload', authenticateToken, (req, res) => {
+  upload.single('image')(req, res, function (err) {
+    if (err instanceof multer.MulterError) {
+      // A Multer error occurred when uploading.
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({ error: 'File size exceeds 1MB limit' });
+      }
+      return res.status(400).json({ error: err.message });
+    } else if (err) {
+      // An unknown error occurred when uploading.
+      return res.status(400).json({ error: err.message });
+    }
+
+    // Everything went fine.
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    // Return the URL to the uploaded file
+    const fileUrl = `/uploads/${req.file.filename}`;
+    res.json({ url: fileUrl });
+  });
+});
+
+app.delete('/api/upload', authenticateToken, (req, res) => {
+  const { url } = req.body;
+  if (!url || !url.startsWith('/uploads/')) {
+    return res.status(400).json({ error: 'Invalid image URL' });
+  }
+  try {
+    deleteLocalImage(url);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Bands API
 app.get('/api/bands', (req, res) => {
   const bands = db.prepare('SELECT * FROM bands').all();
@@ -186,6 +275,10 @@ app.put('/api/bands/:id', authenticateToken, (req, res) => {
 
 app.delete('/api/bands/:id', authenticateToken, (req, res) => {
   try {
+    const band = db.prepare('SELECT image_url FROM bands WHERE id = ?').get(req.params.id) as any;
+    if (band && band.image_url) {
+      deleteLocalImage(band.image_url);
+    }
     db.prepare('DELETE FROM bands WHERE id = ?').run(req.params.id);
     res.json({ success: true });
   } catch (error: any) {
@@ -228,6 +321,10 @@ app.put('/api/venues/:id', authenticateToken, (req, res) => {
 
 app.delete('/api/venues/:id', authenticateToken, (req, res) => {
   try {
+    const venue = db.prepare('SELECT image_url FROM venues WHERE id = ?').get(req.params.id) as any;
+    if (venue && venue.image_url) {
+      deleteLocalImage(venue.image_url);
+    }
     db.prepare('DELETE FROM venues WHERE id = ?').run(req.params.id);
     res.json({ success: true });
   } catch (error: any) {
