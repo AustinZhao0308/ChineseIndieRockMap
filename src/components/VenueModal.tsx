@@ -18,11 +18,30 @@ const VenueModal: React.FC<VenueModalProps> = ({ venue, onClose }) => {
     setCopied(false);
   }, [venue]);
 
-  const handleCopy = (e: React.MouseEvent, text: string) => {
+  const handleCopy = async (e: React.MouseEvent, text: string) => {
     e.stopPropagation();
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      // Fallback for iframe/non-secure context
+      const textArea = document.createElement("textarea");
+      textArea.value = text;
+      textArea.style.position = "fixed";
+      textArea.style.left = "-9999px";
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      try {
+        document.execCommand('copy');
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      } catch (error) {
+        console.error('Copy failed', error);
+      }
+      textArea.remove();
+    }
   };
 
   const getContactDetails = (info: string) => {
