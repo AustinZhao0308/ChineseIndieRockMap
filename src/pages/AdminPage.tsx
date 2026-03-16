@@ -38,6 +38,7 @@ export default function AdminPage() {
     venue_id: '',
     address: '',
     capacity: '',
+    ticket_url: '',
     // Common
     name: '',
     name_zh: '',
@@ -273,6 +274,7 @@ export default function AdminPage() {
       xiaohongshu_url: item.xiaohongshu_url || '',
       address: item.address || '',
       capacity: item.capacity ? item.capacity.toString() : '',
+      ticket_url: item.ticket_url || '',
       intro: item.intro,
       image_url: item.image_url || '',
       contact_info: item.contact_info || ''
@@ -289,7 +291,7 @@ export default function AdminPage() {
     setFormData({
       province_id: '', province_zh: '', city_id: '', city_zh: '',
       band_id: '', venue_id: '', name: '', name_zh: '', genre: '', 
-      netease_url: '', xiaohongshu_url: '',
+      netease_url: '', xiaohongshu_url: '', ticket_url: '',
       address: '', capacity: '', intro: '', image_url: '', contact_info: ''
     });
   };
@@ -400,7 +402,10 @@ export default function AdminPage() {
               ) : (
                 <>
                   <input required placeholder="Address" value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-full" />
-                  <input required type="number" placeholder="Capacity (e.g. 500)" value={formData.capacity} onChange={e => setFormData({...formData, capacity: e.target.value})} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-full" />
+                  <div className="grid grid-cols-2 gap-4">
+                    <input required type="number" placeholder="Capacity (e.g. 500)" value={formData.capacity} onChange={e => setFormData({...formData, capacity: e.target.value})} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-full" />
+                    <input placeholder="Ticket URL (e.g. ShowStart)" value={formData.ticket_url} onChange={e => setFormData({...formData, ticket_url: e.target.value})} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-full" />
+                  </div>
                 </>
               )}
 

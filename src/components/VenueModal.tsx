@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { X, MapPin, Users, Info, Calendar, Mail, MessageCircle, Copy, CheckCircle2 } from "lucide-react";
+import { X, MapPin, Users, Info, Calendar, Mail, MessageCircle, Copy, CheckCircle2, Ticket } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { Venue } from "../data";
 
@@ -190,29 +190,31 @@ const VenueModal: React.FC<VenueModalProps> = ({ venue, onClose }) => {
                 <div>
                   <h3 className="text-sm text-gray-500 uppercase tracking-widest mb-4 flex items-center gap-2">
                     <Calendar size={16} />
-                    近期演出 (Demo)
+                    近期演出
                   </h3>
                   
-                  {/* Mock Events List */}
-                  <div className="space-y-3">
-                    {[1, 2, 3].map((i) => (
-                      <div key={i} className="bg-black/40 rounded-xl p-3 border border-white/5 hover:border-white/20 transition-colors cursor-pointer group">
-                        <div className="flex justify-between items-start mb-2">
-                          <span className="text-xs text-[#ff4e00] font-mono">10/{15 + i}</span>
-                          <span className="text-[10px] text-gray-500 border border-gray-700 px-1.5 rounded">售票中</span>
-                        </div>
-                        <p className="text-sm text-white font-medium truncate group-hover:text-[#ff4e00] transition-colors">
-                          {['独立摇滚之夜', '后朋克派对', '民谣不插电专场'][i-1]}
-                        </p>
-                        <p className="text-xs text-gray-400 mt-1 truncate">
-                          {['Carsick Cars / 刺猬', '法兹 FAZI', '五条人'][i-1]}
-                        </p>
+                  {venue.ticketUrl ? (
+                    <a 
+                      href={venue.ticketUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="group flex items-center gap-4 bg-[#ff4e00]/10 hover:bg-[#ff4e00]/20 rounded-xl p-4 border border-[#ff4e00]/30 transition-all duration-300"
+                    >
+                      <div className="w-12 h-12 rounded-full bg-[#ff4e00] flex items-center justify-center text-white shadow-[0_0_15px_rgba(255,78,0,0.4)] group-hover:scale-110 transition-transform duration-300 shrink-0">
+                        <Ticket size={20} />
                       </div>
-                    ))}
-                  </div>
-                  <button className="w-full mt-4 py-2 rounded-lg border border-white/10 text-sm text-gray-400 hover:text-white hover:bg-white/5 transition-colors">
-                    查看全部演出
-                  </button>
+                      <div className="flex flex-col">
+                        <span className="text-white font-medium text-sm mb-0.5">购票链接</span>
+                        <span className="text-xs text-gray-400 group-hover:text-gray-300 transition-colors">
+                          查看近期演出及购票
+                        </span>
+                      </div>
+                    </a>
+                  ) : (
+                    <div className="bg-white/5 rounded-xl p-4 border border-white/10 text-center">
+                      <p className="text-sm text-gray-400">暂无购票链接</p>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

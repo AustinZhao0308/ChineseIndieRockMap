@@ -84,7 +84,8 @@ db.exec(`
     capacity INTEGER,
     intro TEXT NOT NULL,
     image_url TEXT,
-    contact_info TEXT
+    contact_info TEXT,
+    ticket_url TEXT
   );
 `);
 
@@ -92,6 +93,7 @@ db.exec(`
 try { db.exec('ALTER TABLE bands ADD COLUMN contact_info TEXT;'); } catch (e) {}
 try { db.exec('ALTER TABLE bands ADD COLUMN netease_url TEXT;'); } catch (e) {}
 try { db.exec('ALTER TABLE bands ADD COLUMN xiaohongshu_url TEXT;'); } catch (e) {}
+try { db.exec('ALTER TABLE venues ADD COLUMN ticket_url TEXT;'); } catch (e) {}
 
 // Seed initial data if empty
 const countBands = db.prepare('SELECT COUNT(*) as count FROM bands').get() as { count: number };
@@ -296,12 +298,12 @@ app.get('/api/venues', (req, res) => {
 });
 
 app.post('/api/venues', authenticateToken, (req, res) => {
-  const { province_id, province_zh, city_id, city_zh, venue_id, name, name_zh, address, capacity, intro, image_url, contact_info } = req.body;
+  const { province_id, province_zh, city_id, city_zh, venue_id, name, name_zh, address, capacity, intro, image_url, contact_info, ticket_url } = req.body;
   try {
     const info = db.prepare(`
-      INSERT INTO venues (province_id, province_zh, city_id, city_zh, venue_id, name, name_zh, address, capacity, intro, image_url, contact_info)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(province_id, province_zh, city_id, city_zh, venue_id, name, name_zh, address, capacity, intro, image_url, contact_info);
+      INSERT INTO venues (province_id, province_zh, city_id, city_zh, venue_id, name, name_zh, address, capacity, intro, image_url, contact_info, ticket_url)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(province_id, province_zh, city_id, city_zh, venue_id, name, name_zh, address, capacity, intro, image_url, contact_info, ticket_url);
     res.json({ id: info.lastInsertRowid });
   } catch (error: any) {
     res.status(400).json({ error: error.message });
@@ -309,13 +311,13 @@ app.post('/api/venues', authenticateToken, (req, res) => {
 });
 
 app.put('/api/venues/:id', authenticateToken, (req, res) => {
-  const { province_id, province_zh, city_id, city_zh, venue_id, name, name_zh, address, capacity, intro, image_url, contact_info } = req.body;
+  const { province_id, province_zh, city_id, city_zh, venue_id, name, name_zh, address, capacity, intro, image_url, contact_info, ticket_url } = req.body;
   try {
     db.prepare(`
       UPDATE venues SET 
-        province_id = ?, province_zh = ?, city_id = ?, city_zh = ?, venue_id = ?, name = ?, name_zh = ?, address = ?, capacity = ?, intro = ?, image_url = ?, contact_info = ?
+        province_id = ?, province_zh = ?, city_id = ?, city_zh = ?, venue_id = ?, name = ?, name_zh = ?, address = ?, capacity = ?, intro = ?, image_url = ?, contact_info = ?, ticket_url = ?
       WHERE id = ?
-    `).run(province_id, province_zh, city_id, city_zh, venue_id, name, name_zh, address, capacity, intro, image_url, contact_info, req.params.id);
+    `).run(province_id, province_zh, city_id, city_zh, venue_id, name, name_zh, address, capacity, intro, image_url, contact_info, ticket_url, req.params.id);
     res.json({ success: true });
   } catch (error: any) {
     res.status(400).json({ error: error.message });

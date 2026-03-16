@@ -26,6 +26,7 @@ export interface Venue {
   city_zh: string;
   imageUrl?: string;
   contactInfo?: string;
+  ticketUrl?: string;
   dbId?: number;
 }
 

@@ -106,6 +106,7 @@ export function useProvinceData() {
             city_zh: cityZh,
             imageUrl: v.image_url,
             contactInfo: v.contact_info,
+            ticketUrl: v.ticket_url,
             dbId: v.id
           });
         });
