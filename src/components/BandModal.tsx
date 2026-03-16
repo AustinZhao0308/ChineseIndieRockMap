@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { X, Disc, Headphones, Music, BookHeart, Mail } from "lucide-react";
+import { X, Disc, Headphones, Music, BookHeart, Mail, MessageCircle, Copy, CheckCircle2 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { Band } from "../data";
 
@@ -10,11 +10,30 @@ interface BandModalProps {
 
 const BandModal: React.FC<BandModalProps> = ({ band, onClose }) => {
   const [showContact, setShowContact] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   // Reset showContact when band changes
   React.useEffect(() => {
     setShowContact(false);
+    setCopied(false);
   }, [band]);
+
+  const handleCopy = (e: React.MouseEvent, text: string) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const getContactDetails = (info: string) => {
+    if (info.startsWith('wechat:')) {
+      return { type: '微信', value: info.substring(7), icon: <MessageCircle size={20} /> };
+    } else if (info.startsWith('email:')) {
+      return { type: '邮箱', value: info.substring(6), icon: <Mail size={20} /> };
+    }
+    const isEmail = info.includes('@');
+    return { type: isEmail ? '邮箱' : '微信', value: info, icon: isEmail ? <Mail size={20} /> : <MessageCircle size={20} /> };
+  };
 
   if (!band) return null;
 
@@ -85,30 +104,50 @@ const BandModal: React.FC<BandModalProps> = ({ band, onClose }) => {
                   </p>
                 </div>
                 
-                {band.contactInfo && (
+                {band.contactInfo && (() => {
+                  const contact = getContactDetails(band.contactInfo);
+                  return (
                   <div className="pt-6 border-t border-white/10">
                     <h3 className="text-sm text-gray-500 uppercase tracking-widest mb-4 flex items-center gap-2">
-                      <Mail size={16} />
+                      {contact.icon}
                       联系方式
                     </h3>
                     <div 
-                      onClick={() => setShowContact(!showContact)}
-                      className="bg-white/5 hover:bg-white/10 rounded-xl p-4 border border-white/10 flex items-center gap-3 cursor-pointer transition-colors"
+                      onClick={() => !showContact && setShowContact(true)}
+                      className={`bg-white/5 rounded-xl p-4 border border-white/10 flex items-center justify-between gap-3 transition-colors ${!showContact ? 'cursor-pointer hover:bg-white/10' : ''}`}
                     >
-                      <div className="bg-[#ff4e00]/20 p-2 rounded-lg text-[#ff4e00] shrink-0">
-                        <Mail size={20} />
+                      <div className="flex items-center gap-3">
+                        <div className="bg-[#ff4e00]/20 p-2 rounded-lg text-[#ff4e00] shrink-0">
+                          {contact.icon}
+                        </div>
+                        <div>
+                          <p className="text-white font-medium mb-1 flex items-center gap-2">
+                            {showContact ? (
+                              <>
+                                <span className="text-gray-400 text-sm">{contact.type}:</span>
+                                {contact.value}
+                              </>
+                            ) : (
+                              `点击查看联系方式 (${contact.type})`
+                            )}
+                          </p>
+                          <p className="text-sm text-gray-400">
+                            {showContact ? '请说明来意' : '仅供演出邀约及商务合作'}
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-white font-medium mb-1">
-                          {showContact ? band.contactInfo : '点击查看联系方式 (微信/邮箱)'}
-                        </p>
-                        <p className="text-sm text-gray-400">
-                          {showContact ? '请说明来意' : '仅供演出邀约及商务合作'}
-                        </p>
-                      </div>
+                      {showContact && (
+                        <button
+                          onClick={(e) => handleCopy(e, contact.value)}
+                          className="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-gray-300 transition-colors flex items-center gap-2 text-sm"
+                        >
+                          {copied ? <CheckCircle2 size={16} className="text-green-500" /> : <Copy size={16} />}
+                          {copied ? '已复制' : '复制'}
+                        </button>
+                      )}
                     </div>
                   </div>
-                )}
+                )})()}
               </div>
               
               <div className="space-y-6 border-t md:border-t-0 md:border-l border-white/10 pt-6 md:pt-0 md:pl-8">

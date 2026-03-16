@@ -12,6 +12,9 @@ export default function AdminPage() {
   const [locations, setLocations] = useState<any[]>([]);
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const [message, setMessage] = useState<{text: string, type: 'error' | 'success'} | null>(null);
+  const [imageInputType, setImageInputType] = useState<'upload' | 'url'>('upload');
+  const [contactType, setContactType] = useState<'wechat' | 'email'>('wechat');
+  const [contactValue, setContactValue] = useState('');
 
   const showMessage = (text: string, type: 'error' | 'success' = 'error') => {
     setMessage({ text, type });
@@ -194,6 +197,7 @@ export default function AdminPage() {
       const method = isEditing ? 'PUT' : 'POST';
       
       const payload = { ...formData };
+      payload.contact_info = contactValue ? `${contactType}:${contactValue}` : '';
       if (activeTab === 'venues') {
         payload.capacity = parseInt(payload.capacity as string) || 0 as any;
       }
@@ -242,6 +246,19 @@ export default function AdminPage() {
   const handleEdit = (item: any) => {
     setIsEditing(true);
     setCurrentId(item.id);
+    
+    let cType: 'wechat' | 'email' = 'wechat';
+    let cValue = item.contact_info || '';
+    if (cValue.startsWith('wechat:')) {
+      cType = 'wechat';
+      cValue = cValue.substring(7);
+    } else if (cValue.startsWith('email:')) {
+      cType = 'email';
+      cValue = cValue.substring(6);
+    }
+    setContactType(cType);
+    setContactValue(cValue);
+
     setFormData({
       province_id: item.province_id,
       province_zh: item.province_zh,
@@ -260,11 +277,15 @@ export default function AdminPage() {
       image_url: item.image_url || '',
       contact_info: item.contact_info || ''
     });
+    setImageInputType(item.image_url && !item.image_url.startsWith('/uploads/') ? 'url' : 'upload');
   };
 
   const resetForm = () => {
     setIsEditing(false);
     setCurrentId(null);
+    setContactType('wechat');
+    setContactValue('');
+    setImageInputType('upload');
     setFormData({
       province_id: '', province_zh: '', city_id: '', city_zh: '',
       band_id: '', venue_id: '', name: '', name_zh: '', genre: '', 
@@ -386,10 +407,31 @@ export default function AdminPage() {
               <textarea required placeholder="Introduction" value={formData.intro} onChange={e => setFormData({...formData, intro: e.target.value})} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-full h-24 resize-none" />
               
               <div className="space-y-2">
-                <label className="text-sm text-gray-400 block">Image (Max 1MB)</label>
-                <div className="flex gap-2">
-                  <input type="file" accept="image/*" onChange={handleImageUpload} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm flex-1 file:mr-4 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:bg-white/10 file:text-white hover:file:bg-white/20" />
-                  <input placeholder="Or enter Image URL" value={formData.image_url} onChange={e => setFormData({...formData, image_url: e.target.value})} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm flex-1" />
+                <div className="flex items-center justify-between">
+                  <label className="text-sm text-gray-400 block">Image (Max 1MB)</label>
+                  <div className="flex gap-2 bg-black/50 rounded-lg p-1 border border-white/10">
+                    <button
+                      type="button"
+                      onClick={() => setImageInputType('upload')}
+                      className={`px-3 py-1 text-xs rounded-md transition-colors ${imageInputType === 'upload' ? 'bg-[#ff4e00] text-white' : 'text-gray-400 hover:text-white'}`}
+                    >
+                      Upload File
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setImageInputType('url')}
+                      className={`px-3 py-1 text-xs rounded-md transition-colors ${imageInputType === 'url' ? 'bg-[#ff4e00] text-white' : 'text-gray-400 hover:text-white'}`}
+                    >
+                      Image URL
+                    </button>
+                  </div>
+                </div>
+                <div className="flex flex-col gap-2">
+                  {imageInputType === 'upload' ? (
+                    <input type="file" accept="image/*" onChange={handleImageUpload} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-full file:mr-4 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:bg-white/10 file:text-white hover:file:bg-white/20" />
+                  ) : (
+                    <input placeholder="Enter Image URL (e.g. https://...)" value={formData.image_url} onChange={e => setFormData({...formData, image_url: e.target.value})} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-full" />
+                  )}
                 </div>
                 {formData.image_url && (
                   <div className="mt-2 relative inline-block">
@@ -406,7 +448,22 @@ export default function AdminPage() {
                 )}
               </div>
 
-              <input placeholder="Contact Info (WeChat/Email) (optional)" value={formData.contact_info} onChange={e => setFormData({...formData, contact_info: e.target.value})} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-full" />
+              <div className="flex gap-2">
+                <select 
+                  value={contactType} 
+                  onChange={e => setContactType(e.target.value as 'wechat' | 'email')}
+                  className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-1/3 text-white"
+                >
+                  <option value="wechat">WeChat</option>
+                  <option value="email">Email</option>
+                </select>
+                <input 
+                  placeholder="Contact Info (optional)" 
+                  value={contactValue} 
+                  onChange={e => setContactValue(e.target.value)} 
+                  className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-2/3" 
+                />
+              </div>
               
               <div className="flex gap-3 pt-4">
                 <button type="submit" className="flex-1 bg-[#ff4e00] text-white rounded py-2 text-sm font-medium hover:bg-[#ff4e00]/90">
