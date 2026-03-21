@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import ChinaMap from "../components/ChinaMap";
 import ProvincePanel from "../components/ProvincePanel";
 import BandModal from "../components/BandModal";
@@ -15,6 +15,16 @@ export default function MapPage() {
   const [selectedBand, setSelectedBand] = useState<Band | null>(null);
   const [selectedVenue, setSelectedVenue] = useState<Venue | null>(null);
   const [isGigModalOpen, setIsGigModalOpen] = useState(false);
+  const [featuredEvent, setFeaturedEvent] = useState<any>(null);
+
+  useEffect(() => {
+    fetch('/api/featured_events/active')
+      .then(res => res.json())
+      .then(data => {
+        if (data) setFeaturedEvent(data);
+      })
+      .catch(err => console.error('Failed to load featured event', err));
+  }, []);
 
   const handleProvinceClick = (provinceId: string) => {
     setSelectedProvinceId(provinceId);
@@ -108,16 +118,23 @@ export default function MapPage() {
       />
 
       {/* Ad Banner */}
-      <AdBanner 
-        isPanelOpen={!!selectedProvinceId} 
-        onClick={() => setIsGigModalOpen(true)} 
-      />
+      {featuredEvent && (
+        <AdBanner 
+          isPanelOpen={!!selectedProvinceId} 
+          onClick={() => setIsGigModalOpen(true)} 
+          event={featuredEvent}
+        />
+      )}
 
       {/* Gig Modal */}
-      <GigModal 
-        isOpen={isGigModalOpen} 
-        onClose={() => setIsGigModalOpen(false)} 
-      />
+      {featuredEvent && (
+        <GigModal 
+          isOpen={isGigModalOpen} 
+          onClose={() => setIsGigModalOpen(false)} 
+          event={featuredEvent}
+          onBandClick={handleBandClick}
+        />
+      )}
     </div>
   );
 }

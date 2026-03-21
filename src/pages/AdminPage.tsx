@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Lock, LogOut, Plus, Trash2, Edit2, Music, MapPin, X } from 'lucide-react';
+import { Lock, LogOut, Plus, Trash2, Edit2, Music, MapPin, X, Calendar, Star } from 'lucide-react';
 
 export default function AdminPage() {
   const [token, setToken] = useState(localStorage.getItem('adminToken'));
@@ -7,8 +7,9 @@ export default function AdminPage() {
   const [error, setError] = useState('');
   const [bands, setBands] = useState<any[]>([]);
   const [venues, setVenues] = useState<any[]>([]);
+  const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'bands' | 'venues'>('bands');
+  const [activeTab, setActiveTab] = useState<'bands' | 'venues' | 'events'>('bands');
   const [locations, setLocations] = useState<any[]>([]);
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const [message, setMessage] = useState<{text: string, type: 'error' | 'success'} | null>(null);
@@ -39,6 +40,12 @@ export default function AdminPage() {
     address: '',
     capacity: '',
     ticket_url: '',
+    // Event specific
+    title: '',
+    date_str: '',
+    location: '',
+    is_active: false,
+    lineup: [] as { day: string, bandIds: string[] }[],
     // Common
     name: '',
     name_zh: '',
@@ -72,11 +79,12 @@ export default function AdminPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const endpoint = activeTab === 'bands' ? '/api/bands' : '/api/venues';
+      const endpoint = activeTab === 'bands' ? '/api/bands' : activeTab === 'venues' ? '/api/venues' : '/api/featured_events';
       const res = await fetch(endpoint);
       const data = await res.json();
       if (activeTab === 'bands') setBands(data);
-      else setVenues(data);
+      else if (activeTab === 'venues') setVenues(data);
+      else setEvents(data);
     } catch (err) {
       console.error(err);
     } finally {
@@ -193,14 +201,17 @@ export default function AdminPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const endpoint = activeTab === 'bands' ? '/api/bands' : '/api/venues';
+      const endpoint = activeTab === 'bands' ? '/api/bands' : activeTab === 'venues' ? '/api/venues' : '/api/featured_events';
       const url = isEditing ? `${endpoint}/${currentId}` : endpoint;
       const method = isEditing ? 'PUT' : 'POST';
       
-      const payload = { ...formData };
+      const payload = { ...formData } as any;
       payload.contact_info = contactValue ? `${contactType}:${contactValue}` : '';
       if (activeTab === 'venues') {
         payload.capacity = parseInt(payload.capacity as string) || 0 as any;
+      }
+      if (activeTab === 'events') {
+        payload.description = payload.intro;
       }
 
       const res = await fetch(url, {
@@ -227,7 +238,7 @@ export default function AdminPage() {
 
   const handleDelete = async (id: number) => {
     try {
-      const endpoint = activeTab === 'bands' ? '/api/bands' : '/api/venues';
+      const endpoint = activeTab === 'bands' ? '/api/bands' : activeTab === 'venues' ? '/api/venues' : '/api/featured_events';
       const res = await fetch(`${endpoint}/${id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
@@ -260,6 +271,20 @@ export default function AdminPage() {
     setContactType(cType);
     setContactValue(cValue);
 
+    let parsedLineup = [];
+    if (item.lineup) {
+      try {
+        parsedLineup = typeof item.lineup === 'string' ? JSON.parse(item.lineup) : item.lineup;
+        // If it's already populated with band objects, map it back to just IDs for the form
+        parsedLineup = parsedLineup.map((dayObj: any) => ({
+          day: dayObj.day,
+          bandIds: dayObj.bandIds || (dayObj.bands ? dayObj.bands.map((b: any) => b.band_id) : [])
+        }));
+      } catch (e) {
+        parsedLineup = [];
+      }
+    }
+
     setFormData({
       province_id: item.province_id,
       province_zh: item.province_zh,
@@ -275,7 +300,12 @@ export default function AdminPage() {
       address: item.address || '',
       capacity: item.capacity ? item.capacity.toString() : '',
       ticket_url: item.ticket_url || '',
-      intro: item.intro,
+      title: item.title || '',
+      date_str: item.date_str || '',
+      location: item.location || '',
+      is_active: !!item.is_active,
+      lineup: parsedLineup,
+      intro: item.intro || item.description || '',
       image_url: item.image_url || '',
       contact_info: item.contact_info || ''
     });
@@ -292,6 +322,7 @@ export default function AdminPage() {
       province_id: '', province_zh: '', city_id: '', city_zh: '',
       band_id: '', venue_id: '', name: '', name_zh: '', genre: '', 
       netease_url: '', xiaohongshu_url: '', ticket_url: '',
+      title: '', date_str: '', location: '', is_active: false, lineup: [],
       address: '', capacity: '', intro: '', image_url: '', contact_info: ''
     });
   };
@@ -322,7 +353,7 @@ export default function AdminPage() {
     );
   }
 
-  const currentList = activeTab === 'bands' ? bands : venues;
+  const currentList = activeTab === 'bands' ? bands : activeTab === 'venues' ? venues : events;
 
   return (
     <div className="min-h-screen bg-[#0a0502] text-white p-8 font-sans">
@@ -355,6 +386,12 @@ export default function AdminPage() {
           >
             <MapPin size={18} /> Manage Venues
           </button>
+          <button 
+            onClick={() => { setActiveTab('events'); resetForm(); }}
+            className={`flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-colors ${activeTab === 'events' ? 'bg-[#ff4e00] text-white' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}
+          >
+            <Calendar size={18} /> Manage Events
+          </button>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -362,34 +399,52 @@ export default function AdminPage() {
           <div className="bg-[#1a1a1a] p-6 rounded-2xl border border-white/10 h-fit">
             <h2 className="text-xl mb-6 font-medium flex items-center gap-2">
               {isEditing ? <Edit2 size={20} className="text-[#ff4e00]" /> : <Plus size={20} className="text-[#ff4e00]" />}
-              {isEditing ? `Edit ${activeTab === 'bands' ? 'Band' : 'Venue'}` : `Add New ${activeTab === 'bands' ? 'Band' : 'Venue'}`}
+              {isEditing ? `Edit ${activeTab === 'bands' ? 'Band' : activeTab === 'venues' ? 'Venue' : 'Event'}` : `Add New ${activeTab === 'bands' ? 'Band' : activeTab === 'venues' ? 'Venue' : 'Event'}`}
             </h2>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <select required value={formData.province_id} onChange={handleProvinceChange} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-full text-white">
-                  <option value="" disabled>Select Province</option>
-                  {provinces.map(p => (
-                    <option key={p.en} value={p.en}>{p.zh} ({p.en})</option>
-                  ))}
-                </select>
-                <select required value={formData.city_id} onChange={handleCityChange} disabled={!formData.province_id} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-full text-white disabled:opacity-50">
-                  <option value="" disabled>Select City</option>
-                  {cities.map(c => (
-                    <option key={c.en} value={c.en}>{c.zh} ({c.en})</option>
-                  ))}
-                </select>
-              </div>
+              {activeTab !== 'events' && (
+                <div className="grid grid-cols-2 gap-4">
+                  <select required value={formData.province_id} onChange={handleProvinceChange} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-full text-white">
+                    <option value="" disabled>Select Province</option>
+                    {provinces.map(p => (
+                      <option key={p.en} value={p.en}>{p.zh} ({p.en})</option>
+                    ))}
+                  </select>
+                  <select required value={formData.city_id} onChange={handleCityChange} disabled={!formData.province_id} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-full text-white disabled:opacity-50">
+                    <option value="" disabled>Select City</option>
+                    {cities.map(c => (
+                      <option key={c.en} value={c.en}>{c.zh} ({c.en})</option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               {activeTab === 'bands' ? (
                 <input required placeholder="Band ID (e.g. carsick-cars)" value={formData.band_id} onChange={e => setFormData({...formData, band_id: e.target.value})} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-full" />
-              ) : (
+              ) : activeTab === 'venues' ? (
                 <input required placeholder="Venue ID (e.g. school-bar)" value={formData.venue_id} onChange={e => setFormData({...formData, venue_id: e.target.value})} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-full" />
-              )}
+              ) : null}
 
-              <div className="grid grid-cols-2 gap-4">
-                <input required placeholder="Name (副标题)" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-full" />
-                <input required placeholder="Name (主标题)" value={formData.name_zh} onChange={e => setFormData({...formData, name_zh: e.target.value})} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-full" />
-              </div>
+              {activeTab === 'events' ? (
+                <>
+                  <input required placeholder="Event Title" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-full" />
+                  <div className="grid grid-cols-2 gap-4">
+                    <input required placeholder="Date (e.g. 2026.4.3 - 4.5)" value={formData.date_str} onChange={e => setFormData({...formData, date_str: e.target.value})} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-full" />
+                    <input required placeholder="Location Name (e.g. Mosh Space)" value={formData.location} onChange={e => setFormData({...formData, location: e.target.value})} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-full" />
+                  </div>
+                  <input required placeholder="Full Address" value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-full" />
+                  <input placeholder="Ticket URL" value={formData.ticket_url} onChange={e => setFormData({...formData, ticket_url: e.target.value})} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-full" />
+                  <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                    <input type="checkbox" checked={formData.is_active} onChange={e => setFormData({...formData, is_active: e.target.checked})} className="rounded border-white/10 bg-black/50 text-[#ff4e00] focus:ring-[#ff4e00]" />
+                    Set as Active Featured Event
+                  </label>
+                </>
+              ) : (
+                <div className="grid grid-cols-2 gap-4">
+                  <input required placeholder="Name (副标题)" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-full" />
+                  <input required placeholder="Name (主标题)" value={formData.name_zh} onChange={e => setFormData({...formData, name_zh: e.target.value})} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-full" />
+                </div>
+              )}
 
               {activeTab === 'bands' ? (
                 <>
@@ -399,7 +454,7 @@ export default function AdminPage() {
                     <input placeholder="Xiaohongshu URL" value={formData.xiaohongshu_url} onChange={e => setFormData({...formData, xiaohongshu_url: e.target.value})} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-full" />
                   </div>
                 </>
-              ) : (
+              ) : activeTab === 'venues' ? (
                 <>
                   <input required placeholder="Address" value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-full" />
                   <div className="grid grid-cols-2 gap-4">
@@ -407,10 +462,63 @@ export default function AdminPage() {
                     <input placeholder="Ticket URL (e.g. ShowStart)" value={formData.ticket_url} onChange={e => setFormData({...formData, ticket_url: e.target.value})} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-full" />
                   </div>
                 </>
+              ) : null}
+
+              <textarea required placeholder={activeTab === 'events' ? "Event Description" : "Introduction"} value={formData.intro} onChange={e => setFormData({...formData, intro: e.target.value})} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-full h-24 resize-none" />
+              
+              {activeTab === 'events' && (
+                <div className="space-y-4 border border-white/10 p-4 rounded-xl bg-black/20">
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-sm font-medium text-white">Lineup Configuration</h3>
+                    <button type="button" onClick={() => setFormData({...formData, lineup: [...formData.lineup, { day: `Day ${formData.lineup.length + 1}`, bandIds: [] }]})} className="text-xs text-[#ff4e00] hover:text-[#ff6a2b] flex items-center gap-1"><Plus size={14}/> Add Day</button>
+                  </div>
+                  {formData.lineup.map((dayObj, dayIndex) => (
+                    <div key={dayIndex} className="space-y-2 border border-white/5 p-3 rounded-lg bg-black/40">
+                      <div className="flex justify-between items-center">
+                        <input value={dayObj.day} onChange={e => {
+                          const newLineup = [...formData.lineup];
+                          newLineup[dayIndex].day = e.target.value;
+                          setFormData({...formData, lineup: newLineup});
+                        }} className="bg-transparent border-b border-white/10 px-1 py-1 text-sm text-[#ff4e00] font-mono focus:outline-none focus:border-[#ff4e00] w-1/2" placeholder="e.g. Day 1 - Friday" />
+                        <button type="button" onClick={() => {
+                          const newLineup = formData.lineup.filter((_, i) => i !== dayIndex);
+                          setFormData({...formData, lineup: newLineup});
+                        }} className="text-gray-500 hover:text-red-400"><X size={14}/></button>
+                      </div>
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {dayObj.bandIds.map((bandId, bandIndex) => {
+                          const band = bands.find(b => b.band_id === bandId);
+                          return (
+                            <div key={bandIndex} className="flex items-center gap-1 bg-white/10 text-xs px-2 py-1 rounded-full text-gray-300">
+                              {band ? band.name_zh || band.name : bandId}
+                              <button type="button" onClick={() => {
+                                const newLineup = [...formData.lineup];
+                                newLineup[dayIndex].bandIds = newLineup[dayIndex].bandIds.filter((_, i) => i !== bandIndex);
+                                setFormData({...formData, lineup: newLineup});
+                              }} className="hover:text-red-400 ml-1"><X size={12}/></button>
+                            </div>
+                          );
+                        })}
+                        <select onChange={e => {
+                          if (!e.target.value) return;
+                          const newLineup = [...formData.lineup];
+                          if (!newLineup[dayIndex].bandIds.includes(e.target.value)) {
+                            newLineup[dayIndex].bandIds.push(e.target.value);
+                          }
+                          setFormData({...formData, lineup: newLineup});
+                          e.target.value = '';
+                        }} className="bg-black/50 border border-white/10 rounded-full px-2 py-1 text-xs text-gray-400 focus:outline-none">
+                          <option value="">+ Add Band</option>
+                          {bands.map(b => (
+                            <option key={b.band_id} value={b.band_id}>{b.name_zh || b.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               )}
 
-              <textarea required placeholder="Introduction" value={formData.intro} onChange={e => setFormData({...formData, intro: e.target.value})} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-full h-24 resize-none" />
-              
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <label className="text-sm text-gray-400 block">Image (Max 1MB)</label>
@@ -453,22 +561,24 @@ export default function AdminPage() {
                 )}
               </div>
 
-              <div className="flex gap-2">
-                <select 
-                  value={contactType} 
-                  onChange={e => setContactType(e.target.value as 'wechat' | 'email')}
-                  className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-1/3 text-white"
-                >
-                  <option value="wechat">WeChat</option>
-                  <option value="email">Email</option>
-                </select>
-                <input 
-                  placeholder="Contact Info (optional)" 
-                  value={contactValue} 
-                  onChange={e => setContactValue(e.target.value)} 
-                  className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-2/3" 
-                />
-              </div>
+              {activeTab !== 'events' && (
+                <div className="flex gap-2">
+                  <select 
+                    value={contactType} 
+                    onChange={e => setContactType(e.target.value as 'wechat' | 'email')}
+                    className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-1/3 text-white"
+                  >
+                    <option value="wechat">WeChat</option>
+                    <option value="email">Email</option>
+                  </select>
+                  <input 
+                    placeholder="Contact Info (optional)" 
+                    value={contactValue} 
+                    onChange={e => setContactValue(e.target.value)} 
+                    className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-2/3" 
+                  />
+                </div>
+              )}
               
               <div className="flex gap-3 pt-4">
                 <button type="submit" className="flex-1 bg-[#ff4e00] text-white rounded py-2 text-sm font-medium hover:bg-[#ff4e00]/90">
@@ -485,27 +595,37 @@ export default function AdminPage() {
 
           {/* List */}
           <div className="lg:col-span-2 bg-[#1a1a1a] p-6 rounded-2xl border border-white/10">
-            <h2 className="text-xl mb-6 font-medium">Current {activeTab === 'bands' ? 'Bands' : 'Venues'} ({currentList.length})</h2>
+            <h2 className="text-xl mb-6 font-medium">Current {activeTab === 'bands' ? 'Bands' : activeTab === 'venues' ? 'Venues' : 'Events'} ({currentList.length})</h2>
             {loading ? (
               <div className="text-center py-8 text-gray-500">Loading...</div>
             ) : (
               <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
                 {currentList.map(item => (
-                  <div key={item.id} className="flex items-center justify-between bg-black/30 p-4 rounded-lg border border-white/5 hover:border-white/10 transition-colors">
+                  <div key={item.id} className={`flex items-center justify-between bg-black/30 p-4 rounded-lg border ${item.is_active ? 'border-[#ff4e00]/50' : 'border-white/5'} hover:border-white/10 transition-colors`}>
                     <div>
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="font-medium text-white">{item.name_zh}</span>
-                        <span className="text-xs text-gray-500">{item.name}</span>
+                        <span className="font-medium text-white">{activeTab === 'events' ? item.title : item.name_zh}</span>
+                        {activeTab !== 'events' && <span className="text-xs text-gray-500">{item.name}</span>}
+                        {item.is_active && <span className="text-[10px] bg-[#ff4e00] text-white px-1.5 py-0.5 rounded flex items-center gap-1"><Star size={10} /> Active</span>}
                       </div>
                       <div className="text-xs text-gray-400 flex gap-2">
-                        <span className="bg-white/5 px-2 py-0.5 rounded">{item.province_zh} - {item.city_zh}</span>
-                        {activeTab === 'bands' ? (
-                          <span className="bg-[#ff4e00]/10 text-[#ff4e00] px-2 py-0.5 rounded">{item.genre}</span>
+                        {activeTab === 'events' ? (
+                          <>
+                            <span className="bg-white/5 px-2 py-0.5 rounded">{item.date_str}</span>
+                            <span className="bg-white/5 px-2 py-0.5 rounded">{item.location}</span>
+                          </>
                         ) : (
-                          <span className="bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded">容纳 {item.capacity} 人</span>
-                        )}
-                        {item.contact_info && (
-                          <span className="bg-green-500/10 text-green-400 px-2 py-0.5 rounded">有联系方式</span>
+                          <>
+                            <span className="bg-white/5 px-2 py-0.5 rounded">{item.province_zh} - {item.city_zh}</span>
+                            {activeTab === 'bands' ? (
+                              <span className="bg-[#ff4e00]/10 text-[#ff4e00] px-2 py-0.5 rounded">{item.genre}</span>
+                            ) : (
+                              <span className="bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded">容纳 {item.capacity} 人</span>
+                            )}
+                            {item.contact_info && (
+                              <span className="bg-green-500/10 text-green-400 px-2 py-0.5 rounded">有联系方式</span>
+                            )}
+                          </>
                         )}
                       </div>
                     </div>

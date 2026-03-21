@@ -5,9 +5,10 @@ import { Megaphone, ChevronRight, X } from "lucide-react";
 interface AdBannerProps {
   isPanelOpen: boolean;
   onClick: () => void;
+  event: any;
 }
 
-const AdBanner: React.FC<AdBannerProps> = ({ isPanelOpen, onClick }) => {
+const AdBanner: React.FC<AdBannerProps> = ({ isPanelOpen, onClick, event }) => {
   const [isVisible, setIsVisible] = React.useState(true);
 
   if (!isVisible) return null;
@@ -46,10 +47,10 @@ const AdBanner: React.FC<AdBannerProps> = ({ isPanelOpen, onClick }) => {
                 <span className="text-[9px] font-mono text-[#ff4e00] uppercase tracking-wider border border-[#ff4e00]/30 px-1 py-0.5 rounded backdrop-blur-sm leading-none">
                   Featured
                 </span>
-                <span className="text-[10px] text-gray-400 truncate">2026.4.3-4.5 @ 上海 Mosh Space</span>
+                <span className="text-[10px] text-gray-400 truncate">{event.date_str} @ {event.location}</span>
               </div>
               <h4 className="text-sm text-white font-medium truncate group-hover:text-[#ff4e00] transition-colors">
-                音速革命 Sonic Revolution 3.0
+                {event.title}
               </h4>
             </div>
             

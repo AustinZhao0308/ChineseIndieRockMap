@@ -5,9 +5,11 @@ import { motion, AnimatePresence } from "motion/react";
 interface GigModalProps {
   isOpen: boolean;
   onClose: () => void;
+  event: any;
+  onBandClick?: (band: any) => void;
 }
 
-const GigModal: React.FC<GigModalProps> = ({ isOpen, onClose }) => {
+const GigModal: React.FC<GigModalProps> = ({ isOpen, onClose, event, onBandClick }) => {
   if (!isOpen) return null;
 
   return (
@@ -30,8 +32,8 @@ const GigModal: React.FC<GigModalProps> = ({ isOpen, onClose }) => {
           <div className="relative h-48 md:h-64 bg-zinc-900 shrink-0">
             <div className="absolute inset-0 bg-gradient-to-t from-[#151619] to-transparent z-10" />
             <img 
-              src="https://picsum.photos/seed/sonic-revolution/800/400?grayscale" 
-              alt="Sonic Revolution 3.0"
+              src={event.image_url || "https://picsum.photos/seed/sonic-revolution/800/400?grayscale"} 
+              alt={event.title}
               className="w-full h-full object-cover mix-blend-luminosity opacity-50"
               referrerPolicy="no-referrer"
             />
@@ -48,7 +50,7 @@ const GigModal: React.FC<GigModalProps> = ({ isOpen, onClose }) => {
                 <span>Featured Event</span>
               </div>
               <h2 className="text-3xl md:text-4xl font-serif text-white tracking-tight drop-shadow-lg">
-                音速革命 Sonic Revolution 3.0
+                {event.title}
               </h2>
             </div>
           </div>
@@ -62,7 +64,7 @@ const GigModal: React.FC<GigModalProps> = ({ isOpen, onClose }) => {
                 </div>
                 <div>
                   <p className="text-sm text-gray-500 uppercase tracking-wider mb-1">演出时间</p>
-                  <p className="text-white font-medium">2026.4.3 - 4.5</p>
+                  <p className="text-white font-medium">{event.date_str}</p>
                 </div>
               </div>
               <div className="flex items-start gap-3 flex-1">
@@ -71,8 +73,8 @@ const GigModal: React.FC<GigModalProps> = ({ isOpen, onClose }) => {
                 </div>
                 <div>
                   <p className="text-sm text-gray-500 uppercase tracking-wider mb-1">演出地点</p>
-                  <p className="text-white font-medium">Mosh Space</p>
-                  <p className="text-xs text-gray-400 mt-0.5">上海市杨浦区三号湾广场B1</p>
+                  <p className="text-white font-medium">{event.location}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">{event.address}</p>
                 </div>
               </div>
             </div>
@@ -80,63 +82,63 @@ const GigModal: React.FC<GigModalProps> = ({ isOpen, onClose }) => {
             <div className="mb-6">
               <div className="flex items-center gap-2 mb-6 border-b border-white/10 pb-4">
                 <Users size={20} className="text-[#ff4e00]" />
-                <h3 className="text-xl font-medium text-white">演出阵容 Lineup</h3>
+                <h3 className="text-xl font-medium text-white">演出详情 Event Details</h3>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {/* Friday */}
-                <div className="bg-white/5 rounded-xl p-5 border border-white/5">
-                  <div className="text-[#ff4e00] font-mono text-sm mb-4 pb-2 border-b border-white/10">
-                    周五 4.3
-                  </div>
-                  <ul className="space-y-3 text-sm text-gray-300">
-                    <li className="font-medium text-white">lastWeJust...</li>
-                    <li>千败1000Failures</li>
-                    <li>CAR CAR CARS</li>
-                    <li className="text-gray-500 text-xs mt-4 pt-2 border-t border-white/5">SpiceSoup (DJ AfterParty)</li>
-                  </ul>
-                </div>
-
-                {/* Saturday */}
-                <div className="bg-white/5 rounded-xl p-5 border border-white/5">
-                  <div className="text-[#ff4e00] font-mono text-sm mb-4 pb-2 border-b border-white/10">
-                    周六 4.4
-                  </div>
-                  <ul className="space-y-3 text-sm text-gray-300">
-                    <li className="font-medium text-white">yooha!</li>
-                    <li>falling nana</li>
-                    <li>the farmers</li>
-                    <li>dinner in haze</li>
-                    <li>中西部情绪麻将</li>
-                    <li>返校日</li>
-                  </ul>
-                </div>
-
-                {/* Sunday */}
-                <div className="bg-white/5 rounded-xl p-5 border border-white/5">
-                  <div className="text-[#ff4e00] font-mono text-sm mb-4 pb-2 border-b border-white/10">
-                    周日 4.5
-                  </div>
-                  <ul className="space-y-3 text-sm text-gray-300">
-                    <li className="font-medium text-white">used to be sad</li>
-                    <li>if we could stay</li>
-                    <li>奶盖儿</li>
-                    <li>Tiny Time</li>
-                    <li>Hello Franky</li>
-                    <li>Silly Function</li>
-                  </ul>
+              <div className="bg-white/5 rounded-xl p-5 border border-white/5">
+                <div className="whitespace-pre-wrap text-sm text-gray-300 leading-relaxed">
+                  {event.description}
                 </div>
               </div>
             </div>
+
+            {event.lineup && event.lineup.length > 0 && (
+              <div className="mb-6">
+                <div className="flex items-center gap-2 mb-6 border-b border-white/10 pb-4">
+                  <Users size={20} className="text-[#ff4e00]" />
+                  <h3 className="text-xl font-medium text-white">演出阵容 Lineup</h3>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {event.lineup.map((day: any, index: number) => (
+                    <div key={index} className="bg-white/5 rounded-xl p-5 border border-white/5">
+                      <div className="text-[#ff4e00] font-mono text-sm mb-4 pb-2 border-b border-white/10">
+                        {day.day}
+                      </div>
+                      <ul className="space-y-3 text-sm text-gray-300">
+                        {day.bands && day.bands.map((band: any, bIndex: number) => (
+                          <li key={bIndex}>
+                            <button 
+                              onClick={() => {
+                                if (onBandClick) {
+                                  onBandClick(band);
+                                }
+                              }}
+                              className="font-medium text-white hover:text-[#ff4e00] transition-colors text-left"
+                            >
+                              {band.name_zh || band.name}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             
-            <div className="mt-8 pt-6 border-t border-white/10 flex justify-center">
-              <button 
-                className="px-8 py-3 bg-[#ff4e00] hover:bg-[#ff6a2b] text-white rounded-full font-medium tracking-wide transition-colors shadow-[0_0_20px_rgba(255,78,0,0.3)] hover:shadow-[0_0_30px_rgba(255,78,0,0.5)]"
-                onClick={onClose}
-              >
-                了解更多
-              </button>
-            </div>
+            {event.ticket_url && (
+              <div className="mt-8 pt-6 border-t border-white/10 flex justify-center">
+                <a 
+                  href={event.ticket_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-8 py-3 bg-[#ff4e00] hover:bg-[#ff6a2b] text-white rounded-full font-medium tracking-wide transition-colors shadow-[0_0_20px_rgba(255,78,0,0.3)] hover:shadow-[0_0_30px_rgba(255,78,0,0.5)]"
+                >
+                  购票链接
+                </a>
+              </div>
+            )}
           </div>
         </motion.div>
       </motion.div>

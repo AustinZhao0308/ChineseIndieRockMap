@@ -87,6 +87,19 @@ db.exec(`
     contact_info TEXT,
     ticket_url TEXT
   );
+
+  CREATE TABLE IF NOT EXISTS featured_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    date_str TEXT NOT NULL,
+    location TEXT NOT NULL,
+    address TEXT NOT NULL,
+    description TEXT NOT NULL,
+    image_url TEXT,
+    ticket_url TEXT,
+    is_active INTEGER DEFAULT 0,
+    lineup TEXT
+  );
 `);
 
 // Add columns to existing tables if they don't exist (migration)
@@ -94,6 +107,7 @@ try { db.exec('ALTER TABLE bands ADD COLUMN contact_info TEXT;'); } catch (e) {}
 try { db.exec('ALTER TABLE bands ADD COLUMN netease_url TEXT;'); } catch (e) {}
 try { db.exec('ALTER TABLE bands ADD COLUMN xiaohongshu_url TEXT;'); } catch (e) {}
 try { db.exec('ALTER TABLE venues ADD COLUMN ticket_url TEXT;'); } catch (e) {}
+try { db.exec('ALTER TABLE featured_events ADD COLUMN lineup TEXT;'); } catch (e) {}
 
 // Seed initial data if empty
 const countBands = db.prepare('SELECT COUNT(*) as count FROM bands').get() as { count: number };
@@ -161,6 +175,25 @@ if (countVenues.count === 0) {
     for (const venue of venues) insert.run(venue);
   });
   insertMany(initialData);
+}
+
+const countEvents = db.prepare('SELECT COUNT(*) as count FROM featured_events').get() as { count: number };
+if (countEvents.count === 0) {
+  console.log('Seeding initial featured event data...');
+  const insert = db.prepare(`
+    INSERT INTO featured_events (title, date_str, location, address, description, image_url, ticket_url, is_active)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  insert.run(
+    '音速革命 Sonic Revolution 3.0',
+    '2026.4.3 - 4.5',
+    'Mosh Space',
+    '上海市杨浦区三号湾广场B1',
+    '周五 4.3\nlastWeJust...\n千败1000Failures\nCAR CAR CARS\n\n周六 4.4\nyooha!\nfalling nana\nthe farmers\n\n周日 4.5\nused to be sad\nif we could stay\n奶盖儿',
+    'https://picsum.photos/seed/sonic-revolution/800/400?grayscale',
+    '',
+    1
+  );
 }
 
 // Middleware to verify JWT
@@ -331,6 +364,84 @@ app.delete('/api/venues/:id', authenticateToken, (req, res) => {
       deleteLocalImage(venue.image_url);
     }
     db.prepare('DELETE FROM venues WHERE id = ?').run(req.params.id);
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Featured Events API
+app.get('/api/featured_events', (req, res) => {
+  const events = db.prepare('SELECT * FROM featured_events ORDER BY id DESC').all();
+  res.json(events);
+});
+
+app.get('/api/featured_events/active', (req, res) => {
+  const event = db.prepare('SELECT * FROM featured_events WHERE is_active = 1 LIMIT 1').get() as any;
+  if (event) {
+    if (event.lineup) {
+      try {
+        const parsedLineup = JSON.parse(event.lineup);
+        // parsedLineup is an array of { day: string, bandIds: string[] }
+        const populatedLineup = parsedLineup.map((dayObj: any) => {
+          const bands = dayObj.bandIds.map((id: string) => {
+            return db.prepare('SELECT * FROM bands WHERE band_id = ?').get(id);
+          }).filter(Boolean);
+          return { ...dayObj, bands };
+        });
+        event.lineup = populatedLineup;
+      } catch (e) {
+        event.lineup = [];
+      }
+    } else {
+      event.lineup = [];
+    }
+  }
+  res.json(event || null);
+});
+
+app.post('/api/featured_events', authenticateToken, (req, res) => {
+  const { title, date_str, location, address, description, image_url, ticket_url, is_active, lineup } = req.body;
+  try {
+    if (is_active) {
+      db.prepare('UPDATE featured_events SET is_active = 0').run();
+    }
+    const lineupStr = lineup ? JSON.stringify(lineup) : null;
+    const info = db.prepare(`
+      INSERT INTO featured_events (title, date_str, location, address, description, image_url, ticket_url, is_active, lineup)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(title, date_str, location, address, description, image_url, ticket_url, is_active ? 1 : 0, lineupStr);
+    res.json({ id: info.lastInsertRowid });
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.put('/api/featured_events/:id', authenticateToken, (req, res) => {
+  const { title, date_str, location, address, description, image_url, ticket_url, is_active, lineup } = req.body;
+  try {
+    if (is_active) {
+      db.prepare('UPDATE featured_events SET is_active = 0').run();
+    }
+    const lineupStr = lineup ? JSON.stringify(lineup) : null;
+    db.prepare(`
+      UPDATE featured_events SET 
+        title = ?, date_str = ?, location = ?, address = ?, description = ?, image_url = ?, ticket_url = ?, is_active = ?, lineup = ?
+      WHERE id = ?
+    `).run(title, date_str, location, address, description, image_url, ticket_url, is_active ? 1 : 0, lineupStr, req.params.id);
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.delete('/api/featured_events/:id', authenticateToken, (req, res) => {
+  try {
+    const event = db.prepare('SELECT image_url FROM featured_events WHERE id = ?').get(req.params.id) as any;
+    if (event && event.image_url) {
+      deleteLocalImage(event.image_url);
+    }
+    db.prepare('DELETE FROM featured_events WHERE id = ?').run(req.params.id);
     res.json({ success: true });
   } catch (error: any) {
     res.status(400).json({ error: error.message });
