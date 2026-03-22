@@ -5,14 +5,11 @@ import { Megaphone, ChevronRight, X } from "lucide-react";
 interface AdBannerProps {
   isPanelOpen: boolean;
   onClick: () => void;
+  onClose: () => void;
   event: any;
 }
 
-const AdBanner: React.FC<AdBannerProps> = ({ isPanelOpen, onClick, event }) => {
-  const [isVisible, setIsVisible] = React.useState(true);
-
-  if (!isVisible) return null;
-
+const AdBanner: React.FC<AdBannerProps> = ({ isPanelOpen, onClick, onClose, event }) => {
   return (
     <AnimatePresence>
       <motion.div
@@ -62,7 +59,7 @@ const AdBanner: React.FC<AdBannerProps> = ({ isPanelOpen, onClick, event }) => {
                 className="p-1.5 text-gray-500 hover:text-white transition-colors"
                 onClick={(e) => {
                   e.stopPropagation();
-                  setIsVisible(false);
+                  onClose();
                 }}
               >
                 <X size={14} />

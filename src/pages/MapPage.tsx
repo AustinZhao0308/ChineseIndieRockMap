@@ -5,6 +5,7 @@ import BandModal from "../components/BandModal";
 import VenueModal from "../components/VenueModal";
 import AdBanner from "../components/AdBanner";
 import GigModal from "../components/GigModal";
+import FeedbackMenu from "../components/FeedbackMenu";
 import { Band, Venue } from "../data";
 import { Music2 } from "lucide-react";
 import { useProvinceData } from "../hooks/useProvinceData";
@@ -16,6 +17,7 @@ export default function MapPage() {
   const [selectedVenue, setSelectedVenue] = useState<Venue | null>(null);
   const [isGigModalOpen, setIsGigModalOpen] = useState(false);
   const [featuredEvent, setFeaturedEvent] = useState<any>(null);
+  const [isAdBannerVisible, setIsAdBannerVisible] = useState(true);
 
   useEffect(() => {
     fetch('/api/featured_events/active')
@@ -118,10 +120,11 @@ export default function MapPage() {
       />
 
       {/* Ad Banner */}
-      {featuredEvent && (
+      {featuredEvent && isAdBannerVisible && (
         <AdBanner 
           isPanelOpen={!!selectedProvinceId} 
           onClick={() => setIsGigModalOpen(true)} 
+          onClose={() => setIsAdBannerVisible(false)}
           event={featuredEvent}
         />
       )}
@@ -135,6 +138,12 @@ export default function MapPage() {
           onBandClick={handleBandClick}
         />
       )}
+
+      {/* Feedback Menu */}
+      <FeedbackMenu 
+        isPanelOpen={!!selectedProvinceId}
+        hasBanner={!!featuredEvent && isAdBannerVisible}
+      />
     </div>
   );
 }
