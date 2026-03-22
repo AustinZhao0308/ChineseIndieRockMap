@@ -140,6 +140,12 @@ export default function AdminPage() {
         body: uploadData
       });
       
+      if (res.status === 401 || res.status === 403) {
+        handleLogout();
+        showMessage('登录已过期，请重新登录', 'error');
+        return;
+      }
+
       const data = await res.json();
       if (res.ok) {
         setFormData(prev => ({ ...prev, image_url: data.url }));
@@ -223,6 +229,12 @@ export default function AdminPage() {
         body: JSON.stringify(payload)
       });
 
+      if (res.status === 401 || res.status === 403) {
+        handleLogout();
+        showMessage('登录已过期，请重新登录', 'error');
+        return;
+      }
+
       if (res.ok) {
         fetchData();
         resetForm();
@@ -243,6 +255,13 @@ export default function AdminPage() {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
+
+      if (res.status === 401 || res.status === 403) {
+        handleLogout();
+        showMessage('登录已过期，请重新登录', 'error');
+        return;
+      }
+
       if (res.ok) {
         fetchData();
         setConfirmDeleteId(null);

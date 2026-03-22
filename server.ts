@@ -205,8 +205,8 @@ const authenticateToken = (req: express.Request, res: express.Response, next: ex
 
   jwt.verify(token, JWT_SECRET, (err: any, user: any) => {
     if (err) {
-      console.error('JWT Verify Error:', err);
-      return res.status(403).json({ error: err.message, secret: JWT_SECRET });
+      console.error('JWT Verify Error:', err.message);
+      return res.status(403).json({ error: err.message });
     }
     (req as any).user = user;
     next();
