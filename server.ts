@@ -385,7 +385,22 @@ app.get('/api/featured_events/active', (req, res) => {
         // parsedLineup is an array of { day: string, bandIds: string[] }
         const populatedLineup = parsedLineup.map((dayObj: any) => {
           const bands = dayObj.bandIds.map((id: string) => {
-            return db.prepare('SELECT * FROM bands WHERE band_id = ?').get(id);
+            const b = db.prepare('SELECT * FROM bands WHERE band_id = ?').get(id) as any;
+            if (!b) return null;
+            return {
+              id: b.band_id,
+              name: b.name,
+              name_zh: b.name_zh,
+              genre: b.genre,
+              intro: b.intro,
+              city: b.city_id,
+              city_zh: b.city_zh ? b.city_zh.replace(/(省|市|维吾尔自治区|壮族自治区|回族自治区|自治区|特别行政区|自治州|地区|盟)$/, '') : '',
+              imageUrl: b.image_url,
+              contactInfo: b.contact_info,
+              neteaseUrl: b.netease_url,
+              xiaohongshuUrl: b.xiaohongshu_url,
+              dbId: b.id
+            };
           }).filter(Boolean);
           return { ...dayObj, bands };
         });
