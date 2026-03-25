@@ -348,7 +348,7 @@ export default function AdminPage() {
 
   if (!token) {
     return (
-      <div className="min-h-screen bg-[#0a0502] flex items-center justify-center p-4">
+      <div className="min-h-[100dvh] bg-[#0a0502] flex items-center justify-center p-4">
         <form onSubmit={handleLogin} className="bg-[#1a1a1a] p-8 rounded-2xl max-w-md w-full border border-white/10">
           <div className="flex justify-center mb-6">
             <div className="w-12 h-12 bg-[#ff4e00] rounded-full flex items-center justify-center text-white">
@@ -375,7 +375,7 @@ export default function AdminPage() {
   const currentList = activeTab === 'bands' ? bands : activeTab === 'venues' ? venues : events;
 
   return (
-    <div className="min-h-screen bg-[#0a0502] text-white p-8 font-sans">
+    <div className="min-h-[100dvh] bg-[#0a0502] text-white p-8 font-sans">
       <div className="max-w-6xl mx-auto">
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-serif">Data Management</h1>

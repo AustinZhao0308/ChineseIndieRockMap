@@ -74,7 +74,7 @@ const ProvincePanel: React.FC<ProvincePanelProps> = ({ province, onClose, onBand
           onTouchEnd={handleTouchEnd}
           className="absolute bottom-0 md:top-0 right-0 w-full md:w-[400px] bg-[#151619]/90 backdrop-blur-xl border-t md:border-t-0 md:border-l border-white/10 shadow-[0_-10px_40px_rgba(0,0,0,0.5)] md:shadow-2xl z-40 overflow-y-auto scrollbar-hide rounded-t-3xl md:rounded-none"
         >
-          <div className="p-6">
+          <div className="p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
             {/* Mobile drag indicator */}
             <div 
               className="w-12 h-1.5 bg-white/20 rounded-full mx-auto mb-6 md:hidden cursor-pointer" 

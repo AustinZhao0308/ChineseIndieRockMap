@@ -51,7 +51,7 @@ export default function FeedbackMenu({ isPanelOpen = false, hasBanner = false }:
   return (
     <div 
       className={`absolute right-4 md:right-8 z-30 transition-all duration-500 ease-in-out
-        ${hasBanner ? 'bottom-[6rem] md:bottom-8' : 'bottom-6 md:bottom-8'}
+        ${hasBanner ? 'bottom-[calc(6rem+env(safe-area-inset-bottom))] md:bottom-8' : 'bottom-[calc(1.5rem+env(safe-area-inset-bottom))] md:bottom-8'}
         ${isPanelOpen 
           ? 'opacity-0 pointer-events-none md:opacity-100 md:pointer-events-auto' 
           : ''

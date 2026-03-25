@@ -53,14 +53,14 @@ export default function MapPage() {
 
   if (loading) {
     return (
-      <div className="w-full h-screen bg-[#0a0502] flex items-center justify-center">
+      <div className="w-full h-[100dvh] bg-[#0a0502] flex items-center justify-center">
         <div className="text-[#ff4e00] text-xl font-mono animate-pulse">Loading Map Data...</div>
       </div>
     );
   }
 
   return (
-    <div className="w-full h-screen bg-[#0a0502] overflow-hidden font-sans relative">
+    <div className="w-full h-[100dvh] bg-[#0a0502] overflow-hidden font-sans relative">
       {/* Header */}
       <header className="absolute top-0 left-0 w-full p-6 z-10 pointer-events-none flex justify-between items-start">
         <div className="pointer-events-auto">

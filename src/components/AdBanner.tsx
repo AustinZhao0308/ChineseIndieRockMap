@@ -22,8 +22,8 @@ const AdBanner: React.FC<AdBannerProps> = ({ isPanelOpen, onClick, onClose, even
         className={`absolute z-30 transition-all duration-500 ease-in-out
           left-4 right-4 md:right-auto md:w-[400px]
           ${isPanelOpen 
-            ? 'opacity-0 pointer-events-none md:opacity-100 md:pointer-events-auto bottom-6 md:left-6' 
-            : 'bottom-6 md:left-6'
+            ? 'opacity-0 pointer-events-none md:opacity-100 md:pointer-events-auto bottom-[calc(1.5rem+env(safe-area-inset-bottom))] md:bottom-6 md:left-6' 
+            : 'bottom-[calc(1.5rem+env(safe-area-inset-bottom))] md:bottom-6 md:left-6'
           }
         `}
       >
