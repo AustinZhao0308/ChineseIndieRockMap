@@ -1,5 +1,5 @@
 import React from "react";
-import { X, MapPin, Music, Building2, Users, Mic2, Coffee, DollarSign } from "lucide-react";
+import { X, MapPin, Music, Building2, Users, Mic2, Coffee, DollarSign, ChevronRight } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { Province, Band, Venue, RehearsalRoom, Spot } from "../data";
 
@@ -10,30 +10,42 @@ interface ProvincePanelProps {
   onVenueClick: (venue: Venue) => void;
   onRehearsalRoomClick: (room: RehearsalRoom) => void;
   onSpotClick: (spot: Spot) => void;
-  activeCategory: 'bands' | 'venues' | 'rehearsal_rooms' | 'spots';
 }
 
-const ProvincePanel: React.FC<ProvincePanelProps> = ({ province, onClose, onBandClick, onVenueClick, onRehearsalRoomClick, onSpotClick, activeCategory }) => {
+const ProvincePanel: React.FC<ProvincePanelProps> = ({ province, onClose, onBandClick, onVenueClick, onRehearsalRoomClick, onSpotClick }) => {
   const [isMobile, setIsMobile] = React.useState(
     typeof window !== "undefined" ? window.innerWidth < 768 : false
   );
+  const [activeTab, setActiveTab] = React.useState<'bands' | 'venues' | 'rehearsal_rooms' | 'spots'>('bands');
   const [isExpanded, setIsExpanded] = React.useState(false);
+  const [showRightArrow, setShowRightArrow] = React.useState(false);
+  const tabsRef = React.useRef<HTMLDivElement>(null);
   const touchStartY = React.useRef(0);
   const scrollTopAtStart = React.useRef(0);
+
+  const checkScroll = React.useCallback(() => {
+    if (tabsRef.current) {
+      const { scrollLeft, scrollWidth, clientWidth } = tabsRef.current;
+      setShowRightArrow(scrollLeft + clientWidth < scrollWidth - 5);
+    }
+  }, []);
 
   React.useEffect(() => {
     const handleResize = () => {
       setIsMobile(window.innerWidth < 768);
+      checkScroll();
     };
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
-  }, []);
+  }, [checkScroll]);
 
   React.useEffect(() => {
     if (province) {
+      setActiveTab('bands');
       setIsExpanded(false);
+      setTimeout(checkScroll, 50);
     }
-  }, [province]);
+  }, [province, checkScroll]);
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     if (isMobile) {
@@ -82,7 +94,7 @@ const ProvincePanel: React.FC<ProvincePanelProps> = ({ province, onClose, onBand
               onClick={() => setIsExpanded(!isExpanded)}
             />
             
-            <div className="flex justify-between items-center mb-8">
+            <div className="flex justify-between items-center mb-6">
               <div>
                 <h2 className="text-4xl font-serif text-white tracking-tight">
                   {province.name_zh}
@@ -99,11 +111,80 @@ const ProvincePanel: React.FC<ProvincePanelProps> = ({ province, onClose, onBand
               </button>
             </div>
 
-            <div className="space-y-8">
+            {/* Tabs */}
+            <div className="relative mb-8">
+              <div 
+                ref={tabsRef}
+                onScroll={checkScroll}
+                className="flex gap-6 border-b border-white/10 overflow-x-auto scrollbar-hide pr-8"
+              >
+                <button
+                onClick={() => setActiveTab('bands')}
+                className={`pb-3 text-sm font-medium uppercase tracking-widest border-b-2 transition-colors whitespace-nowrap ${
+                  activeTab === 'bands' 
+                    ? 'text-[#ff4e00] border-[#ff4e00]' 
+                    : 'text-gray-500 border-transparent hover:text-gray-300'
+                }`}
+              >
+                乐队 Bands
+              </button>
+              <button
+                onClick={() => setActiveTab('venues')}
+                className={`pb-3 text-sm font-medium uppercase tracking-widest border-b-2 transition-colors whitespace-nowrap ${
+                  activeTab === 'venues' 
+                    ? 'text-[#ff4e00] border-[#ff4e00]' 
+                    : 'text-gray-500 border-transparent hover:text-gray-300'
+                }`}
+              >
+                场地 Venues
+              </button>
+              <button
+                onClick={() => setActiveTab('rehearsal_rooms')}
+                className={`pb-3 text-sm font-medium uppercase tracking-widest border-b-2 transition-colors whitespace-nowrap ${
+                  activeTab === 'rehearsal_rooms' 
+                    ? 'text-[#ff4e00] border-[#ff4e00]' 
+                    : 'text-gray-500 border-transparent hover:text-gray-300'
+                }`}
+              >
+                排练房 Rehearsal
+              </button>
+              <button
+                onClick={() => setActiveTab('spots')}
+                className={`pb-3 text-sm font-medium uppercase tracking-widest border-b-2 transition-colors whitespace-nowrap ${
+                  activeTab === 'spots' 
+                    ? 'text-[#ff4e00] border-[#ff4e00]' 
+                    : 'text-gray-500 border-transparent hover:text-gray-300'
+                }`}
+              >
+                城市角落 Spots
+              </button>
+            </div>
+
+            {/* Right Arrow Indicator */}
+            <AnimatePresence>
+              {showRightArrow && (
+                <motion.div 
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="absolute right-0 top-0 bottom-0 flex items-center justify-center w-12 bg-gradient-to-l from-[#151619] via-[#151619]/80 to-transparent pointer-events-none"
+                >
+                  <motion.div
+                    animate={{ x: [0, 4, 0] }}
+                    transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
+                  >
+                    <ChevronRight size={18} className="text-[#ff4e00]" />
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
+          <div className="space-y-8">
               {province.cities.map((city, cityIdx) => {
-                const hasContent = activeCategory === 'bands' ? city.bands.length > 0 : 
-                                   activeCategory === 'venues' ? (city.venues && city.venues.length > 0) :
-                                   activeCategory === 'rehearsal_rooms' ? (city.rehearsalRooms && city.rehearsalRooms.length > 0) :
+                const hasContent = activeTab === 'bands' ? city.bands.length > 0 : 
+                                   activeTab === 'venues' ? (city.venues && city.venues.length > 0) :
+                                   activeTab === 'rehearsal_rooms' ? (city.rehearsalRooms && city.rehearsalRooms.length > 0) :
                                    (city.spots && city.spots.length > 0);
                 
                 if (!hasContent) return null;
@@ -117,7 +198,7 @@ const ProvincePanel: React.FC<ProvincePanelProps> = ({ province, onClose, onBand
                     </div>
                     
                     <div className="space-y-3 pl-6 border-l border-white/10 ml-[9px]">
-                      {activeCategory === 'bands' && city.bands.map((band) => (
+                      {activeTab === 'bands' && city.bands.map((band) => (
                         <motion.div
                           whileHover={{ x: 4 }}
                           key={band.id}
@@ -162,7 +243,7 @@ const ProvincePanel: React.FC<ProvincePanelProps> = ({ province, onClose, onBand
                         </motion.div>
                       ))}
 
-                      {activeCategory === 'venues' && city.venues?.map((venue) => (
+                      {activeTab === 'venues' && city.venues?.map((venue) => (
                         <motion.div
                           whileHover={{ x: 4 }}
                           key={venue.id}
@@ -216,7 +297,7 @@ const ProvincePanel: React.FC<ProvincePanelProps> = ({ province, onClose, onBand
                         </motion.div>
                       ))}
 
-                      {activeCategory === 'rehearsal_rooms' && city.rehearsalRooms?.map((room) => (
+                      {activeTab === 'rehearsal_rooms' && city.rehearsalRooms?.map((room) => (
                         <motion.div
                           whileHover={{ x: 4 }}
                           key={room.id}
@@ -265,7 +346,7 @@ const ProvincePanel: React.FC<ProvincePanelProps> = ({ province, onClose, onBand
                         </motion.div>
                       ))}
 
-                      {activeCategory === 'spots' && city.spots?.map((spot) => (
+                      {activeTab === 'spots' && city.spots?.map((spot) => (
                         <motion.div
                           whileHover={{ x: 4 }}
                           key={spot.id}
@@ -320,21 +401,21 @@ const ProvincePanel: React.FC<ProvincePanelProps> = ({ province, onClose, onBand
               })}
               
               {/* Empty state for venues if none exist in the province */}
-              {activeCategory === 'venues' && !province.cities.some(city => city.venues && city.venues.length > 0) && (
+              {activeTab === 'venues' && !province.cities.some(city => city.venues && city.venues.length > 0) && (
                 <div className="text-center py-12">
                   <Building2 size={32} className="mx-auto text-gray-600 mb-4" />
                   <p className="text-gray-400 text-sm">该省份暂无场地信息</p>
                 </div>
               )}
 
-              {activeCategory === 'rehearsal_rooms' && !province.cities.some(city => city.rehearsalRooms && city.rehearsalRooms.length > 0) && (
+              {activeTab === 'rehearsal_rooms' && !province.cities.some(city => city.rehearsalRooms && city.rehearsalRooms.length > 0) && (
                 <div className="text-center py-12">
                   <Mic2 size={32} className="mx-auto text-gray-600 mb-4" />
                   <p className="text-gray-400 text-sm">该省份暂无排练房信息</p>
                 </div>
               )}
 
-              {activeCategory === 'spots' && !province.cities.some(city => city.spots && city.spots.length > 0) && (
+              {activeTab === 'spots' && !province.cities.some(city => city.spots && city.spots.length > 0) && (
                 <div className="text-center py-12">
                   <Coffee size={32} className="mx-auto text-gray-600 mb-4" />
                   <p className="text-gray-400 text-sm">该省份暂无城市角落信息</p>

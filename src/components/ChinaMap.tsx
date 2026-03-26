@@ -16,57 +16,10 @@ const normalizeProvinceName = (name: string) => {
   return name.replace(/(省|市|维吾尔自治区|壮族自治区|回族自治区|自治区|特别行政区)$/, '');
 };
 
-// Helper to interpolate between two hex colors
-const interpolateColor = (color1: string, color2: string, factor: number) => {
-  const hexToRgb = (hex: string) => {
-    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-    return result ? {
-      r: parseInt(result[1], 16),
-      g: parseInt(result[2], 16),
-      b: parseInt(result[3], 16)
-    } : null;
-  };
-
-  const c1 = hexToRgb(color1);
-  const c2 = hexToRgb(color2);
-  if (!c1 || !c2) return color1;
-  
-  // Clamp factor between 0 and 1
-  const clampedFactor = Math.max(0, Math.min(1, factor));
-  
-  const r = Math.round(c1.r + clampedFactor * (c2.r - c1.r));
-  const g = Math.round(c1.g + clampedFactor * (c2.g - c1.g));
-  const b = Math.round(c1.b + clampedFactor * (c2.b - c1.b));
-  
-  return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
-};
-
 const ChinaMap: React.FC<ChinaMapProps> = ({ onProvinceClick, selectedProvinceId, provinceData }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const [transform, setTransform] = useState<ZoomTransform>(zoomIdentity);
   const [hoveredProvince, setHoveredProvince] = useState<string | null>(null);
-
-  // Calculate total counts for each province and the maximum count
-  const { provinceCounts, maxCount } = useMemo(() => {
-    const counts: Record<string, number> = {};
-    let max = 0;
-    
-    Object.entries(provinceData).forEach(([provinceName, provData]) => {
-      let total = 0;
-      provData.cities.forEach(c => {
-        total += (c.bands?.length || 0);
-        total += (c.venues?.length || 0);
-        total += (c.rehearsalRooms?.length || 0);
-        total += (c.spots?.length || 0);
-      });
-      counts[provinceName] = total;
-      if (total > max) {
-        max = total;
-      }
-    });
-    
-    return { provinceCounts: counts, maxCount: max };
-  }, [provinceData]);
 
   // Set up projection
   const projection = useMemo(() => {
@@ -131,31 +84,24 @@ const ChinaMap: React.FC<ChinaMapProps> = ({ onProvinceClick, selectedProvinceId
             const rawName = geo.properties.name;
             const provinceName = normalizeProvinceName(rawName);
             
-            const count = provinceCounts[provinceName] || 0;
-            const hasData = count > 0;
+            // Check if there are any bands, venues, rehearsal rooms, or spots in this province
+            const provData = provinceData[provinceName];
+            const hasBands = provData && provData.cities.some(c => 
+              c.bands.length > 0 || 
+              (c.venues && c.venues.length > 0) ||
+              (c.rehearsalRooms && c.rehearsalRooms.length > 0) ||
+              (c.spots && c.spots.length > 0)
+            );
             
             const isSelected = selectedProvinceId === provinceName;
             const isHovered = hoveredProvince === provinceName;
 
             // Determine styles
-            let fill = "#1a1a1a"; // Default no data
-            
-            if (isSelected) {
-              fill = "#ff4e00"; // Selected highlight
-            } else if (isHovered && hasData) {
-              fill = "#ff4e00"; // Hover highlight
-            } else if (isHovered && !hasData) {
-              fill = "#222222"; // Hover no data
-            } else if (hasData) {
-              // Dynamic color interpolation for unselected state with data
-              // Use square root compression to ensure most provinces stay closer to the dark base color
-              // while still showing differences.
-              const ratio = maxCount > 0 ? count / maxCount : 0;
-              const factor = Math.pow(ratio, 0.5); 
-              
-              // Min color: #2c100b, Max color: #8a2e00
-              fill = interpolateColor("#2c100b", "#8a2e00", factor);
-            }
+            let fill = "#1a1a1a";
+            if (isSelected) fill = "#ff4e00";
+            else if (isHovered && hasBands) fill = "#ff4e00";
+            else if (isHovered && !hasBands) fill = "#222222";
+            else if (hasBands) fill = "#3a1510";
 
             return (
               <path
@@ -165,14 +111,14 @@ const ChinaMap: React.FC<ChinaMapProps> = ({ onProvinceClick, selectedProvinceId
                 stroke={isHovered ? "#555555" : "#333333"}
                 strokeWidth={(isHovered ? 1 : 0.5) / transform.k}
                 style={{
-                  cursor: hasData ? "pointer" : "default",
+                  cursor: hasBands ? "pointer" : "default",
                   transition: "fill 250ms, stroke 250ms",
                   outline: "none"
                 }}
                 onMouseEnter={() => setHoveredProvince(provinceName)}
                 onMouseLeave={() => setHoveredProvince(null)}
                 onClick={() => {
-                  if (hasData) {
+                  if (hasBands) {
                     const centroid = geoCentroid(geo);
                     const isDesktop = window.innerWidth >= 768;
                     const longitudeOffset = isDesktop ? 6 : 0;
