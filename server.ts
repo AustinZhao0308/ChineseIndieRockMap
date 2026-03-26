@@ -6,18 +6,12 @@ import path from 'path';
 import fs from 'fs';
 import multer from 'multer';
 import { createServer as createViteServer } from 'vite';
-import bcrypt from 'bcrypt';
 
 dotenv.config();
 
 const app = express();
 const PORT = 3000;
-// Default hash is for 'bercatpwd2024'
-let ADMIN_PASSWORD_HASH = process.env.ADMIN_PASSWORD_HASH || '$2b$10$7MOD0rEBAzJ8FAtlvThBY.GKhv8LFnswAY2zctGf161bhRTITR06q';
-if (!ADMIN_PASSWORD_HASH.startsWith('$2')) {
-  console.warn('Warning: ADMIN_PASSWORD_HASH in environment is not a valid bcrypt hash. Falling back to default.');
-  ADMIN_PASSWORD_HASH = '$2b$10$7MOD0rEBAzJ8FAtlvThBY.GKhv8LFnswAY2zctGf161bhRTITR06q';
-}
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
 const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_jwt_key_for_indie_rock_map';
 
 app.use(express.json());
@@ -220,12 +214,9 @@ const authenticateToken = (req: express.Request, res: express.Response, next: ex
 };
 
 // API Routes
-app.post('/api/login', async (req, res) => {
+app.post('/api/login', (req, res) => {
   const { password } = req.body;
-  
-  const isValid = await bcrypt.compare(password, ADMIN_PASSWORD_HASH);
-
-  if (isValid) {
+  if (password === ADMIN_PASSWORD) {
     const token = jwt.sign({ role: 'admin' }, JWT_SECRET, { expiresIn: '24h' });
     res.json({ token });
   } else {
