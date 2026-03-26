@@ -5,13 +5,14 @@ import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
 import multer from 'multer';
+import bcrypt from 'bcryptjs';
 import { createServer as createViteServer } from 'vite';
 
 dotenv.config();
 
 const app = express();
 const PORT = 3000;
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
+const ADMIN_PASSWORD_HASH = process.env.ADMIN_PASSWORD_HASH || '$2b$10$xVBmUPJph0jgqqkqnLIt8e.4EhwN4NYUj1wqEazquAsPWtEazLvDO'; // Default hash for 'bercat2026'
 const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_jwt_key_for_indie_rock_map';
 
 app.use(express.json());
@@ -214,9 +215,10 @@ const authenticateToken = (req: express.Request, res: express.Response, next: ex
 };
 
 // API Routes
-app.post('/api/login', (req, res) => {
+app.post('/api/login', async (req, res) => {
   const { password } = req.body;
-  if (password === ADMIN_PASSWORD) {
+  const isValid = await bcrypt.compare(password, ADMIN_PASSWORD_HASH);
+  if (isValid) {
     const token = jwt.sign({ role: 'admin' }, JWT_SECRET, { expiresIn: '24h' });
     res.json({ token });
   } else {

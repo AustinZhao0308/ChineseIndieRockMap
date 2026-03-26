@@ -9,13 +9,14 @@ export default function AdminPage() {
   const [venues, setVenues] = useState<any[]>([]);
   const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'bands' | 'venues' | 'events'>('bands');
+  const [activeTab, setActiveTab] = useState<'bands' | 'venues' | 'events' | 'settings'>('bands');
   const [locations, setLocations] = useState<any[]>([]);
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const [message, setMessage] = useState<{text: string, type: 'error' | 'success'} | null>(null);
   const [imageInputType, setImageInputType] = useState<'upload' | 'url'>('upload');
   const [contactType, setContactType] = useState<'wechat' | 'email'>('wechat');
   const [contactValue, setContactValue] = useState('');
+  const [passwordForm, setPasswordForm] = useState({ oldPassword: '', newPassword: '', confirmPassword: '' });
 
   const showMessage = (text: string, type: 'error' | 'success' = 'error') => {
     setMessage({ text, type });
@@ -116,6 +117,36 @@ export default function AdminPage() {
   const handleLogout = () => {
     setToken(null);
     localStorage.removeItem('adminToken');
+  };
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      showMessage('New passwords do not match', 'error');
+      return;
+    }
+    try {
+      const res = await fetch('/api/admin/password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          oldPassword: passwordForm.oldPassword,
+          newPassword: passwordForm.newPassword
+        })
+      });
+      if (res.ok) {
+        showMessage('Password updated successfully', 'success');
+        setPasswordForm({ oldPassword: '', newPassword: '', confirmPassword: '' });
+      } else {
+        const data = await res.json();
+        showMessage(data.error || 'Failed to update password', 'error');
+      }
+    } catch (err) {
+      showMessage('Network error', 'error');
+    }
   };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -411,8 +442,51 @@ export default function AdminPage() {
           >
             <Calendar size={18} /> Manage Events
           </button>
+          <button 
+            onClick={() => { setActiveTab('settings'); resetForm(); }}
+            className={`flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-colors ${activeTab === 'settings' ? 'bg-[#ff4e00] text-white' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}
+          >
+            <Lock size={18} /> Settings
+          </button>
         </div>
 
+        {activeTab === 'settings' ? (
+          <div className="bg-[#1a1a1a] p-6 rounded-2xl border border-white/10 max-w-md">
+            <h2 className="text-xl mb-6 font-medium flex items-center gap-2">
+              <Lock size={20} className="text-[#ff4e00]" />
+              Change Password
+            </h2>
+            <form onSubmit={handleChangePassword} className="space-y-4">
+              <input
+                type="password"
+                required
+                placeholder="Current Password"
+                value={passwordForm.oldPassword}
+                onChange={e => setPasswordForm({...passwordForm, oldPassword: e.target.value})}
+                className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-full text-white focus:outline-none focus:border-[#ff4e00]"
+              />
+              <input
+                type="password"
+                required
+                placeholder="New Password"
+                value={passwordForm.newPassword}
+                onChange={e => setPasswordForm({...passwordForm, newPassword: e.target.value})}
+                className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-full text-white focus:outline-none focus:border-[#ff4e00]"
+              />
+              <input
+                type="password"
+                required
+                placeholder="Confirm New Password"
+                value={passwordForm.confirmPassword}
+                onChange={e => setPasswordForm({...passwordForm, confirmPassword: e.target.value})}
+                className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-full text-white focus:outline-none focus:border-[#ff4e00]"
+              />
+              <button type="submit" className="w-full bg-[#ff4e00] text-white rounded py-2 text-sm font-medium hover:bg-[#ff4e00]/90">
+                Update Password
+              </button>
+            </form>
+          </div>
+        ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Form */}
           <div className="bg-[#1a1a1a] p-6 rounded-2xl border border-white/10 h-fit">
@@ -676,6 +750,7 @@ export default function AdminPage() {
             )}
           </div>
         </div>
+        )}
       </div>
     </div>
   );
