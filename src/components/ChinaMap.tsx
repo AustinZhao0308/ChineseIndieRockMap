@@ -31,22 +31,6 @@ const ChinaMap: React.FC<ChinaMapProps> = ({ onProvinceClick, selectedProvinceId
 
   const pathGenerator = useMemo(() => geoPath().projection(projection), [projection]);
 
-  // Calculate maximum items across all provinces for dynamic heatmap scaling
-  const maxItems = useMemo(() => {
-    let max = 0;
-    Object.values(provinceData).forEach(prov => {
-      let total = 0;
-      prov.cities.forEach(c => {
-        total += c.bands?.length || 0;
-        total += c.venues?.length || 0;
-        total += c.rehearsalRooms?.length || 0;
-        total += c.spots?.length || 0;
-      });
-      if (total > max) max = total;
-    });
-    return max || 1; // prevent division by zero
-  }, [provinceData]);
-
   // Set up d3-zoom
   const zoomBehavior = useMemo(() => {
     return d3Zoom<SVGSVGElement, unknown>()
@@ -102,45 +86,22 @@ const ChinaMap: React.FC<ChinaMapProps> = ({ onProvinceClick, selectedProvinceId
             
             // Check if there are any bands, venues, rehearsal rooms, or spots in this province
             const provData = provinceData[provinceName];
-            let totalItems = 0;
-            if (provData) {
-              provData.cities.forEach(c => {
-                totalItems += c.bands?.length || 0;
-                totalItems += c.venues?.length || 0;
-                totalItems += c.rehearsalRooms?.length || 0;
-                totalItems += c.spots?.length || 0;
-              });
-            }
-            const hasBands = totalItems > 0;
+            const hasBands = provData && provData.cities.some(c => 
+              c.bands.length > 0 || 
+              (c.venues && c.venues.length > 0) ||
+              (c.rehearsalRooms && c.rehearsalRooms.length > 0) ||
+              (c.spots && c.spots.length > 0)
+            );
             
             const isSelected = selectedProvinceId === provinceName;
             const isHovered = hoveredProvince === provinceName;
 
-            // Determine styles based on item count (Dynamic Heatmap effect)
+            // Determine styles
             let fill = "#1a1a1a";
-            if (isSelected) {
-              fill = "#ff4e00";
-            } else if (isHovered && hasBands) {
-              fill = "#ff4e00";
-            } else if (isHovered && !hasBands) {
-              fill = "#222222";
-            } else if (hasBands) {
-              // Calculate ratio relative to maxItems (using sqrt for better distribution of skewed data)
-              const ratio = maxItems > 1 ? Math.sqrt(totalItems / maxItems) : 1;
-              
-              // Interpolate between dark orange/brown (#3a1510) and bright orange (#f24a00)
-              // #3a1510 = rgb(58, 21, 16)
-              // #f24a00 = rgb(242, 74, 0)
-              // We use a minimum intensity so even 1 item is visible
-              const minIntensity = 0.15;
-              const intensity = minIntensity + (1 - minIntensity) * ratio;
-              
-              const r = Math.round(58 + (242 - 58) * intensity);
-              const g = Math.round(21 + (74 - 21) * intensity);
-              const b = Math.round(16 + (0 - 16) * intensity);
-              
-              fill = `rgb(${r}, ${g}, ${b})`;
-            }
+            if (isSelected) fill = "#ff4e00";
+            else if (isHovered && hasBands) fill = "#ff4e00";
+            else if (isHovered && !hasBands) fill = "#222222";
+            else if (hasBands) fill = "#3a1510";
 
             return (
               <path

@@ -15,7 +15,6 @@ import { useProvinceData } from "../hooks/useProvinceData";
 export default function MapPage() {
   const { data: provinceData, loading } = useProvinceData();
   const [selectedProvinceId, setSelectedProvinceId] = useState<string | null>(null);
-  const [activeCategory, setActiveCategory] = useState<'bands' | 'venues' | 'rehearsal_rooms' | 'spots'>('bands');
   const [selectedBand, setSelectedBand] = useState<Band | null>(null);
   const [selectedVenue, setSelectedVenue] = useState<Venue | null>(null);
   const [selectedRehearsalRoom, setSelectedRehearsalRoom] = useState<RehearsalRoom | null>(null);
@@ -97,32 +96,6 @@ export default function MapPage() {
                 by <span className="text-[#ff4e00] font-semibold">Catbeer Records</span>
               </p>
             </div>
-
-            {/* Category Selector */}
-            <div className="mt-6 md:mt-8 flex flex-nowrap gap-3 sm:gap-5 md:gap-6 overflow-x-auto scrollbar-hide max-w-[calc(100vw-3rem)] md:max-w-none pb-1">
-              {[
-                { id: 'bands', zh: '乐队', en: 'BANDS' },
-                { id: 'venues', zh: '场地', en: 'VENUES' },
-                { id: 'rehearsal_rooms', zh: '排练房', en: 'REHEARSAL' },
-                { id: 'spots', zh: '角落', en: 'SPOTS' }
-              ].map(cat => (
-                <button
-                  key={cat.id}
-                  onClick={() => {
-                    setActiveCategory(cat.id as any);
-                    setSelectedProvinceId(null); // Close panel when switching categories
-                  }}
-                  className={`flex items-baseline gap-1 whitespace-nowrap pb-1.5 border-b-2 transition-colors ${
-                    activeCategory === cat.id
-                      ? 'text-[#ff4e00] border-[#ff4e00]'
-                      : 'text-gray-500 border-transparent hover:text-gray-300'
-                  }`}
-                >
-                  <span className="text-xs sm:text-sm font-medium tracking-widest">{cat.zh}</span>
-                  <span className="text-[8px] sm:text-[10px] font-mono tracking-wider uppercase opacity-80">{cat.en}</span>
-                </button>
-              ))}
-            </div>
           </div>
         </div>
         
@@ -138,7 +111,6 @@ export default function MapPage() {
         onProvinceClick={handleProvinceClick} 
         selectedProvinceId={selectedProvinceId} 
         provinceData={provinceData}
-        activeCategory={activeCategory}
       />
 
       {/* Side Panel */}
@@ -149,7 +121,6 @@ export default function MapPage() {
         onVenueClick={handleVenueClick}
         onRehearsalRoomClick={handleRehearsalRoomClick}
         onSpotClick={handleSpotClick}
-        activeCategory={activeCategory}
       />
 
       {/* Band Modal */}
