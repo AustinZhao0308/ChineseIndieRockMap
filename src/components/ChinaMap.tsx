@@ -16,6 +16,26 @@ const normalizeProvinceName = (name: string) => {
   return name.replace(/(省|市|维吾尔自治区|壮族自治区|回族自治区|自治区|特别行政区)$/, '');
 };
 
+const hexToRgb = (hex: string) => {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  return result ? {
+    r: parseInt(result[1], 16),
+    g: parseInt(result[2], 16),
+    b: parseInt(result[3], 16)
+  } : { r: 0, g: 0, b: 0 };
+};
+
+const interpolateColor = (color1: string, color2: string, factor: number) => {
+  const c1 = hexToRgb(color1);
+  const c2 = hexToRgb(color2);
+  
+  const r = Math.round(c1.r + factor * (c2.r - c1.r));
+  const g = Math.round(c1.g + factor * (c2.g - c1.g));
+  const b = Math.round(c1.b + factor * (c2.b - c1.b));
+  
+  return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
+};
+
 const ChinaMap: React.FC<ChinaMapProps> = ({ onProvinceClick, selectedProvinceId, provinceData }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const [transform, setTransform] = useState<ZoomTransform>(zoomIdentity);
@@ -39,6 +59,34 @@ const ChinaMap: React.FC<ChinaMapProps> = ({ onProvinceClick, selectedProvinceId
         setTransform(event.transform);
       });
   }, []);
+
+  // Calculate province data counts
+  const { provinceCounts, minCount, maxCount } = useMemo(() => {
+    const counts: Record<string, number> = {};
+    let min = Infinity;
+    let max = -Infinity;
+
+    Object.entries(provinceData).forEach(([provinceName, provData]) => {
+      let count = 0;
+      provData.cities.forEach(c => {
+        count += c.bands?.length || 0;
+        count += c.venues?.length || 0;
+        count += c.rehearsalRooms?.length || 0;
+        count += c.spots?.length || 0;
+      });
+      if (count > 0) {
+        counts[provinceName] = count;
+        if (count < min) min = count;
+        if (count > max) max = count;
+      }
+    });
+
+    return { 
+      provinceCounts: counts, 
+      minCount: min === Infinity ? 0 : min, 
+      maxCount: max === -Infinity ? 0 : max 
+    };
+  }, [provinceData]);
 
   useEffect(() => {
     if (svgRef.current) {
@@ -85,13 +133,8 @@ const ChinaMap: React.FC<ChinaMapProps> = ({ onProvinceClick, selectedProvinceId
             const provinceName = normalizeProvinceName(rawName);
             
             // Check if there are any bands, venues, rehearsal rooms, or spots in this province
-            const provData = provinceData[provinceName];
-            const hasBands = provData && provData.cities.some(c => 
-              c.bands.length > 0 || 
-              (c.venues && c.venues.length > 0) ||
-              (c.rehearsalRooms && c.rehearsalRooms.length > 0) ||
-              (c.spots && c.spots.length > 0)
-            );
+            const count = provinceCounts[provinceName] || 0;
+            const hasData = count > 0;
             
             const isSelected = selectedProvinceId === provinceName;
             const isHovered = hoveredProvince === provinceName;
@@ -99,9 +142,12 @@ const ChinaMap: React.FC<ChinaMapProps> = ({ onProvinceClick, selectedProvinceId
             // Determine styles
             let fill = "#1a1a1a";
             if (isSelected) fill = "#ff4e00";
-            else if (isHovered && hasBands) fill = "#ff4e00";
-            else if (isHovered && !hasBands) fill = "#222222";
-            else if (hasBands) fill = "#3a1510";
+            else if (isHovered && hasData) fill = "#ff4e00";
+            else if (isHovered && !hasData) fill = "#222222";
+            else if (hasData) {
+              const factor = maxCount > minCount ? (count - minCount) / (maxCount - minCount) : 0;
+              fill = interpolateColor("#2c100b", "#732600", factor);
+            }
 
             return (
               <path
@@ -111,14 +157,14 @@ const ChinaMap: React.FC<ChinaMapProps> = ({ onProvinceClick, selectedProvinceId
                 stroke={isHovered ? "#555555" : "#333333"}
                 strokeWidth={(isHovered ? 1 : 0.5) / transform.k}
                 style={{
-                  cursor: hasBands ? "pointer" : "default",
+                  cursor: hasData ? "pointer" : "default",
                   transition: "fill 250ms, stroke 250ms",
                   outline: "none"
                 }}
                 onMouseEnter={() => setHoveredProvince(provinceName)}
                 onMouseLeave={() => setHoveredProvince(null)}
                 onClick={() => {
-                  if (hasBands) {
+                  if (hasData) {
                     const centroid = geoCentroid(geo);
                     const isDesktop = window.innerWidth >= 768;
                     const longitudeOffset = isDesktop ? 6 : 0;
