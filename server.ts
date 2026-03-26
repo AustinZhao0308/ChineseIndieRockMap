@@ -101,6 +101,41 @@ db.exec(`
     is_active INTEGER DEFAULT 0,
     lineup TEXT
   );
+
+  CREATE TABLE IF NOT EXISTS rehearsal_rooms (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    province_id TEXT NOT NULL,
+    province_zh TEXT NOT NULL,
+    city_id TEXT NOT NULL,
+    city_zh TEXT NOT NULL,
+    room_id TEXT NOT NULL UNIQUE,
+    name TEXT NOT NULL,
+    name_zh TEXT NOT NULL,
+    address TEXT NOT NULL,
+    equipment TEXT NOT NULL,
+    price_info TEXT NOT NULL,
+    intro TEXT NOT NULL,
+    image_url TEXT,
+    contact_info TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS spots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    province_id TEXT NOT NULL,
+    province_zh TEXT NOT NULL,
+    city_id TEXT NOT NULL,
+    city_zh TEXT NOT NULL,
+    spot_id TEXT NOT NULL UNIQUE,
+    name TEXT NOT NULL,
+    name_zh TEXT NOT NULL,
+    type TEXT NOT NULL,
+    address TEXT NOT NULL,
+    business_hours TEXT NOT NULL,
+    intro TEXT NOT NULL,
+    image_url TEXT,
+    contact_info TEXT,
+    social_url TEXT
+  );
 `);
 
 // Add columns to existing tables if they don't exist (migration)
@@ -459,6 +494,98 @@ app.delete('/api/featured_events/:id', authenticateToken, (req, res) => {
       deleteLocalImage(event.image_url);
     }
     db.prepare('DELETE FROM featured_events WHERE id = ?').run(req.params.id);
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Rehearsal Rooms API
+app.get('/api/rehearsal_rooms', (req, res) => {
+  const rooms = db.prepare('SELECT * FROM rehearsal_rooms').all();
+  res.json(rooms);
+});
+
+app.post('/api/rehearsal_rooms', authenticateToken, (req, res) => {
+  const { province_id, province_zh, city_id, city_zh, room_id, name, name_zh, address, equipment, price_info, intro, image_url, contact_info } = req.body;
+  try {
+    const info = db.prepare(`
+      INSERT INTO rehearsal_rooms (province_id, province_zh, city_id, city_zh, room_id, name, name_zh, address, equipment, price_info, intro, image_url, contact_info)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(province_id, province_zh, city_id, city_zh, room_id, name, name_zh, address, equipment, price_info, intro, image_url, contact_info);
+    res.json({ id: info.lastInsertRowid });
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.put('/api/rehearsal_rooms/:id', authenticateToken, (req, res) => {
+  const { province_id, province_zh, city_id, city_zh, room_id, name, name_zh, address, equipment, price_info, intro, image_url, contact_info } = req.body;
+  try {
+    db.prepare(`
+      UPDATE rehearsal_rooms SET 
+        province_id = ?, province_zh = ?, city_id = ?, city_zh = ?, room_id = ?, name = ?, name_zh = ?, address = ?, equipment = ?, price_info = ?, intro = ?, image_url = ?, contact_info = ?
+      WHERE id = ?
+    `).run(province_id, province_zh, city_id, city_zh, room_id, name, name_zh, address, equipment, price_info, intro, image_url, contact_info, req.params.id);
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.delete('/api/rehearsal_rooms/:id', authenticateToken, (req, res) => {
+  try {
+    const room = db.prepare('SELECT image_url FROM rehearsal_rooms WHERE id = ?').get(req.params.id) as any;
+    if (room && room.image_url) {
+      deleteLocalImage(room.image_url);
+    }
+    db.prepare('DELETE FROM rehearsal_rooms WHERE id = ?').run(req.params.id);
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Spots API
+app.get('/api/spots', (req, res) => {
+  const spots = db.prepare('SELECT * FROM spots').all();
+  res.json(spots);
+});
+
+app.post('/api/spots', authenticateToken, (req, res) => {
+  const { province_id, province_zh, city_id, city_zh, spot_id, name, name_zh, type, address, business_hours, intro, image_url, contact_info, social_url } = req.body;
+  try {
+    const info = db.prepare(`
+      INSERT INTO spots (province_id, province_zh, city_id, city_zh, spot_id, name, name_zh, type, address, business_hours, intro, image_url, contact_info, social_url)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(province_id, province_zh, city_id, city_zh, spot_id, name, name_zh, type, address, business_hours, intro, image_url, contact_info, social_url);
+    res.json({ id: info.lastInsertRowid });
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.put('/api/spots/:id', authenticateToken, (req, res) => {
+  const { province_id, province_zh, city_id, city_zh, spot_id, name, name_zh, type, address, business_hours, intro, image_url, contact_info, social_url } = req.body;
+  try {
+    db.prepare(`
+      UPDATE spots SET 
+        province_id = ?, province_zh = ?, city_id = ?, city_zh = ?, spot_id = ?, name = ?, name_zh = ?, type = ?, address = ?, business_hours = ?, intro = ?, image_url = ?, contact_info = ?, social_url = ?
+      WHERE id = ?
+    `).run(province_id, province_zh, city_id, city_zh, spot_id, name, name_zh, type, address, business_hours, intro, image_url, contact_info, social_url, req.params.id);
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.delete('/api/spots/:id', authenticateToken, (req, res) => {
+  try {
+    const spot = db.prepare('SELECT image_url FROM spots WHERE id = ?').get(req.params.id) as any;
+    if (spot && spot.image_url) {
+      deleteLocalImage(spot.image_url);
+    }
+    db.prepare('DELETE FROM spots WHERE id = ?').run(req.params.id);
     res.json({ success: true });
   } catch (error: any) {
     res.status(400).json({ error: error.message });

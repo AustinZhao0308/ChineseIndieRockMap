@@ -3,18 +3,23 @@ import ChinaMap from "../components/ChinaMap";
 import ProvincePanel from "../components/ProvincePanel";
 import BandModal from "../components/BandModal";
 import VenueModal from "../components/VenueModal";
+import RehearsalRoomModal from "../components/RehearsalRoomModal";
+import SpotModal from "../components/SpotModal";
 import AdBanner from "../components/AdBanner";
 import GigModal from "../components/GigModal";
 import FeedbackMenu from "../components/FeedbackMenu";
-import { Band, Venue } from "../data";
+import { Band, Venue, RehearsalRoom, Spot } from "../data";
 import { Music2 } from "lucide-react";
 import { useProvinceData } from "../hooks/useProvinceData";
 
 export default function MapPage() {
   const { data: provinceData, loading } = useProvinceData();
   const [selectedProvinceId, setSelectedProvinceId] = useState<string | null>(null);
+  const [activeCategory, setActiveCategory] = useState<'bands' | 'venues' | 'rehearsal_rooms' | 'spots'>('bands');
   const [selectedBand, setSelectedBand] = useState<Band | null>(null);
   const [selectedVenue, setSelectedVenue] = useState<Venue | null>(null);
+  const [selectedRehearsalRoom, setSelectedRehearsalRoom] = useState<RehearsalRoom | null>(null);
+  const [selectedSpot, setSelectedSpot] = useState<Spot | null>(null);
   const [isGigModalOpen, setIsGigModalOpen] = useState(false);
   const [featuredEvent, setFeaturedEvent] = useState<any>(null);
   const [isAdBannerVisible, setIsAdBannerVisible] = useState(true);
@@ -44,9 +49,19 @@ export default function MapPage() {
     setSelectedVenue(venue);
   };
 
+  const handleRehearsalRoomClick = (room: RehearsalRoom) => {
+    setSelectedRehearsalRoom(room);
+  };
+
+  const handleSpotClick = (spot: Spot) => {
+    setSelectedSpot(spot);
+  };
+
   const handleCloseModal = () => {
     setSelectedBand(null);
     setSelectedVenue(null);
+    setSelectedRehearsalRoom(null);
+    setSelectedSpot(null);
   };
 
   const selectedProvince = selectedProvinceId ? provinceData[selectedProvinceId] : null;
@@ -82,6 +97,32 @@ export default function MapPage() {
                 by <span className="text-[#ff4e00] font-semibold">Catbeer Records</span>
               </p>
             </div>
+
+            {/* Category Selector */}
+            <div className="mt-6 md:mt-8 flex flex-nowrap gap-3 sm:gap-5 md:gap-6 overflow-x-auto scrollbar-hide max-w-[calc(100vw-3rem)] md:max-w-none pb-1">
+              {[
+                { id: 'bands', zh: '乐队', en: 'BANDS' },
+                { id: 'venues', zh: '场地', en: 'VENUES' },
+                { id: 'rehearsal_rooms', zh: '排练房', en: 'REHEARSAL' },
+                { id: 'spots', zh: '角落', en: 'SPOTS' }
+              ].map(cat => (
+                <button
+                  key={cat.id}
+                  onClick={() => {
+                    setActiveCategory(cat.id as any);
+                    setSelectedProvinceId(null); // Close panel when switching categories
+                  }}
+                  className={`flex items-baseline gap-1 whitespace-nowrap pb-1.5 border-b-2 transition-colors ${
+                    activeCategory === cat.id
+                      ? 'text-[#ff4e00] border-[#ff4e00]'
+                      : 'text-gray-500 border-transparent hover:text-gray-300'
+                  }`}
+                >
+                  <span className="text-xs sm:text-sm font-medium tracking-widest">{cat.zh}</span>
+                  <span className="text-[8px] sm:text-[10px] font-mono tracking-wider uppercase opacity-80">{cat.en}</span>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
         
@@ -97,6 +138,7 @@ export default function MapPage() {
         onProvinceClick={handleProvinceClick} 
         selectedProvinceId={selectedProvinceId} 
         provinceData={provinceData}
+        activeCategory={activeCategory}
       />
 
       {/* Side Panel */}
@@ -105,6 +147,9 @@ export default function MapPage() {
         onClose={handleClosePanel} 
         onBandClick={handleBandClick} 
         onVenueClick={handleVenueClick}
+        onRehearsalRoomClick={handleRehearsalRoomClick}
+        onSpotClick={handleSpotClick}
+        activeCategory={activeCategory}
       />
 
       {/* Band Modal */}
@@ -116,6 +161,18 @@ export default function MapPage() {
       {/* Venue Modal */}
       <VenueModal 
         venue={selectedVenue} 
+        onClose={handleCloseModal} 
+      />
+
+      {/* Rehearsal Room Modal */}
+      <RehearsalRoomModal 
+        room={selectedRehearsalRoom} 
+        onClose={handleCloseModal} 
+      />
+
+      {/* Spot Modal */}
+      <SpotModal 
+        spot={selectedSpot} 
         onClose={handleCloseModal} 
       />
 

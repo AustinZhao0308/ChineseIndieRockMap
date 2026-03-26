@@ -13,9 +13,11 @@ export function useProvinceData() {
   useEffect(() => {
     Promise.all([
       fetch('/api/bands').then(res => res.json()),
-      fetch('/api/venues').then(res => res.json())
+      fetch('/api/venues').then(res => res.json()),
+      fetch('/api/rehearsal_rooms').then(res => res.json()),
+      fetch('/api/spots').then(res => res.json())
     ])
-      .then(([bands, venues]) => {
+      .then(([bands, venues, rehearsalRooms, spots]) => {
         // Deep clone initial data to avoid mutating the original static object
         const newData = JSON.parse(JSON.stringify(initialProvinceData));
         
@@ -24,6 +26,8 @@ export function useProvinceData() {
           prov.cities.forEach((city: any) => {
             city.bands = [];
             city.venues = [];
+            city.rehearsalRooms = [];
+            city.spots = [];
           });
         });
 
@@ -88,7 +92,9 @@ export function useProvinceData() {
               name: v.city_id,
               name_zh: cityZh,
               bands: [],
-              venues: []
+              venues: [],
+              rehearsalRooms: [],
+              spots: []
             };
             newData[provId].cities.push(city);
           }
@@ -108,6 +114,97 @@ export function useProvinceData() {
             contactInfo: v.contact_info,
             ticketUrl: v.ticket_url,
             dbId: v.id
+          });
+        });
+
+        // Process Rehearsal Rooms
+        rehearsalRooms.forEach((r: any) => {
+          const provId = normalizeName(r.province_zh);
+          const cityZh = normalizeName(r.city_zh);
+          
+          if (!newData[provId]) {
+            newData[provId] = {
+              id: r.province_id,
+              name: r.province_id,
+              name_zh: provId,
+              cities: []
+            };
+          }
+          
+          let city = newData[provId].cities.find((c: any) => c.name_zh === cityZh);
+          if (!city) {
+            city = {
+              name: r.city_id,
+              name_zh: cityZh,
+              bands: [],
+              venues: [],
+              rehearsalRooms: [],
+              spots: []
+            };
+            newData[provId].cities.push(city);
+          }
+
+          if (!city.rehearsalRooms) city.rehearsalRooms = [];
+          
+          city.rehearsalRooms.push({
+            id: r.room_id,
+            name: r.name,
+            name_zh: r.name_zh,
+            address: r.address,
+            equipment: r.equipment,
+            priceInfo: r.price_info,
+            intro: r.intro,
+            city: r.city_id,
+            city_zh: cityZh,
+            imageUrl: r.image_url,
+            contactInfo: r.contact_info,
+            dbId: r.id
+          });
+        });
+
+        // Process Spots
+        spots.forEach((s: any) => {
+          const provId = normalizeName(s.province_zh);
+          const cityZh = normalizeName(s.city_zh);
+          
+          if (!newData[provId]) {
+            newData[provId] = {
+              id: s.province_id,
+              name: s.province_id,
+              name_zh: provId,
+              cities: []
+            };
+          }
+          
+          let city = newData[provId].cities.find((c: any) => c.name_zh === cityZh);
+          if (!city) {
+            city = {
+              name: s.city_id,
+              name_zh: cityZh,
+              bands: [],
+              venues: [],
+              rehearsalRooms: [],
+              spots: []
+            };
+            newData[provId].cities.push(city);
+          }
+
+          if (!city.spots) city.spots = [];
+          
+          city.spots.push({
+            id: s.spot_id,
+            name: s.name,
+            name_zh: s.name_zh,
+            type: s.type,
+            address: s.address,
+            businessHours: s.business_hours,
+            intro: s.intro,
+            city: s.city_id,
+            city_zh: cityZh,
+            imageUrl: s.image_url,
+            contactInfo: s.contact_info,
+            socialUrl: s.social_url,
+            dbId: s.id
           });
         });
 

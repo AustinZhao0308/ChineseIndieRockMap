@@ -30,11 +30,44 @@ export interface Venue {
   dbId?: number;
 }
 
+export interface RehearsalRoom {
+  id: string;
+  name: string;
+  name_zh: string;
+  address: string;
+  equipment: string;
+  priceInfo: string;
+  intro: string;
+  city: string;
+  city_zh: string;
+  imageUrl?: string;
+  contactInfo?: string;
+  dbId?: number;
+}
+
+export interface Spot {
+  id: string;
+  name: string;
+  name_zh: string;
+  type: string;
+  address: string;
+  businessHours: string;
+  intro: string;
+  city: string;
+  city_zh: string;
+  imageUrl?: string;
+  contactInfo?: string;
+  socialUrl?: string;
+  dbId?: number;
+}
+
 export interface City {
   name: string;
   name_zh: string;
   bands: Band[];
   venues?: Venue[];
+  rehearsalRooms?: RehearsalRoom[];
+  spots?: Spot[];
 }
 
 export interface Province {

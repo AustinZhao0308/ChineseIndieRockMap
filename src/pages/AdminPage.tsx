@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Lock, LogOut, Plus, Trash2, Edit2, Music, MapPin, X, Calendar, Star } from 'lucide-react';
+import { Lock, LogOut, Plus, Trash2, Edit2, Music, MapPin, X, Calendar, Star, Mic2, Coffee } from 'lucide-react';
 
 export default function AdminPage() {
   const [token, setToken] = useState(localStorage.getItem('adminToken'));
@@ -8,8 +8,10 @@ export default function AdminPage() {
   const [bands, setBands] = useState<any[]>([]);
   const [venues, setVenues] = useState<any[]>([]);
   const [events, setEvents] = useState<any[]>([]);
+  const [rehearsalRooms, setRehearsalRooms] = useState<any[]>([]);
+  const [spots, setSpots] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'bands' | 'venues' | 'events' | 'settings'>('bands');
+  const [activeTab, setActiveTab] = useState<'bands' | 'venues' | 'events' | 'rehearsal_rooms' | 'spots' | 'settings'>('bands');
   const [locations, setLocations] = useState<any[]>([]);
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const [message, setMessage] = useState<{text: string, type: 'error' | 'success'} | null>(null);
@@ -41,6 +43,15 @@ export default function AdminPage() {
     address: '',
     capacity: '',
     ticket_url: '',
+    // Rehearsal Room specific
+    room_id: '',
+    equipment: '',
+    price_info: '',
+    // Spot specific
+    spot_id: '',
+    type: '',
+    business_hours: '',
+    social_url: '',
     // Event specific
     title: '',
     date_str: '',
@@ -80,12 +91,14 @@ export default function AdminPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const endpoint = activeTab === 'bands' ? '/api/bands' : activeTab === 'venues' ? '/api/venues' : '/api/featured_events';
+      const endpoint = activeTab === 'bands' ? '/api/bands' : activeTab === 'venues' ? '/api/venues' : activeTab === 'events' ? '/api/featured_events' : activeTab === 'rehearsal_rooms' ? '/api/rehearsal_rooms' : '/api/spots';
       const res = await fetch(endpoint);
       const data = await res.json();
       if (activeTab === 'bands') setBands(data);
       else if (activeTab === 'venues') setVenues(data);
-      else setEvents(data);
+      else if (activeTab === 'events') setEvents(data);
+      else if (activeTab === 'rehearsal_rooms') setRehearsalRooms(data);
+      else if (activeTab === 'spots') setSpots(data);
     } catch (err) {
       console.error(err);
     } finally {
@@ -238,7 +251,7 @@ export default function AdminPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const endpoint = activeTab === 'bands' ? '/api/bands' : activeTab === 'venues' ? '/api/venues' : '/api/featured_events';
+      const endpoint = activeTab === 'bands' ? '/api/bands' : activeTab === 'venues' ? '/api/venues' : activeTab === 'events' ? '/api/featured_events' : activeTab === 'rehearsal_rooms' ? '/api/rehearsal_rooms' : '/api/spots';
       const url = isEditing ? `${endpoint}/${currentId}` : endpoint;
       const method = isEditing ? 'PUT' : 'POST';
       
@@ -281,7 +294,7 @@ export default function AdminPage() {
 
   const handleDelete = async (id: number) => {
     try {
-      const endpoint = activeTab === 'bands' ? '/api/bands' : activeTab === 'venues' ? '/api/venues' : '/api/featured_events';
+      const endpoint = activeTab === 'bands' ? '/api/bands' : activeTab === 'venues' ? '/api/venues' : activeTab === 'events' ? '/api/featured_events' : activeTab === 'rehearsal_rooms' ? '/api/rehearsal_rooms' : '/api/spots';
       const res = await fetch(`${endpoint}/${id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
@@ -342,13 +355,20 @@ export default function AdminPage() {
       city_zh: item.city_zh,
       band_id: item.band_id || '',
       venue_id: item.venue_id || '',
+      room_id: item.room_id || '',
+      spot_id: item.spot_id || '',
       name: item.name,
       name_zh: item.name_zh,
       genre: item.genre || '',
+      type: item.type || '',
       netease_url: item.netease_url || '',
       xiaohongshu_url: item.xiaohongshu_url || '',
+      social_url: item.social_url || '',
       address: item.address || '',
       capacity: item.capacity ? item.capacity.toString() : '',
+      equipment: item.equipment || '',
+      price_info: item.price_info || '',
+      business_hours: item.business_hours || '',
       ticket_url: item.ticket_url || '',
       title: item.title || '',
       date_str: item.date_str || '',
@@ -370,10 +390,10 @@ export default function AdminPage() {
     setImageInputType('upload');
     setFormData({
       province_id: '', province_zh: '', city_id: '', city_zh: '',
-      band_id: '', venue_id: '', name: '', name_zh: '', genre: '', 
-      netease_url: '', xiaohongshu_url: '', ticket_url: '',
+      band_id: '', venue_id: '', room_id: '', spot_id: '', name: '', name_zh: '', genre: '', type: '',
+      netease_url: '', xiaohongshu_url: '', social_url: '', ticket_url: '',
       title: '', date_str: '', location: '', is_active: false, lineup: [],
-      address: '', capacity: '', intro: '', image_url: '', contact_info: ''
+      address: '', capacity: '', equipment: '', price_info: '', business_hours: '', intro: '', image_url: '', contact_info: ''
     });
   };
 
@@ -403,7 +423,7 @@ export default function AdminPage() {
     );
   }
 
-  const currentList = activeTab === 'bands' ? bands : activeTab === 'venues' ? venues : events;
+  const currentList = activeTab === 'bands' ? bands : activeTab === 'venues' ? venues : activeTab === 'events' ? events : activeTab === 'rehearsal_rooms' ? rehearsalRooms : spots;
 
   return (
     <div className="min-h-[100dvh] bg-[#0a0502] text-white p-8 font-sans">
@@ -423,7 +443,7 @@ export default function AdminPage() {
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-4 mb-8">
+        <div className="flex flex-wrap gap-4 mb-8">
           <button 
             onClick={() => { setActiveTab('bands'); resetForm(); }}
             className={`flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-colors ${activeTab === 'bands' ? 'bg-[#ff4e00] text-white' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}
@@ -435,6 +455,18 @@ export default function AdminPage() {
             className={`flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-colors ${activeTab === 'venues' ? 'bg-[#ff4e00] text-white' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}
           >
             <MapPin size={18} /> Manage Venues
+          </button>
+          <button 
+            onClick={() => { setActiveTab('rehearsal_rooms'); resetForm(); }}
+            className={`flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-colors ${activeTab === 'rehearsal_rooms' ? 'bg-[#ff4e00] text-white' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}
+          >
+            <Mic2 size={18} /> Manage Rehearsal Rooms
+          </button>
+          <button 
+            onClick={() => { setActiveTab('spots'); resetForm(); }}
+            className={`flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-colors ${activeTab === 'spots' ? 'bg-[#ff4e00] text-white' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}
+          >
+            <Coffee size={18} /> Manage Spots
           </button>
           <button 
             onClick={() => { setActiveTab('events'); resetForm(); }}
@@ -492,7 +524,7 @@ export default function AdminPage() {
           <div className="bg-[#1a1a1a] p-6 rounded-2xl border border-white/10 h-fit">
             <h2 className="text-xl mb-6 font-medium flex items-center gap-2">
               {isEditing ? <Edit2 size={20} className="text-[#ff4e00]" /> : <Plus size={20} className="text-[#ff4e00]" />}
-              {isEditing ? `Edit ${activeTab === 'bands' ? 'Band' : activeTab === 'venues' ? 'Venue' : 'Event'}` : `Add New ${activeTab === 'bands' ? 'Band' : activeTab === 'venues' ? 'Venue' : 'Event'}`}
+              {isEditing ? `Edit ${activeTab === 'bands' ? 'Band' : activeTab === 'venues' ? 'Venue' : activeTab === 'events' ? 'Event' : activeTab === 'rehearsal_rooms' ? 'Rehearsal Room' : 'Spot'}` : `Add New ${activeTab === 'bands' ? 'Band' : activeTab === 'venues' ? 'Venue' : activeTab === 'events' ? 'Event' : activeTab === 'rehearsal_rooms' ? 'Rehearsal Room' : 'Spot'}`}
             </h2>
             <form onSubmit={handleSubmit} className="space-y-4">
               {activeTab !== 'events' && (
@@ -516,6 +548,10 @@ export default function AdminPage() {
                 <input required placeholder="Band ID (e.g. carsick-cars)" value={formData.band_id} onChange={e => setFormData({...formData, band_id: e.target.value})} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-full" />
               ) : activeTab === 'venues' ? (
                 <input required placeholder="Venue ID (e.g. school-bar)" value={formData.venue_id} onChange={e => setFormData({...formData, venue_id: e.target.value})} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-full" />
+              ) : activeTab === 'rehearsal_rooms' ? (
+                <input required placeholder="Room ID (e.g. super-rehearsal)" value={formData.room_id} onChange={e => setFormData({...formData, room_id: e.target.value})} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-full" />
+              ) : activeTab === 'spots' ? (
+                <input required placeholder="Spot ID (e.g. fruityspace)" value={formData.spot_id} onChange={e => setFormData({...formData, spot_id: e.target.value})} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-full" />
               ) : null}
 
               {activeTab === 'events' ? (
@@ -553,6 +589,21 @@ export default function AdminPage() {
                   <div className="grid grid-cols-2 gap-4">
                     <input required type="number" placeholder="Capacity (e.g. 500)" value={formData.capacity} onChange={e => setFormData({...formData, capacity: e.target.value})} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-full" />
                     <input placeholder="Ticket URL (e.g. ShowStart)" value={formData.ticket_url} onChange={e => setFormData({...formData, ticket_url: e.target.value})} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-full" />
+                  </div>
+                </>
+              ) : activeTab === 'rehearsal_rooms' ? (
+                <>
+                  <input required placeholder="Address" value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-full" />
+                  <input required placeholder="Equipment (e.g. Marshall JCM900...)" value={formData.equipment} onChange={e => setFormData({...formData, equipment: e.target.value})} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-full" />
+                  <input required placeholder="Price Info (e.g. 80元/小时)" value={formData.price_info} onChange={e => setFormData({...formData, price_info: e.target.value})} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-full" />
+                </>
+              ) : activeTab === 'spots' ? (
+                <>
+                  <input required placeholder="Type (e.g. 唱片店, 摇滚酒吧)" value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-full" />
+                  <input required placeholder="Address" value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-full" />
+                  <div className="grid grid-cols-2 gap-4">
+                    <input required placeholder="Business Hours" value={formData.business_hours} onChange={e => setFormData({...formData, business_hours: e.target.value})} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-full" />
+                    <input placeholder="Social URL (e.g. Xiaohongshu)" value={formData.social_url} onChange={e => setFormData({...formData, social_url: e.target.value})} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-full" />
                   </div>
                 </>
               ) : null}
@@ -688,7 +739,7 @@ export default function AdminPage() {
 
           {/* List */}
           <div className="lg:col-span-2 bg-[#1a1a1a] p-6 rounded-2xl border border-white/10">
-            <h2 className="text-xl mb-6 font-medium">Current {activeTab === 'bands' ? 'Bands' : activeTab === 'venues' ? 'Venues' : 'Events'} ({currentList.length})</h2>
+            <h2 className="text-xl mb-6 font-medium">Current {activeTab === 'bands' ? 'Bands' : activeTab === 'venues' ? 'Venues' : activeTab === 'events' ? 'Events' : activeTab === 'rehearsal_rooms' ? 'Rehearsal Rooms' : 'Spots'} ({currentList.length})</h2>
             {loading ? (
               <div className="text-center py-8 text-gray-500">Loading...</div>
             ) : (
@@ -712,9 +763,13 @@ export default function AdminPage() {
                             <span className="bg-white/5 px-2 py-0.5 rounded">{item.province_zh} - {item.city_zh}</span>
                             {activeTab === 'bands' ? (
                               <span className="bg-[#ff4e00]/10 text-[#ff4e00] px-2 py-0.5 rounded">{item.genre}</span>
-                            ) : (
+                            ) : activeTab === 'venues' ? (
                               <span className="bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded">容纳 {item.capacity} 人</span>
-                            )}
+                            ) : activeTab === 'rehearsal_rooms' ? (
+                              <span className="bg-purple-500/10 text-purple-400 px-2 py-0.5 rounded">{item.price_info}</span>
+                            ) : activeTab === 'spots' ? (
+                              <span className="bg-yellow-500/10 text-yellow-400 px-2 py-0.5 rounded">{item.type}</span>
+                            ) : null}
                             {item.contact_info && (
                               <span className="bg-green-500/10 text-green-400 px-2 py-0.5 rounded">有联系方式</span>
                             )}

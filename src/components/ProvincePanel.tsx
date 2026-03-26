@@ -1,20 +1,22 @@
 import React from "react";
-import { X, MapPin, Music, Building2, Users } from "lucide-react";
+import { X, MapPin, Music, Building2, Users, Mic2, Coffee, DollarSign } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import { Province, Band, Venue } from "../data";
+import { Province, Band, Venue, RehearsalRoom, Spot } from "../data";
 
 interface ProvincePanelProps {
   province: Province | null;
   onClose: () => void;
   onBandClick: (band: Band) => void;
   onVenueClick: (venue: Venue) => void;
+  onRehearsalRoomClick: (room: RehearsalRoom) => void;
+  onSpotClick: (spot: Spot) => void;
+  activeCategory: 'bands' | 'venues' | 'rehearsal_rooms' | 'spots';
 }
 
-const ProvincePanel: React.FC<ProvincePanelProps> = ({ province, onClose, onBandClick, onVenueClick }) => {
+const ProvincePanel: React.FC<ProvincePanelProps> = ({ province, onClose, onBandClick, onVenueClick, onRehearsalRoomClick, onSpotClick, activeCategory }) => {
   const [isMobile, setIsMobile] = React.useState(
     typeof window !== "undefined" ? window.innerWidth < 768 : false
   );
-  const [activeTab, setActiveTab] = React.useState<'bands' | 'venues'>('bands');
   const [isExpanded, setIsExpanded] = React.useState(false);
   const touchStartY = React.useRef(0);
   const scrollTopAtStart = React.useRef(0);
@@ -29,7 +31,6 @@ const ProvincePanel: React.FC<ProvincePanelProps> = ({ province, onClose, onBand
 
   React.useEffect(() => {
     if (province) {
-      setActiveTab('bands');
       setIsExpanded(false);
     }
   }, [province]);
@@ -81,7 +82,7 @@ const ProvincePanel: React.FC<ProvincePanelProps> = ({ province, onClose, onBand
               onClick={() => setIsExpanded(!isExpanded)}
             />
             
-            <div className="flex justify-between items-center mb-6">
+            <div className="flex justify-between items-center mb-8">
               <div>
                 <h2 className="text-4xl font-serif text-white tracking-tight">
                   {province.name_zh}
@@ -98,33 +99,12 @@ const ProvincePanel: React.FC<ProvincePanelProps> = ({ province, onClose, onBand
               </button>
             </div>
 
-            {/* Tabs */}
-            <div className="flex gap-6 mb-8 border-b border-white/10">
-              <button
-                onClick={() => setActiveTab('bands')}
-                className={`pb-3 text-sm font-medium uppercase tracking-widest border-b-2 transition-colors ${
-                  activeTab === 'bands' 
-                    ? 'text-[#ff4e00] border-[#ff4e00]' 
-                    : 'text-gray-500 border-transparent hover:text-gray-300'
-                }`}
-              >
-                乐队 Bands
-              </button>
-              <button
-                onClick={() => setActiveTab('venues')}
-                className={`pb-3 text-sm font-medium uppercase tracking-widest border-b-2 transition-colors ${
-                  activeTab === 'venues' 
-                    ? 'text-[#ff4e00] border-[#ff4e00]' 
-                    : 'text-gray-500 border-transparent hover:text-gray-300'
-                }`}
-              >
-                场地 Venues
-              </button>
-            </div>
-
             <div className="space-y-8">
               {province.cities.map((city, cityIdx) => {
-                const hasContent = activeTab === 'bands' ? city.bands.length > 0 : (city.venues && city.venues.length > 0);
+                const hasContent = activeCategory === 'bands' ? city.bands.length > 0 : 
+                                   activeCategory === 'venues' ? (city.venues && city.venues.length > 0) :
+                                   activeCategory === 'rehearsal_rooms' ? (city.rehearsalRooms && city.rehearsalRooms.length > 0) :
+                                   (city.spots && city.spots.length > 0);
                 
                 if (!hasContent) return null;
 
@@ -137,7 +117,7 @@ const ProvincePanel: React.FC<ProvincePanelProps> = ({ province, onClose, onBand
                     </div>
                     
                     <div className="space-y-3 pl-6 border-l border-white/10 ml-[9px]">
-                      {activeTab === 'bands' && city.bands.map((band) => (
+                      {activeCategory === 'bands' && city.bands.map((band) => (
                         <motion.div
                           whileHover={{ x: 4 }}
                           key={band.id}
@@ -182,7 +162,7 @@ const ProvincePanel: React.FC<ProvincePanelProps> = ({ province, onClose, onBand
                         </motion.div>
                       ))}
 
-                      {activeTab === 'venues' && city.venues?.map((venue) => (
+                      {activeCategory === 'venues' && city.venues?.map((venue) => (
                         <motion.div
                           whileHover={{ x: 4 }}
                           key={venue.id}
@@ -235,16 +215,129 @@ const ProvincePanel: React.FC<ProvincePanelProps> = ({ province, onClose, onBand
                           </div>
                         </motion.div>
                       ))}
+
+                      {activeCategory === 'rehearsal_rooms' && city.rehearsalRooms?.map((room) => (
+                        <motion.div
+                          whileHover={{ x: 4 }}
+                          key={room.id}
+                          onClick={() => onRehearsalRoomClick(room)}
+                          className="group relative overflow-hidden cursor-pointer bg-white/5 hover:bg-white/10 rounded-xl transition-all border border-white/5 hover:border-purple-500/30"
+                        >
+                          <div 
+                            className="absolute inset-y-0 right-0 w-3/5 pointer-events-none opacity-30 group-hover:opacity-60 transition-opacity duration-500"
+                            style={{ 
+                              maskImage: 'linear-gradient(to left, black 20%, transparent 100%)', 
+                              WebkitMaskImage: 'linear-gradient(to left, black 20%, transparent 100%)' 
+                            }}
+                          >
+                            <img 
+                              src={room.imageUrl || `https://picsum.photos/seed/${room.id}/400/300?grayscale`} 
+                              alt={room.name_zh}
+                              className="w-full h-full object-cover mix-blend-luminosity"
+                              referrerPolicy="no-referrer"
+                            />
+                          </div>
+                          
+                          <div className="relative z-20 p-4">
+                            <div className="flex justify-between items-start mb-3">
+                              <div className="w-2/3">
+                                <h4 className="text-lg font-medium text-white group-hover:text-purple-400 transition-colors drop-shadow-md">
+                                  {room.name_zh}
+                                </h4>
+                                <p className="text-xs text-gray-400 mt-1 drop-shadow-md">{room.name}</p>
+                              </div>
+                              <div className="bg-purple-500/20 p-2 rounded-full text-purple-400 opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm">
+                                <Mic2 size={16} />
+                              </div>
+                            </div>
+                            
+                            <div className="space-y-2 mt-3">
+                              <div className="flex items-start gap-2 text-xs text-gray-300 drop-shadow-md">
+                                <MapPin size={14} className="text-gray-400 mt-0.5 shrink-0" />
+                                <span className="line-clamp-1">{room.address}</span>
+                              </div>
+                              <div className="flex items-center gap-2 text-xs text-gray-300 drop-shadow-md">
+                                <DollarSign size={14} className="text-gray-400 shrink-0" />
+                                <span>{room.priceInfo}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </motion.div>
+                      ))}
+
+                      {activeCategory === 'spots' && city.spots?.map((spot) => (
+                        <motion.div
+                          whileHover={{ x: 4 }}
+                          key={spot.id}
+                          onClick={() => onSpotClick(spot)}
+                          className="group relative overflow-hidden cursor-pointer bg-white/5 hover:bg-white/10 rounded-xl transition-all border border-white/5 hover:border-yellow-500/30"
+                        >
+                          <div 
+                            className="absolute inset-y-0 right-0 w-3/5 pointer-events-none opacity-30 group-hover:opacity-60 transition-opacity duration-500"
+                            style={{ 
+                              maskImage: 'linear-gradient(to left, black 20%, transparent 100%)', 
+                              WebkitMaskImage: 'linear-gradient(to left, black 20%, transparent 100%)' 
+                            }}
+                          >
+                            <img 
+                              src={spot.imageUrl || `https://picsum.photos/seed/${spot.id}/400/300?grayscale`} 
+                              alt={spot.name_zh}
+                              className="w-full h-full object-cover mix-blend-luminosity"
+                              referrerPolicy="no-referrer"
+                            />
+                          </div>
+                          
+                          <div className="relative z-20 p-4">
+                            <div className="flex justify-between items-start mb-3">
+                              <div className="w-2/3">
+                                <h4 className="text-lg font-medium text-white group-hover:text-yellow-400 transition-colors drop-shadow-md">
+                                  {spot.name_zh}
+                                </h4>
+                                <p className="text-xs text-gray-400 mt-1 drop-shadow-md">{spot.name}</p>
+                              </div>
+                              <div className="bg-yellow-500/20 p-2 rounded-full text-yellow-400 opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm">
+                                <Coffee size={16} />
+                              </div>
+                            </div>
+                            
+                            <div className="space-y-2 mt-3">
+                              <div className="flex items-start gap-2 text-xs text-gray-300 drop-shadow-md">
+                                <MapPin size={14} className="text-gray-400 mt-0.5 shrink-0" />
+                                <span className="line-clamp-1">{spot.address}</span>
+                              </div>
+                              <div className="mt-2">
+                                <span className="inline-block px-2 py-1 bg-black/50 backdrop-blur-md rounded text-[10px] text-gray-300 uppercase tracking-wider border border-white/5">
+                                  {spot.type}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </motion.div>
+                      ))}
                     </div>
                   </div>
                 );
               })}
               
               {/* Empty state for venues if none exist in the province */}
-              {activeTab === 'venues' && !province.cities.some(city => city.venues && city.venues.length > 0) && (
+              {activeCategory === 'venues' && !province.cities.some(city => city.venues && city.venues.length > 0) && (
                 <div className="text-center py-12">
                   <Building2 size={32} className="mx-auto text-gray-600 mb-4" />
                   <p className="text-gray-400 text-sm">该省份暂无场地信息</p>
+                </div>
+              )}
+
+              {activeCategory === 'rehearsal_rooms' && !province.cities.some(city => city.rehearsalRooms && city.rehearsalRooms.length > 0) && (
+                <div className="text-center py-12">
+                  <Mic2 size={32} className="mx-auto text-gray-600 mb-4" />
+                  <p className="text-gray-400 text-sm">该省份暂无排练房信息</p>
+                </div>
+              )}
+
+              {activeCategory === 'spots' && !province.cities.some(city => city.spots && city.spots.length > 0) && (
+                <div className="text-center py-12">
+                  <Coffee size={32} className="mx-auto text-gray-600 mb-4" />
+                  <p className="text-gray-400 text-sm">该省份暂无城市角落信息</p>
                 </div>
               )}
             </div>

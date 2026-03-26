@@ -1,0 +1,231 @@
+import React, { useState } from "react";
+import { X, MapPin, Info, Mail, MessageCircle, Copy, CheckCircle2, Coffee, Clock, Link as LinkIcon } from "lucide-react";
+import { motion, AnimatePresence } from "motion/react";
+import { Spot } from "../data";
+
+interface SpotModalProps {
+  spot: Spot | null;
+  onClose: () => void;
+}
+
+const SpotModal: React.FC<SpotModalProps> = ({ spot, onClose }) => {
+  const [showContact, setShowContact] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  React.useEffect(() => {
+    setShowContact(false);
+    setCopied(false);
+  }, [spot]);
+
+  const handleCopy = async (e: React.MouseEvent, text: string) => {
+    e.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      const textArea = document.createElement("textarea");
+      textArea.value = text;
+      textArea.style.position = "fixed";
+      textArea.style.left = "-9999px";
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      try {
+        document.execCommand('copy');
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      } catch (error) {
+        console.error('Copy failed', error);
+      }
+      textArea.remove();
+    }
+  };
+
+  const getContactDetails = (info: string) => {
+    if (info.startsWith('wechat:')) {
+      return { type: '微信', value: info.substring(7), icon: <MessageCircle size={20} /> };
+    } else if (info.startsWith('email:')) {
+      return { type: '邮箱', value: info.substring(6), icon: <Mail size={20} /> };
+    }
+    const isEmail = info.includes('@');
+    return { type: isEmail ? '邮箱' : '微信', value: info, icon: isEmail ? <Mail size={20} /> : <MessageCircle size={20} /> };
+  };
+
+  if (!spot) return null;
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+      >
+        <motion.div
+          initial={{ scale: 0.95, y: 20, opacity: 0 }}
+          animate={{ scale: 1, y: 0, opacity: 1 }}
+          exit={{ scale: 0.95, y: 20, opacity: 0 }}
+          transition={{ type: "spring", stiffness: 300, damping: 30 }}
+          className="relative w-full max-w-3xl max-h-[90vh] flex flex-col bg-[#151619] rounded-2xl overflow-hidden shadow-2xl border border-white/10"
+        >
+          <button
+            onClick={onClose}
+            className="absolute top-4 right-4 p-2 rounded-full bg-black/50 hover:bg-[#ff4e00] transition-colors text-white backdrop-blur-md z-50"
+          >
+            <X size={24} />
+          </button>
+
+          <div className="overflow-y-auto flex-1 custom-scrollbar">
+            <div className="relative h-64 md:h-80 w-full shrink-0 overflow-hidden">
+              <img
+                src={spot.imageUrl || `https://picsum.photos/seed/${spot.id}/800/400?grayscale`}
+                alt={spot.name_zh}
+                className="w-full h-full object-cover opacity-60"
+                referrerPolicy="no-referrer"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#151619] via-[#151619]/50 to-transparent" />
+
+              <div className="absolute bottom-6 left-6 right-6">
+                <div className="flex items-end justify-between">
+                  <div>
+                    <span className="inline-block px-3 py-1 bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 rounded-full text-xs font-medium uppercase tracking-widest mb-3">
+                      <Coffee size={12} className="inline mr-1 mb-0.5" />
+                      {spot.type}
+                    </span>
+                    <span className="inline-block px-3 py-1 bg-white/10 text-gray-300 border border-white/20 rounded-full text-xs font-medium tracking-widest mb-3 ml-2">
+                      {spot.city_zh}
+                    </span>
+                    <h2 className="text-4xl md:text-5xl font-serif text-white tracking-tight mb-1">
+                      {spot.name_zh}
+                    </h2>
+                    <p className="text-lg text-gray-300 font-mono tracking-wider">
+                      {spot.name}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 md:p-8">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              <div className="md:col-span-2 space-y-6">
+                <div>
+                  <h3 className="text-sm text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-2">
+                    <Info size={16} />
+                    角落介绍
+                  </h3>
+                  <p className="text-gray-300 leading-relaxed text-lg font-serif whitespace-pre-wrap">
+                    {spot.intro}
+                  </p>
+                </div>
+                
+                <div className="pt-6 border-t border-white/10">
+                  <h3 className="text-sm text-gray-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+                    <MapPin size={16} />
+                    详细地址
+                  </h3>
+                  <div className="bg-white/5 rounded-xl p-4 border border-white/10 flex items-start gap-3">
+                    <div className="bg-[#ff4e00]/20 p-2 rounded-lg text-[#ff4e00] shrink-0">
+                      <MapPin size={20} />
+                    </div>
+                    <div>
+                      <p className="text-white font-medium mb-1">{spot.address}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {spot.contactInfo && (() => {
+                  const contact = getContactDetails(spot.contactInfo);
+                  return (
+                  <div className="pt-6 border-t border-white/10">
+                    <h3 className="text-sm text-gray-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+                      {contact.icon}
+                      联系方式
+                    </h3>
+                    <div 
+                      onClick={() => !showContact && setShowContact(true)}
+                      className={`bg-white/5 rounded-xl p-4 border border-white/10 flex items-center justify-between gap-3 transition-colors ${!showContact ? 'cursor-pointer hover:bg-white/10' : ''}`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="bg-[#ff4e00]/20 p-2 rounded-lg text-[#ff4e00] shrink-0">
+                          {contact.icon}
+                        </div>
+                        <div>
+                          <p className="text-white font-medium mb-1 flex items-center gap-2">
+                            {showContact ? (
+                              <>
+                                <span className="text-gray-400 text-sm">{contact.type}:</span>
+                                {contact.value}
+                              </>
+                            ) : (
+                              `点击查看联系方式 (${contact.type})`
+                            )}
+                          </p>
+                          <p className="text-sm text-gray-400">
+                            {showContact ? '请说明来意' : '仅供预定及合作'}
+                          </p>
+                        </div>
+                      </div>
+                      {showContact && (
+                        <button
+                          onClick={(e) => handleCopy(e, contact.value)}
+                          className="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-gray-300 transition-colors flex items-center gap-2 text-sm"
+                        >
+                          {copied ? <CheckCircle2 size={16} className="text-green-500" /> : <Copy size={16} />}
+                          {copied ? '已复制' : '复制'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )})()}
+              </div>
+              
+              <div className="space-y-6 border-t md:border-t-0 md:border-l border-white/10 pt-6 md:pt-0 md:pl-8">
+                <div>
+                  <h3 className="text-sm text-gray-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+                    <Clock size={16} />
+                    营业时间
+                  </h3>
+                  <div className="bg-white/5 rounded-xl p-4 border border-white/10">
+                    <p className="text-sm text-gray-300 whitespace-pre-wrap leading-relaxed">
+                      {spot.businessHours}
+                    </p>
+                  </div>
+                </div>
+
+                {spot.socialUrl && (
+                  <div>
+                    <h3 className="text-sm text-gray-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+                      <LinkIcon size={16} />
+                      社交主页
+                    </h3>
+                    <a 
+                      href={spot.socialUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="group flex items-center gap-4 bg-[#ff4e00]/10 hover:bg-[#ff4e00]/20 rounded-xl p-4 border border-[#ff4e00]/30 transition-all duration-300"
+                    >
+                      <div className="w-12 h-12 rounded-full bg-[#ff4e00] flex items-center justify-center text-white shadow-[0_0_15px_rgba(255,78,0,0.4)] group-hover:scale-110 transition-transform duration-300 shrink-0">
+                        <LinkIcon size={20} />
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-white font-medium text-sm mb-0.5">访问主页</span>
+                        <span className="text-xs text-gray-400 group-hover:text-gray-300 transition-colors">
+                          查看更多动态
+                        </span>
+                      </div>
+                    </a>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  );
+};
+
+export default SpotModal;
