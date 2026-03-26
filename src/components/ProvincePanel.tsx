@@ -167,7 +167,7 @@ const ProvincePanel: React.FC<ProvincePanelProps> = ({ province, onClose, onBand
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  className="absolute right-0 top-0 bottom-0 flex items-center justify-center w-12 bg-gradient-to-l from-[#151619] via-[#151619]/80 to-transparent pointer-events-none"
+                  className="absolute right-0 top-0 bottom-0 flex items-center justify-center w-12 pb-3 bg-gradient-to-l from-[#151619] via-[#151619]/80 to-transparent pointer-events-none"
                 >
                   <motion.div
                     animate={{ x: [0, 4, 0] }}
