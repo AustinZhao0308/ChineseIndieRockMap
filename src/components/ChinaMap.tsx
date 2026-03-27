@@ -177,6 +177,101 @@ const ChinaMap: React.FC<ChinaMapProps> = ({ onProvinceClick, selectedProvinceId
               />
             );
           })}
+
+          {/* Extra labels for small regions */}
+          {(() => {
+            const regions = [
+              { id: 'Hong Kong', name: '香港', coords: [114.1699, 22.3242] as [number, number], offset: [35, 25] },
+              { id: 'Macau', name: '澳门', coords: [113.5437, 22.1484] as [number, number], offset: [5, 35] }
+            ];
+
+            return regions.map(region => {
+              const count = provinceCounts[region.name] || 0;
+              const hasData = count > 0;
+              const isSelected = selectedProvinceId === region.name;
+              const isHovered = hoveredProvince === region.name;
+
+              // Determine styles
+              let fill = "#1a1a1a";
+              if (isSelected) fill = "#ff4e00";
+              else if (isHovered && hasData) fill = "#ff4e00";
+              else if (isHovered && !hasData) fill = "#222222";
+              else if (hasData) {
+                const factor = maxCount > minCount ? (count - minCount) / (maxCount - minCount) : 0;
+                fill = interpolateColor("#2c100b", "#732600", factor);
+              }
+
+              const [x, y] = projection(region.coords) || [0, 0];
+              if (x === 0 && y === 0) return null;
+
+              const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+              const sizeMultiplier = isMobile ? 1.6 : 1;
+
+              // Keep label size constant relative to the viewport
+              const scale = 1 / transform.k;
+              // Slightly extend the offset line on mobile to accommodate the larger label
+              const labelX = x + region.offset[0] * scale * (isMobile ? 1.3 : 1);
+              const labelY = y + region.offset[1] * scale * (isMobile ? 1.3 : 1);
+              
+              const rectW = 32 * scale * sizeMultiplier;
+              const rectH = 18 * scale * sizeMultiplier;
+              const fontSize = 10 * scale * sizeMultiplier;
+
+              return (
+                <g 
+                  key={region.id}
+                  style={{ cursor: hasData ? "pointer" : "default" }}
+                  onMouseEnter={() => setHoveredProvince(region.name)}
+                  onMouseLeave={() => setHoveredProvince(null)}
+                  onClick={() => {
+                    if (hasData) {
+                      const isDesktop = window.innerWidth >= 768;
+                      const longitudeOffset = isDesktop ? 6 : 0;
+                      const latitudeOffset = isDesktop ? 0 : -8;
+                      zoomTo([region.coords[0] + longitudeOffset, region.coords[1] + latitudeOffset], 2.5);
+                      onProvinceClick(region.name);
+                    }
+                  }}
+                >
+                  {/* Connection line */}
+                  <line 
+                    x1={x} 
+                    y1={y} 
+                    x2={labelX} 
+                    y2={labelY} 
+                    stroke={isHovered ? "#888" : "#444"} 
+                    strokeWidth={1 * scale}
+                  />
+                  
+                  {/* Label background */}
+                  <rect 
+                    x={labelX - rectW / 2} 
+                    y={labelY - rectH / 2} 
+                    width={rectW} 
+                    height={rectH} 
+                    rx={3 * scale}
+                    fill={fill}
+                    stroke={isHovered ? "#555555" : "#333333"}
+                    strokeWidth={(isHovered ? 1.5 : 0.5) * scale}
+                    style={{ transition: "fill 250ms, stroke 250ms" }}
+                  />
+                  
+                  {/* Label text */}
+                  <text
+                    x={labelX}
+                    y={labelY + 1 * scale}
+                    textAnchor="middle"
+                    alignmentBaseline="middle"
+                    fill={hasData ? "#ffffff" : "#888888"}
+                    fontSize={fontSize}
+                    style={{ pointerEvents: "none", transition: "fill 250ms" }}
+                  >
+                    {region.name}
+                  </text>
+                </g>
+              );
+            });
+          })()}
         </g>
       </svg>
       
