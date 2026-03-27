@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Lock, LogOut, Plus, Trash2, Edit2, Music, MapPin, X, Calendar, Star, Mic2, Coffee } from 'lucide-react';
+import { Lock, LogOut, Plus, Trash2, Edit2, Music, MapPin, X, Calendar, Star, Mic2, Coffee, Search, Upload } from 'lucide-react';
+import BulkImportModal from '../components/BulkImportModal';
 
 export default function AdminPage() {
   const [token, setToken] = useState(localStorage.getItem('adminToken'));
@@ -19,6 +20,8 @@ export default function AdminPage() {
   const [contactType, setContactType] = useState<'wechat' | 'email'>('wechat');
   const [contactValue, setContactValue] = useState('');
   const [passwordForm, setPasswordForm] = useState({ oldPassword: '', newPassword: '', confirmPassword: '' });
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
 
   const showMessage = (text: string, type: 'error' | 'success' = 'error') => {
     setMessage({ text, type });
@@ -349,16 +352,16 @@ export default function AdminPage() {
     }
 
     setFormData({
-      province_id: item.province_id,
-      province_zh: item.province_zh,
-      city_id: item.city_id,
-      city_zh: item.city_zh,
+      province_id: item.province_id || '',
+      province_zh: item.province_zh || '',
+      city_id: item.city_id || '',
+      city_zh: item.city_zh || '',
       band_id: item.band_id || '',
       venue_id: item.venue_id || '',
       room_id: item.room_id || '',
       spot_id: item.spot_id || '',
-      name: item.name,
-      name_zh: item.name_zh,
+      name: item.name || '',
+      name_zh: item.name_zh || '',
       genre: item.genre || '',
       type: item.type || '',
       netease_url: item.netease_url || '',
@@ -388,6 +391,7 @@ export default function AdminPage() {
     setContactType('wechat');
     setContactValue('');
     setImageInputType('upload');
+    setSearchQuery('');
     setFormData({
       province_id: '', province_zh: '', city_id: '', city_zh: '',
       band_id: '', venue_id: '', room_id: '', spot_id: '', name: '', name_zh: '', genre: '', type: '',
@@ -424,6 +428,19 @@ export default function AdminPage() {
   }
 
   const currentList = activeTab === 'bands' ? bands : activeTab === 'venues' ? venues : activeTab === 'events' ? events : activeTab === 'rehearsal_rooms' ? rehearsalRooms : spots;
+
+  const filteredList = currentList.filter(item => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    if (activeTab === 'events') {
+      return item.title?.toLowerCase().includes(query) || item.location?.toLowerCase().includes(query);
+    } else {
+      return item.name?.toLowerCase().includes(query) || 
+             item.name_zh?.toLowerCase().includes(query) || 
+             item.province_zh?.toLowerCase().includes(query) || 
+             item.city_zh?.toLowerCase().includes(query);
+    }
+  });
 
   return (
     <div className="min-h-[100dvh] bg-[#0a0502] text-white p-8 font-sans">
@@ -522,10 +539,20 @@ export default function AdminPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Form */}
           <div className="bg-[#1a1a1a] p-6 rounded-2xl border border-white/10 h-fit">
-            <h2 className="text-xl mb-6 font-medium flex items-center gap-2">
-              {isEditing ? <Edit2 size={20} className="text-[#ff4e00]" /> : <Plus size={20} className="text-[#ff4e00]" />}
-              {isEditing ? `Edit ${activeTab === 'bands' ? 'Band' : activeTab === 'venues' ? 'Venue' : activeTab === 'events' ? 'Event' : activeTab === 'rehearsal_rooms' ? 'Rehearsal Room' : 'Spot'}` : `Add New ${activeTab === 'bands' ? 'Band' : activeTab === 'venues' ? 'Venue' : activeTab === 'events' ? 'Event' : activeTab === 'rehearsal_rooms' ? 'Rehearsal Room' : 'Spot'}`}
-            </h2>
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-medium flex items-center gap-2">
+                {isEditing ? <Edit2 size={20} className="text-[#ff4e00]" /> : <Plus size={20} className="text-[#ff4e00]" />}
+                {isEditing ? `Edit ${activeTab === 'bands' ? 'Band' : activeTab === 'venues' ? 'Venue' : activeTab === 'events' ? 'Event' : activeTab === 'rehearsal_rooms' ? 'Rehearsal Room' : 'Spot'}` : `Add New ${activeTab === 'bands' ? 'Band' : activeTab === 'venues' ? 'Venue' : activeTab === 'events' ? 'Event' : activeTab === 'rehearsal_rooms' ? 'Rehearsal Room' : 'Spot'}`}
+              </h2>
+              {!isEditing && (
+                <button 
+                  onClick={() => setIsBulkImportOpen(true)}
+                  className="flex items-center gap-1.5 text-xs bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-lg transition-colors"
+                >
+                  <Upload size={14} /> Bulk Import
+                </button>
+              )}
+            </div>
             <form onSubmit={handleSubmit} className="space-y-4">
               {activeTab !== 'events' && (
                 <div className="grid grid-cols-2 gap-4">
@@ -738,13 +765,25 @@ export default function AdminPage() {
           </div>
 
           {/* List */}
-          <div className="lg:col-span-2 bg-[#1a1a1a] p-6 rounded-2xl border border-white/10">
-            <h2 className="text-xl mb-6 font-medium">Current {activeTab === 'bands' ? 'Bands' : activeTab === 'venues' ? 'Venues' : activeTab === 'events' ? 'Events' : activeTab === 'rehearsal_rooms' ? 'Rehearsal Rooms' : 'Spots'} ({currentList.length})</h2>
+          <div className="lg:col-span-2 bg-[#1a1a1a] p-6 rounded-2xl border border-white/10 flex flex-col h-full">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-medium">Current {activeTab === 'bands' ? 'Bands' : activeTab === 'venues' ? 'Venues' : activeTab === 'events' ? 'Events' : activeTab === 'rehearsal_rooms' ? 'Rehearsal Rooms' : 'Spots'} ({filteredList.length}/{currentList.length})</h2>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
+                <input
+                  type="text"
+                  placeholder="Search..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="bg-black/50 border border-white/10 rounded-lg pl-9 pr-4 py-2 text-sm text-white focus:outline-none focus:border-[#ff4e00] w-64"
+                />
+              </div>
+            </div>
             {loading ? (
               <div className="text-center py-8 text-gray-500">Loading...</div>
             ) : (
-              <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
-                {currentList.map(item => (
+              <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar flex-1">
+                {filteredList.map(item => (
                   <div key={item.id} className={`flex items-center justify-between bg-black/30 p-4 rounded-lg border ${item.is_active ? 'border-[#ff4e00]/50' : 'border-white/5'} hover:border-white/10 transition-colors`}>
                     <div>
                       <div className="flex items-center gap-2 mb-1">
@@ -807,6 +846,20 @@ export default function AdminPage() {
         </div>
         )}
       </div>
+
+      <BulkImportModal
+        isOpen={isBulkImportOpen}
+        onClose={() => setIsBulkImportOpen(false)}
+        activeTab={activeTab}
+        currentList={currentList}
+        locations={locations}
+        token={token}
+        onImportComplete={() => {
+          setIsBulkImportOpen(false);
+          fetchData();
+          showMessage('Bulk import successful', 'success');
+        }}
+      />
     </div>
   );
 }
