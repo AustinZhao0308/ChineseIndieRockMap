@@ -13,7 +13,7 @@ import { Music2 } from "lucide-react";
 import { useProvinceData } from "../hooks/useProvinceData";
 
 export default function MapPage() {
-  const { data: provinceData, loading } = useProvinceData();
+  const { data: provinceData, loading, error } = useProvinceData();
   const [selectedProvinceId, setSelectedProvinceId] = useState<string | null>(null);
   const [selectedBand, setSelectedBand] = useState<Band | null>(null);
   const [selectedVenue, setSelectedVenue] = useState<Venue | null>(null);
@@ -21,15 +21,22 @@ export default function MapPage() {
   const [selectedSpot, setSelectedSpot] = useState<Spot | null>(null);
   const [isGigModalOpen, setIsGigModalOpen] = useState(false);
   const [featuredEvent, setFeaturedEvent] = useState<any>(null);
+  const [featuredEventError, setFeaturedEventError] = useState<string | null>(null);
   const [isAdBannerVisible, setIsAdBannerVisible] = useState(true);
 
   useEffect(() => {
     fetch('/api/featured_events/active')
-      .then(res => res.json())
+      .then(res => {
+        if (!res.ok) throw new Error(`Featured Event API failed: ${res.status}`);
+        return res.json();
+      })
       .then(data => {
         if (data) setFeaturedEvent(data);
       })
-      .catch(err => console.error('Failed to load featured event', err));
+      .catch(err => {
+        console.error('Failed to load featured event', err);
+        setFeaturedEventError(err instanceof Error ? err.message : "Failed to load featured event");
+      });
   }, []);
 
   const handleProvinceClick = (provinceId: string) => {
@@ -69,6 +76,24 @@ export default function MapPage() {
     return (
       <div className="w-full h-[100dvh] bg-[#0a0502] flex items-center justify-center">
         <div className="text-[#ff4e00] text-xl font-mono animate-pulse">Loading Map Data...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="w-full h-[100dvh] bg-[#0a0502] flex flex-col items-center justify-center p-6 text-center">
+        <div className="text-red-500 text-xl font-mono mb-4">Error Loading Data</div>
+        <div className="text-gray-400 max-w-md">
+          <p className="mb-2">{error}</p>
+          <p className="text-sm">Please check your network connection or disable any adblockers that might be blocking API requests.</p>
+        </div>
+        <button 
+          onClick={() => window.location.reload()} 
+          className="mt-6 px-6 py-2 bg-[#ff4e00] text-white rounded-full hover:bg-[#e04400] transition-colors"
+        >
+          Retry
+        </button>
       </div>
     );
   }

@@ -9,13 +9,26 @@ const normalizeName = (name: string) => {
 export function useProvinceData() {
   const [data, setData] = useState<Record<string, Province>>(initialProvinceData);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     Promise.all([
-      fetch('/api/bands').then(res => res.json()),
-      fetch('/api/venues').then(res => res.json()),
-      fetch('/api/rehearsal_rooms').then(res => res.json()),
-      fetch('/api/spots').then(res => res.json())
+      fetch('/api/bands').then(res => {
+        if (!res.ok) throw new Error(`Bands API failed: ${res.status}`);
+        return res.json();
+      }),
+      fetch('/api/venues').then(res => {
+        if (!res.ok) throw new Error(`Venues API failed: ${res.status}`);
+        return res.json();
+      }),
+      fetch('/api/rehearsal_rooms').then(res => {
+        if (!res.ok) throw new Error(`Rehearsal Rooms API failed: ${res.status}`);
+        return res.json();
+      }),
+      fetch('/api/spots').then(res => {
+        if (!res.ok) throw new Error(`Spots API failed: ${res.status}`);
+        return res.json();
+      })
     ])
       .then(([bands, venues, rehearsalRooms, spots]) => {
         // Deep clone initial data to avoid mutating the original static object
@@ -213,9 +226,10 @@ export function useProvinceData() {
       })
       .catch(err => {
         console.error("Failed to fetch data:", err);
+        setError(err instanceof Error ? err.message : "Failed to fetch data");
         setLoading(false);
       });
   }, []);
 
-  return { data, loading };
+  return { data, loading, error };
 }
