@@ -621,7 +621,7 @@ export default function AdminPage() {
               ) : activeTab === 'rehearsal_rooms' ? (
                 <>
                   <input required placeholder="Address" value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-full" />
-                  <input required placeholder="Equipment (e.g. Marshall JCM900...)" value={formData.equipment} onChange={e => setFormData({...formData, equipment: e.target.value})} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-full" />
+                  <textarea required placeholder="Equipment (e.g. Marshall JCM900...)" value={formData.equipment} onChange={e => setFormData({...formData, equipment: e.target.value})} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-full h-24 resize-none" />
                   <input required placeholder="Price Info (e.g. 80元/小时)" value={formData.price_info} onChange={e => setFormData({...formData, price_info: e.target.value})} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-full" />
                 </>
               ) : activeTab === 'spots' ? (

@@ -662,9 +662,9 @@ export default function BulkImportModal({ isOpen, onClose, activeTab, currentLis
                       <input type="text" value={editFormData.address || ''} onChange={e => setEditFormData({...editFormData, address: e.target.value})} className={`w-full bg-black/50 border ${fieldErrors.address ? 'border-red-500 focus:border-red-500' : 'border-white/10 focus:border-[#ff4e00]'} rounded px-3 py-2 text-sm text-white focus:outline-none`} />
                       {fieldErrors.address && <span className="text-red-500 text-xs mt-1">{fieldErrors.address}</span>}
                     </div>
-                    <div>
+                    <div className="col-span-2">
                       <label className="block text-xs text-gray-500 mb-1 uppercase">Equipment</label>
-                      <input type="text" value={editFormData.equipment || ''} onChange={e => setEditFormData({...editFormData, equipment: e.target.value})} className={`w-full bg-black/50 border ${fieldErrors.equipment ? 'border-red-500 focus:border-red-500' : 'border-white/10 focus:border-[#ff4e00]'} rounded px-3 py-2 text-sm text-white focus:outline-none`} />
+                      <textarea value={editFormData.equipment || ''} onChange={e => setEditFormData({...editFormData, equipment: e.target.value})} className={`w-full bg-black/50 border ${fieldErrors.equipment ? 'border-red-500 focus:border-red-500' : 'border-white/10 focus:border-[#ff4e00]'} rounded px-3 py-2 text-sm text-white focus:outline-none h-24 resize-none`} />
                       {fieldErrors.equipment && <span className="text-red-500 text-xs mt-1">{fieldErrors.equipment}</span>}
                     </div>
                     <div>
