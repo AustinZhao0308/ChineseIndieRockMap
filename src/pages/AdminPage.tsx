@@ -78,8 +78,8 @@ export default function AdminPage() {
     fetch('/provincecity.json')
       .then(res => res.json())
       .then(data => {
-        if (data && data['中国']) {
-          setLocations(data['中国']);
+        if (data && data['地区']) {
+          setLocations(data['地区']);
         }
       })
       .catch(err => console.error('Failed to load locations', err));

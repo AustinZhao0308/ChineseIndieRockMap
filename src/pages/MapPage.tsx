@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import ChinaMap from "../components/ChinaMap";
 import ProvincePanel from "../components/ProvincePanel";
 import BandModal from "../components/BandModal";
@@ -70,6 +70,14 @@ export default function MapPage() {
     setSelectedSpot(null);
   };
 
+  const totalBands = useMemo(() => {
+    return Object.values(provinceData).reduce((provinceTotal, province) => {
+      return provinceTotal + province.cities.reduce((cityTotal, city) => {
+        return cityTotal + (city.bands?.length || 0);
+      }, 0);
+    }, 0);
+  }, [provinceData]);
+
   const selectedProvince = selectedProvinceId ? provinceData[selectedProvinceId] : null;
 
   if (loading) {
@@ -108,12 +116,15 @@ export default function MapPage() {
               <Music2 size={20} />
             </div>
             <h1 className="text-3xl font-serif text-white tracking-tight">
-              中国独立摇滚地图
+              独立摇滚地图
             </h1>
           </div>
           <div className="ml-14">
             <p className="text-sm text-gray-400 font-mono tracking-widest uppercase mb-1">
-              Chinese Indie Rock Map
+              Indie Rock Map
+            </p>
+            <p className="md:hidden text-[11px] text-gray-400 font-mono tracking-widest uppercase mb-1">
+              已收录 <span className="text-[#ff4e00] font-semibold">{totalBands}</span> 支乐队
             </p>
             <div className="flex items-center gap-2">
               <div className="h-[1px] w-4 bg-gray-600/50"></div>
@@ -126,7 +137,7 @@ export default function MapPage() {
         
         <div className="hidden md:block pointer-events-auto bg-black/40 backdrop-blur-md border border-white/10 rounded-full px-6 py-3">
           <p className="text-xs text-gray-300">
-            点击高亮的省份探索当地独立乐队与场地 <span className="text-[#ff4e00] ml-2">●</span>
+            已收录 <span className="text-[#ff4e00] font-semibold">{totalBands}</span> 支乐队 · 点击高亮的省份探索当地独立乐队与场地 <span className="text-[#ff4e00] ml-2">●</span>
           </p>
         </div>
       </header>

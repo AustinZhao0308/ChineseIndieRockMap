@@ -28,13 +28,29 @@ export default function BulkImportModal({ isOpen, onClose, activeTab, currentLis
   const getColumnsForTab = () => {
     const common = ['name', 'name_zh', 'province_zh', 'city_zh', 'intro', 'contact_info', 'image_url'];
     switch (activeTab) {
-      case 'bands': return ['band_id', ...common, 'genre', 'netease_url', 'xiaohongshu_url'];
+      case 'bands': return ['band_id', 'main_title', 'subtitle', 'province_zh', 'city_zh', 'intro', 'contact_info', 'image_url', 'genre', 'netease_url', 'xiaohongshu_url'];
       case 'venues': return ['venue_id', ...common, 'address', 'capacity', 'ticket_url'];
       case 'rehearsal_rooms': return ['room_id', ...common, 'equipment', 'price_info'];
       case 'spots': return ['spot_id', ...common, 'type', 'business_hours', 'social_url'];
       case 'events': return ['title', 'date_str', 'location', 'intro', 'image_url'];
       default: return common;
     }
+  };
+
+  const normalizeCsvRow = (row: any) => {
+    if (activeTab !== 'bands') return row;
+
+    return {
+      ...row,
+      name_zh: row.name_zh || row.main_title || '',
+      name: row.name || row.subtitle || ''
+    };
+  };
+
+  const getCsvFieldLabel = (field: string) => {
+    if (activeTab === 'bands' && field === 'name_zh') return 'main_title';
+    if (activeTab === 'bands' && field === 'name') return 'subtitle';
+    return field;
   };
 
   const downloadTemplate = () => {
@@ -59,7 +75,7 @@ export default function BulkImportModal({ isOpen, onClose, activeTab, currentLis
       skipEmptyLines: true,
       complete: (results) => {
         const data = results.data.map((row: any) => {
-          return validateRow(row);
+          return validateRow(normalizeCsvRow(row));
         });
         setParsedData(data);
       }
@@ -98,12 +114,12 @@ export default function BulkImportModal({ isOpen, onClose, activeTab, currentLis
     // Check required fields
     const nameField = activeTab === 'events' ? 'title' : 'name_zh';
     if (!row[nameField]) {
-      errors.push(`Missing required field: ${nameField}`);
+      errors.push(`Missing required field: ${getCsvFieldLabel(nameField)}`);
       fieldErrors[nameField] = 'Required';
       status = 'error';
     }
     if (activeTab !== 'events' && !row.name) {
-      errors.push(`Missing required field: name`);
+      errors.push(`Missing required field: ${getCsvFieldLabel('name')}`);
       fieldErrors.name = 'Required';
       status = 'error';
     }

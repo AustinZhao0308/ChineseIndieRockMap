@@ -155,10 +155,10 @@ if (countBands.count === 0) {
   `);
 
   const initialData = [
-    ['Beijing', '北京市', 'Beijing', '北京市', 'carsick-cars', 'Carsick Cars', 'Carsick Cars', 'Noise Rock / Indie Rock', '成立于2005年的北京，是中国地下摇滚的标志性乐队之一，以其极具破坏性和实验性的噪音吉他音墙闻名。', 'https://picsum.photos/seed/carsick/400/300?grayscale'],
+    ['Beijing', '北京市', 'Beijing', '北京市', 'carsick-cars', 'Carsick Cars', 'Carsick Cars', 'Noise Rock / Indie Rock', '成立于2005年的北京，是地下摇滚的标志性乐队之一，以其极具破坏性和实验性的噪音吉他音墙闻名。', 'https://picsum.photos/seed/carsick/400/300?grayscale'],
     ['Beijing', '北京市', 'Beijing', '北京市', 'hedgehog', 'Hedgehog', '刺猬', 'Indie Rock / Noise Pop', '2005年成立于北京，由主唱/吉他手子健、鼓手石璐和贝斯手一帆组成。他们的音乐充满了青春的躁动与忧郁。', 'https://picsum.photos/seed/hedgehog/400/300?grayscale'],
-    ['Beijing', '北京市', 'Beijing', '北京市', 'new-pants', 'New Pants', '新裤子', 'Synth-pop / Punk', '中国最具现场活力和创造性偶像摇滚乐队。1996年成立，从朋克到新浪潮，始终引领中国独立音乐的潮流。', 'https://picsum.photos/seed/newpants/400/300?grayscale'],
-    ['Beijing', '北京市', 'Beijing', '北京市', 'joyside', 'Joyside', 'Joyside', 'Punk Rock / Indie Rock', '2001年成立于北京，是中国最具代表性的朋克乐队之一，以其不羁的台风和浪漫的旋律著称。', 'https://picsum.photos/seed/joyside/400/300?grayscale'],
+    ['Beijing', '北京市', 'Beijing', '北京市', 'new-pants', 'New Pants', '新裤子', 'Synth-pop / Punk', '极具现场活力和创造性的偶像摇滚乐队。1996年成立，从朋克到新浪潮，始终引领独立音乐的潮流。', 'https://picsum.photos/seed/newpants/400/300?grayscale'],
+    ['Beijing', '北京市', 'Beijing', '北京市', 'joyside', 'Joyside', 'Joyside', 'Punk Rock / Indie Rock', '2001年成立于北京，是极具代表性的朋克乐队之一，以其不羁的台风和浪漫的旋律著称。', 'https://picsum.photos/seed/joyside/400/300?grayscale'],
     ['Hebei', '河北省', 'Shijiazhuang', '石家庄', 'omnipotent-youth-society', 'Omnipotent Youth Society', '万能青年旅店', 'Indie Rock / Folk Rock', '来自石家庄的独立摇滚乐队，以其深沉的歌词、宏大的管乐编配和对时代变迁的深刻洞察而闻名。代表作《杀死那个石家庄人》。', 'https://picsum.photos/seed/oys/400/300?grayscale'],
     ['Hebei', '河北省', 'Shijiazhuang', '石家庄', 'click-15', 'Click#15', 'Click#15', 'Funk / R&B', '虽然主唱Ricky后来在北京发展，但他来自河北石家庄，乐队以极具律动感的Funk音乐在独立乐坛独树一帜。', 'https://picsum.photos/seed/click15/400/300?grayscale'],
     ['Shaanxi', '陕西省', "Xi'an", '西安', 'fazi', 'FAZI', '法兹', 'Post-Punk', '成立于古城西安的后朋克乐队，音乐中充满了西北的粗犷与克制，现场极具爆发力和感染力。', 'https://picsum.photos/seed/fazi/400/300?grayscale'],
@@ -166,10 +166,10 @@ if (countBands.count === 0) {
     ['Sichuan', '四川省', 'Chengdu', '成都', 'soundtoy', 'Soundtoy', '声音玩具', 'Alternative Rock', '成都独立音乐的先驱之一，音乐旋律优美，歌词充满诗意，现场演出极具艺术气息。', 'https://picsum.photos/seed/soundtoy/400/300?grayscale'],
     ['Sichuan', '四川省', 'Chengdu', '成都', 'stolen', 'Stolen', '秘密行动', 'Electronic Rock / Post-Punk', '将冷峻的电子乐与摇滚乐融合，现场视觉与听觉的双重冲击力极强，是近年来备受瞩目的乐队。', 'https://picsum.photos/seed/stolen/400/300?grayscale'],
     ['Sichuan', '四川省', 'Chengdu', '成都', 'mosaic', 'Mosaic', '马赛克', 'Indie Pop / Disco', '来自成都的独立流行乐队，音乐充满复古的Disco节拍和浪漫的合成器旋律，现场极具感染力。', 'https://picsum.photos/seed/mosaic/400/300?grayscale'],
-    ['Guangdong', '广东省', 'Guangzhou', '广州', 'zhaoze', 'Zhaoze', '沼泽', 'Post-Rock', '中国后摇滚的代表乐队之一，创新性地将古琴融入后摇滚中，创造出独特的“古琴后摇”。', 'https://picsum.photos/seed/zhaoze/400/300?grayscale'],
+    ['Guangdong', '广东省', 'Guangzhou', '广州', 'zhaoze', 'Zhaoze', '沼泽', 'Post-Rock', '后摇滚的代表乐队之一，创新性地将古琴融入后摇滚中，创造出独特的“古琴后摇”。', 'https://picsum.photos/seed/zhaoze/400/300?grayscale'],
     ['Guangdong', '广东省', 'Haifeng', '海丰', 'wutiaoren', 'Wutiaoren', '五条人', 'Folk Rock', '来自广东海丰的民谣摇滚乐队，用方言歌唱市井生活，音乐中充满了泥土的气息和对底层人物的关怀。', 'https://picsum.photos/seed/wutiaoren/400/300?grayscale'],
     ['Guangdong', '广东省', 'Lianping', '连平', 'jiulian', 'Jiulian Zhenren', '九连真人', 'Alternative Rock / Folk', '来自广东连平，以客家话演唱，音乐生猛直接，融合了原生态的民间元素与硬朗的摇滚乐。', 'https://picsum.photos/seed/jiulian/400/300?grayscale'],
-    ['Hubei', '湖北省', 'Wuhan', '武汉', 'smzb', 'SMZB', '生命之饼', 'Punk Rock', '武汉朋克音乐的奠基者，中国最早的朋克乐队之一，以其直白、有力的音乐表达对社会的关注。', 'https://picsum.photos/seed/smzb/400/300?grayscale'],
+    ['Hubei', '湖北省', 'Wuhan', '武汉', 'smzb', 'SMZB', '生命之饼', 'Punk Rock', '武汉朋克音乐的奠基者，早期朋克乐队之一，以其直白、有力的音乐表达对社会的关注。', 'https://picsum.photos/seed/smzb/400/300?grayscale'],
     ['Hubei', '湖北省', 'Wuhan', '武汉', 'hiperson', 'Hiperson', '海朋森', 'Indie Rock / Post-Punk', '来自成都，但主唱陈思江在武汉求学期间深受武汉朋克场景影响。音乐充满诗意与力量。', 'https://picsum.photos/seed/hiperson/400/300?grayscale'],
     ['Hubei', '湖北省', 'Wuhan', '武汉', 'chinese-football', 'Chinese Football', 'Chinese Football', 'Math Rock / Emo', '武汉的独立摇滚乐队，深受90年代Emo和数字摇滚影响，吉他编配精巧，情绪真挚。', 'https://picsum.photos/seed/chinesefootball/400/300?grayscale'],
     ['Taiwan', '台湾省', 'Taipei', '台北', 'no-party-for-caodong', 'No Party For Cao Dong', '草东没有派对', 'Indie Rock / Grunge', '以其丧文化的歌词和极具爆发力的编曲，迅速席卷华语乐坛，深刻反映了当代年轻人的虚无与挣扎。', 'https://picsum.photos/seed/caodong/400/300?grayscale'],

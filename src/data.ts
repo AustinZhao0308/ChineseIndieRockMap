@@ -92,7 +92,7 @@ export const provinceData: Record<string, Province> = {
             name: "Carsick Cars",
             name_zh: "Carsick Cars",
             genre: "Noise Rock / Indie Rock",
-            intro: "成立于2005年的北京，是中国地下摇滚的标志性乐队之一，以其极具破坏性和实验性的噪音吉他音墙闻名。",
+            intro: "成立于2005年的北京，是地下摇滚的标志性乐队之一，以其极具破坏性和实验性的噪音吉他音墙闻名。",
             city: "Beijing",
             city_zh: "北京",
             imageUrl: "https://picsum.photos/seed/carsick/400/300?grayscale"
@@ -112,7 +112,7 @@ export const provinceData: Record<string, Province> = {
             name: "New Pants",
             name_zh: "新裤子",
             genre: "Synth-pop / Punk",
-            intro: "中国最具现场活力和创造性偶像摇滚乐队。1996年成立，从朋克到新浪潮，始终引领中国独立音乐的潮流。",
+            intro: "极具现场活力和创造性的偶像摇滚乐队。1996年成立，从朋克到新浪潮，始终引领独立音乐的潮流。",
             city: "Beijing",
             city_zh: "北京",
             imageUrl: "https://picsum.photos/seed/newpants/400/300?grayscale"
@@ -122,7 +122,7 @@ export const provinceData: Record<string, Province> = {
             name: "Joyside",
             name_zh: "Joyside",
             genre: "Punk Rock / Indie Rock",
-            intro: "2001年成立于北京，是中国最具代表性的朋克乐队之一，以其不羁的台风和浪漫的旋律著称。",
+            intro: "2001年成立于北京，是极具代表性的朋克乐队之一，以其不羁的台风和浪漫的旋律著称。",
             city: "Beijing",
             city_zh: "北京",
             imageUrl: "https://picsum.photos/seed/joyside/400/300?grayscale"
@@ -326,7 +326,7 @@ export const provinceData: Record<string, Province> = {
             name: "Zhaoze",
             name_zh: "沼泽",
             genre: "Post-Rock",
-            intro: "中国后摇滚的代表乐队之一，创新性地将古琴融入后摇滚中，创造出独特的“古琴后摇”。",
+            intro: "后摇滚的代表乐队之一，创新性地将古琴融入后摇滚中，创造出独特的“古琴后摇”。",
             city: "Guangzhou",
             city_zh: "广州",
             imageUrl: "https://picsum.photos/seed/zhaoze/400/300?grayscale"
@@ -405,7 +405,7 @@ export const provinceData: Record<string, Province> = {
             name: "SMZB",
             name_zh: "生命之饼",
             genre: "Punk Rock",
-            intro: "武汉朋克音乐的奠基者，中国最早的朋克乐队之一，以其直白、有力的音乐表达对社会的关注。",
+            intro: "武汉朋克音乐的奠基者，早期朋克乐队之一，以其直白、有力的音乐表达对社会的关注。",
             city: "Wuhan",
             city_zh: "武汉",
             imageUrl: "https://picsum.photos/seed/smzb/400/300?grayscale"
