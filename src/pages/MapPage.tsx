@@ -6,20 +6,20 @@ import VenueModal from "../components/VenueModal";
 import RehearsalRoomModal from "../components/RehearsalRoomModal";
 import SpotModal from "../components/SpotModal";
 import AdBanner from "../components/AdBanner";
-import GigModal from "../components/GigModal";
 import FeedbackMenu from "../components/FeedbackMenu";
 import { Band, Venue, RehearsalRoom, Spot } from "../data";
 import { Music2 } from "lucide-react";
 import { useProvinceData } from "../hooks/useProvinceData";
+import { useNavigate } from "react-router-dom";
 
 export default function MapPage() {
+  const navigate = useNavigate();
   const { data: provinceData, loading, error } = useProvinceData();
   const [selectedProvinceId, setSelectedProvinceId] = useState<string | null>(null);
   const [selectedBand, setSelectedBand] = useState<Band | null>(null);
   const [selectedVenue, setSelectedVenue] = useState<Venue | null>(null);
   const [selectedRehearsalRoom, setSelectedRehearsalRoom] = useState<RehearsalRoom | null>(null);
   const [selectedSpot, setSelectedSpot] = useState<Spot | null>(null);
-  const [isGigModalOpen, setIsGigModalOpen] = useState(false);
   const [featuredEvent, setFeaturedEvent] = useState<any>(null);
   const [featuredEventError, setFeaturedEventError] = useState<string | null>(null);
   const [isAdBannerVisible, setIsAdBannerVisible] = useState(true);
@@ -187,19 +187,9 @@ export default function MapPage() {
       {featuredEvent && isAdBannerVisible && (
         <AdBanner 
           isPanelOpen={!!selectedProvinceId} 
-          onClick={() => setIsGigModalOpen(true)} 
+          onClick={() => navigate(`/events/${featuredEvent.slug || featuredEvent.id}`)} 
           onClose={() => setIsAdBannerVisible(false)}
           event={featuredEvent}
-        />
-      )}
-
-      {/* Gig Modal */}
-      {featuredEvent && (
-        <GigModal 
-          isOpen={isGigModalOpen} 
-          onClose={() => setIsGigModalOpen(false)} 
-          event={featuredEvent}
-          onBandClick={handleBandClick}
         />
       )}
 

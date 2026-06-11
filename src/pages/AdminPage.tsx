@@ -1,8 +1,143 @@
-import React, { useState, useEffect } from 'react';
-import { Lock, LogOut, Plus, Trash2, Edit2, Music, MapPin, X, Calendar, Star, Mic2, Coffee, Search, Upload } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { Code2, Lock, LogOut, Plus, Trash2, Edit2, Music, MapPin, X, Calendar, Star, Mic2, Coffee, Search, Upload } from 'lucide-react';
 import BulkImportModal from '../components/BulkImportModal';
 
+type EventTicketForm = {
+  label: string;
+  url: string;
+};
+
+type EventStopForm = {
+  label: string;
+  start_at: string;
+  venue_id: string;
+  guestBandIds: string[];
+  price_text: string;
+  tickets: EventTicketForm[];
+};
+
+const createEmptyStop = (index: number): EventStopForm => ({
+  label: `第 ${index + 1} 站`,
+  start_at: '',
+  venue_id: '',
+  guestBandIds: [],
+  price_text: '',
+  tickets: []
+});
+
+const normalizeStopsForForm = (stops: any): EventStopForm[] => {
+  const source = typeof stops === 'string' ? (() => {
+    try { return JSON.parse(stops); } catch (e) { return []; }
+  })() : stops;
+
+  if (!Array.isArray(source)) return [];
+
+  return source.map((stop, index) => ({
+    label: stop.label || `第 ${index + 1} 站`,
+    start_at: stop.start_at || '',
+    venue_id: stop.venue_id || '',
+    guestBandIds: Array.isArray(stop.guestBandIds) ? stop.guestBandIds : [],
+    price_text: stop.price_text || stop.priceText || '',
+    tickets: Array.isArray(stop.tickets)
+      ? stop.tickets.map((ticket: any) => ({
+          label: ticket.label || '购票',
+          url: ticket.url || ''
+        }))
+      : []
+  }));
+};
+
+const toDateTimeLocalValue = (value: string) => {
+  if (!value) return '';
+  const match = value.match(/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2})/);
+  return match ? match[1] : value;
+};
+
+const fromDateTimeLocalValue = (value: string) => {
+  if (!value) return '';
+  if (value.length === 16) return `${value}:00+08:00`;
+  if (value.length === 19 && !/[zZ]|[+-]\d{2}:\d{2}$/.test(value)) return `${value}+08:00`;
+  return value;
+};
+
+const formatStopDateTime = (value: string) => {
+  const match = value.match(/^\d{4}-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+  if (!match) return value;
+  return `${match[1]}.${match[2]} ${match[3]}:${match[4]}`;
+};
+
+const buildEventLegacyFields = (source: {
+  date_str: string;
+  location: string;
+  address: string;
+  stops: EventStopForm[];
+}, venues: any[] = []) => {
+  const getVenue = (stop: EventStopForm) => venues.find(venue => venue.venue_id === stop.venue_id);
+  const getVenueName = (stop: EventStopForm) => {
+    const venue = getVenue(stop);
+    return venue ? (venue.name_zh || venue.name) : stop.venue_id;
+  };
+  const getVenueCity = (stop: EventStopForm) => {
+    const venue = getVenue(stop);
+    return venue?.city_zh || '';
+  };
+  const getVenueAddress = (stop: EventStopForm) => {
+    const venue = getVenue(stop);
+    return venue?.address || getVenueName(stop);
+  };
+
+  const stops = source.stops.filter(stop => stop.label || stop.start_at || stop.venue_id);
+  if (stops.length === 0) {
+    return {
+      date_str: source.date_str,
+      location: source.location,
+      address: source.address
+    };
+  }
+
+  return {
+    date_str: stops
+      .map(stop => [stop.label, formatStopDateTime(stop.start_at)].filter(Boolean).join(' '))
+      .filter(Boolean)
+      .join(' / '),
+    location: stops
+      .map(stop => [getVenueCity(stop), getVenueName(stop)].filter(Boolean).join(' '))
+      .filter(Boolean)
+      .join(' / '),
+    address: stops
+      .map(stop => {
+        const label = stop.label || getVenueCity(stop) || getVenueName(stop);
+        const place = getVenueAddress(stop);
+        return [label, place].filter(Boolean).join('：');
+      })
+      .filter(Boolean)
+      .join('；')
+  };
+};
+
+const cleanEventStopsForSave = (stops: EventStopForm[]) => {
+  return stops.map(stop => {
+    return {
+      label: stop.label,
+      start_at: stop.start_at,
+      venue_id: stop.venue_id,
+      guestBandIds: stop.guestBandIds || [],
+      price_text: stop.price_text,
+      tickets: stop.tickets
+    };
+  });
+};
+
+const adminTabs = ['bands', 'venues', 'events', 'rehearsal_rooms', 'spots', 'settings'] as const;
+type AdminTab = typeof adminTabs[number];
+
 export default function AdminPage() {
+  const [searchParams] = useSearchParams();
+  const requestedTab = searchParams.get('tab');
+  const requestedEdit = searchParams.get('edit');
+  const initialTab: AdminTab = adminTabs.includes(requestedTab as AdminTab) ? requestedTab as AdminTab : 'bands';
+  const autoEditKeyRef = useRef('');
   const [token, setToken] = useState(localStorage.getItem('adminToken'));
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -12,7 +147,7 @@ export default function AdminPage() {
   const [rehearsalRooms, setRehearsalRooms] = useState<any[]>([]);
   const [spots, setSpots] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'bands' | 'venues' | 'events' | 'rehearsal_rooms' | 'spots' | 'settings'>('bands');
+  const [activeTab, setActiveTab] = useState<AdminTab>(initialTab);
   const [locations, setLocations] = useState<any[]>([]);
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const [message, setMessage] = useState<{text: string, type: 'error' | 'success'} | null>(null);
@@ -22,6 +157,7 @@ export default function AdminPage() {
   const [passwordForm, setPasswordForm] = useState({ oldPassword: '', newPassword: '', confirmPassword: '' });
   const [searchQuery, setSearchQuery] = useState('');
   const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
+  const [eventJsonInput, setEventJsonInput] = useState('');
 
   const showMessage = (text: string, type: 'error' | 'success' = 'error') => {
     setMessage({ text, type });
@@ -56,11 +192,15 @@ export default function AdminPage() {
     business_hours: '',
     social_url: '',
     // Event specific
+    slug: '',
     title: '',
     date_str: '',
     location: '',
+    organizer: '',
+    status: 'on_sale',
     is_active: false,
     lineup: [] as { day: string, bandIds: string[] }[],
+    stops: [] as EventStopForm[],
     // Common
     name: '',
     name_zh: '',
@@ -94,12 +234,23 @@ export default function AdminPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const endpoint = activeTab === 'bands' ? '/api/bands' : activeTab === 'venues' ? '/api/venues' : activeTab === 'events' ? '/api/featured_events' : activeTab === 'rehearsal_rooms' ? '/api/rehearsal_rooms' : '/api/spots';
+      if (activeTab === 'events') {
+        const [eventsData, bandsData, venuesData] = await Promise.all([
+          fetch('/api/featured_events').then(res => res.json()),
+          fetch('/api/bands').then(res => res.json()),
+          fetch('/api/venues').then(res => res.json())
+        ]);
+        setEvents(eventsData);
+        setBands(bandsData);
+        setVenues(venuesData);
+        return;
+      }
+
+      const endpoint = activeTab === 'bands' ? '/api/bands' : activeTab === 'venues' ? '/api/venues' : activeTab === 'rehearsal_rooms' ? '/api/rehearsal_rooms' : '/api/spots';
       const res = await fetch(endpoint);
       const data = await res.json();
       if (activeTab === 'bands') setBands(data);
       else if (activeTab === 'venues') setVenues(data);
-      else if (activeTab === 'events') setEvents(data);
       else if (activeTab === 'rehearsal_rooms') setRehearsalRooms(data);
       else if (activeTab === 'spots') setSpots(data);
     } catch (err) {
@@ -251,6 +402,69 @@ export default function AdminPage() {
     });
   };
 
+  const getEventJsonPayload = (source = formData) => {
+    return {
+      slug: source.slug,
+      title: source.title,
+      description: source.intro,
+      image_url: source.image_url,
+      ticket_url: source.ticket_url,
+      organizer: source.organizer,
+      status: source.status,
+      is_active: source.is_active,
+      lineup: source.lineup,
+      stops: cleanEventStopsForSave(source.stops)
+    };
+  };
+
+  const refreshEventJson = () => {
+    setEventJsonInput(JSON.stringify(getEventJsonPayload(), null, 2));
+  };
+
+  const applyEventJson = () => {
+    try {
+      const parsed = JSON.parse(eventJsonInput);
+      const nextStops = normalizeStopsForForm(parsed.stops);
+      setFormData(prev => ({
+        ...prev,
+        slug: parsed.slug || '',
+        title: parsed.title || '',
+        date_str: parsed.date_str || '',
+        location: parsed.location || '',
+        address: parsed.address || '',
+        intro: parsed.description || parsed.intro || '',
+        image_url: parsed.image_url || '',
+        ticket_url: parsed.ticket_url || '',
+        organizer: parsed.organizer || '',
+        status: parsed.status || 'on_sale',
+        is_active: !!parsed.is_active,
+        lineup: Array.isArray(parsed.lineup) ? parsed.lineup.map((day: any) => ({
+          day: day.day || '全站阵容',
+          bandIds: day.bandIds || []
+        })) : [],
+        stops: nextStops
+      }));
+      setImageInputType(parsed.image_url && !parsed.image_url.startsWith('/uploads/') ? 'url' : 'upload');
+      showMessage('Event JSON applied', 'success');
+    } catch (err) {
+      showMessage('Invalid JSON');
+    }
+  };
+
+  const updateStop = (index: number, patch: Partial<EventStopForm>) => {
+    const nextStops = [...formData.stops];
+    nextStops[index] = { ...nextStops[index], ...patch };
+    setFormData({ ...formData, stops: nextStops });
+  };
+
+  const updateTicket = (stopIndex: number, ticketIndex: number, patch: Partial<EventTicketForm>) => {
+    const nextStops = [...formData.stops];
+    const tickets = [...nextStops[stopIndex].tickets];
+    tickets[ticketIndex] = { ...tickets[ticketIndex], ...patch };
+    nextStops[stopIndex] = { ...nextStops[stopIndex], tickets };
+    setFormData({ ...formData, stops: nextStops });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -264,7 +478,24 @@ export default function AdminPage() {
         payload.capacity = parseInt(payload.capacity as string) || 0 as any;
       }
       if (activeTab === 'events') {
+        const missingVenueStop = payload.stops.find((stop: EventStopForm) => !stop.venue_id || !venues.some(venue => venue.venue_id === stop.venue_id));
+        if (missingVenueStop) {
+          showMessage(`Invalid venue for stop: ${missingVenueStop.label || 'Unnamed stop'}`);
+          return;
+        }
+
+        const unknownBandId = payload.lineup
+          .flatMap((day: { bandIds: string[] }) => day.bandIds || [])
+          .concat(payload.stops.flatMap((stop: EventStopForm) => stop.guestBandIds || []))
+          .find((bandId: string) => !bands.some(band => band.band_id === bandId));
+        if (unknownBandId) {
+          showMessage(`Unknown band ID: ${unknownBandId}`);
+          return;
+        }
+
         payload.description = payload.intro;
+        Object.assign(payload, buildEventLegacyFields(payload, venues));
+        payload.stops = cleanEventStopsForSave(payload.stops);
       }
 
       const res = await fetch(url, {
@@ -344,14 +575,16 @@ export default function AdminPage() {
         // If it's already populated with band objects, map it back to just IDs for the form
         parsedLineup = parsedLineup.map((dayObj: any) => ({
           day: dayObj.day,
-          bandIds: dayObj.bandIds || (dayObj.bands ? dayObj.bands.map((b: any) => b.band_id) : [])
+          bandIds: dayObj.bandIds || []
         }));
       } catch (e) {
         parsedLineup = [];
       }
     }
 
-    setFormData({
+    const parsedStops = normalizeStopsForForm(item.stops);
+
+    const nextFormData = {
       province_id: item.province_id || '',
       province_zh: item.province_zh || '',
       city_id: item.city_id || '',
@@ -373,15 +606,24 @@ export default function AdminPage() {
       price_info: item.price_info || '',
       business_hours: item.business_hours || '',
       ticket_url: item.ticket_url || '',
+      slug: item.slug || '',
       title: item.title || '',
       date_str: item.date_str || '',
       location: item.location || '',
+      organizer: item.organizer || '',
+      status: item.status || 'on_sale',
       is_active: !!item.is_active,
       lineup: parsedLineup,
+      stops: parsedStops,
       intro: item.intro || item.description || '',
       image_url: item.image_url || '',
       contact_info: item.contact_info || ''
-    });
+    };
+
+    setFormData(nextFormData);
+    if (activeTab === 'events') {
+      setEventJsonInput(JSON.stringify(getEventJsonPayload(nextFormData), null, 2));
+    }
     setImageInputType(item.image_url && !item.image_url.startsWith('/uploads/') ? 'url' : 'upload');
   };
 
@@ -396,10 +638,25 @@ export default function AdminPage() {
       province_id: '', province_zh: '', city_id: '', city_zh: '',
       band_id: '', venue_id: '', room_id: '', spot_id: '', name: '', name_zh: '', genre: '', type: '',
       netease_url: '', xiaohongshu_url: '', social_url: '', ticket_url: '',
-      title: '', date_str: '', location: '', is_active: false, lineup: [],
+      slug: '', title: '', date_str: '', location: '', organizer: '', status: 'on_sale', is_active: false, lineup: [], stops: [],
       address: '', capacity: '', equipment: '', price_info: '', business_hours: '', intro: '', image_url: '', contact_info: ''
     });
+    setEventJsonInput('');
   };
+
+  useEffect(() => {
+    if (!token || activeTab !== 'events' || !requestedEdit || events.length === 0) return;
+
+    const target = events.find(event => event.slug === requestedEdit || String(event.id) === requestedEdit);
+    if (!target) return;
+
+    const editKey = `${target.id}:${target.slug || ''}`;
+    if (autoEditKeyRef.current === editKey) return;
+
+    autoEditKeyRef.current = editKey;
+    handleEdit(target);
+    setSearchQuery(target.title || target.slug || '');
+  }, [token, activeTab, requestedEdit, events]);
 
   if (!token) {
     return (
@@ -583,13 +840,25 @@ export default function AdminPage() {
 
               {activeTab === 'events' ? (
                 <>
+                  <input required placeholder="Slug (e.g. tingkaozai-night-decides-acoustic-live)" value={formData.slug} onChange={e => setFormData({...formData, slug: e.target.value})} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-full" />
                   <input required placeholder="Event Title" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-full" />
                   <div className="grid grid-cols-2 gap-4">
-                    <input required placeholder="Date (e.g. 2026.4.3 - 4.5)" value={formData.date_str} onChange={e => setFormData({...formData, date_str: e.target.value})} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-full" />
-                    <input required placeholder="Location Name (e.g. Mosh Space)" value={formData.location} onChange={e => setFormData({...formData, location: e.target.value})} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-full" />
+                    <input placeholder="Organizer (e.g. 猫啤 Catbeer)" value={formData.organizer} onChange={e => setFormData({...formData, organizer: e.target.value})} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-full" />
+                    <select value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-full text-white">
+                      <option value="on_sale">售票中</option>
+                      <option value="upcoming">即将开始</option>
+                      <option value="sold_out">已售罄</option>
+                      <option value="ended">已结束</option>
+                      <option value="cancelled">已取消</option>
+                      <option value="postponed">已延期</option>
+                    </select>
                   </div>
-                  <input required placeholder="Full Address" value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-full" />
-                  <input placeholder="Ticket URL" value={formData.ticket_url} onChange={e => setFormData({...formData, ticket_url: e.target.value})} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-full" />
+                  <input placeholder="Legacy Ticket URL (optional)" value={formData.ticket_url} onChange={e => setFormData({...formData, ticket_url: e.target.value})} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-full" />
+                  <div className="rounded-xl border border-white/10 bg-black/25 p-3 text-xs text-gray-400 space-y-1">
+                    <div><span className="text-gray-500">Auto Date:</span> {buildEventLegacyFields(formData, venues).date_str || 'Will be generated from Tour Stops'}</div>
+                    <div><span className="text-gray-500">Auto Location:</span> {buildEventLegacyFields(formData, venues).location || 'Will be generated from Tour Stops'}</div>
+                    <div><span className="text-gray-500">Auto Address:</span> {buildEventLegacyFields(formData, venues).address || 'Will be generated from Tour Stops'}</div>
+                  </div>
                   <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
                     <input type="checkbox" checked={formData.is_active} onChange={e => setFormData({...formData, is_active: e.target.checked})} className="rounded border-white/10 bg-black/50 text-[#ff4e00] focus:ring-[#ff4e00]" />
                     Set as Active Featured Event
@@ -687,6 +956,146 @@ export default function AdminPage() {
                       </div>
                     </div>
                   ))}
+                </div>
+              )}
+
+              {activeTab === 'events' && (
+                <div className="space-y-4 border border-white/10 p-4 rounded-xl bg-black/20">
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-sm font-medium text-white">Tour Stops</h3>
+                    <button type="button" onClick={() => setFormData({...formData, stops: [...formData.stops, createEmptyStop(formData.stops.length)]})} className="text-xs text-[#ff4e00] hover:text-[#ff6a2b] flex items-center gap-1"><Plus size={14}/> Add Stop</button>
+                  </div>
+
+                  {formData.stops.map((stop, stopIndex) => (
+                    <div key={stopIndex} className="space-y-3 border border-white/5 p-3 rounded-lg bg-black/40">
+                      <div className="flex justify-between items-center gap-2">
+                        <input value={stop.label} onChange={e => updateStop(stopIndex, { label: e.target.value })} className="bg-transparent border-b border-white/10 px-1 py-1 text-sm text-[#ff4e00] font-mono focus:outline-none focus:border-[#ff4e00] flex-1" placeholder="e.g. 宁波站" />
+                        <button type="button" onClick={() => {
+                          setFormData({...formData, stops: formData.stops.filter((_, i) => i !== stopIndex)});
+                        }} className="text-gray-500 hover:text-red-400"><X size={14}/></button>
+                      </div>
+
+                      <div>
+                        <input
+                          type="datetime-local"
+                          value={toDateTimeLocalValue(stop.start_at)}
+                          onChange={e => updateStop(stopIndex, { start_at: fromDateTimeLocalValue(e.target.value) })}
+                          className="bg-black/50 border border-white/10 rounded px-3 py-2 text-xs w-full text-white"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <select
+                          required
+                          value={stop.venue_id}
+                          onChange={e => {
+                            updateStop(stopIndex, {
+                              venue_id: e.target.value
+                            });
+                          }}
+                          className="bg-black/50 border border-white/10 rounded px-3 py-2 text-xs w-full text-white"
+                        >
+                          <option value="">Select Venue</option>
+                          {venues.map(v => (
+                            <option key={v.venue_id} value={v.venue_id}>{v.name_zh || v.name}</option>
+                          ))}
+                        </select>
+                        <div className="bg-black/30 border border-white/10 rounded px-3 py-2 text-xs text-gray-400 truncate">
+                          {(() => {
+                            const venue = venues.find(v => v.venue_id === stop.venue_id);
+                            return venue ? `${venue.name_zh || venue.name} · ${venue.city_zh || ''}` : 'Select Venue ID to use venue database info';
+                          })()}
+                        </div>
+                      </div>
+
+                      <input placeholder="Price Text" value={stop.price_text} onChange={e => updateStop(stopIndex, { price_text: e.target.value })} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-xs w-full" />
+
+                      <div className="space-y-2">
+                        <span className="text-xs text-gray-400">Guest Bands</span>
+                        <div className="flex flex-wrap gap-2">
+                          {stop.guestBandIds.map((bandId, bandIndex) => {
+                            const band = bands.find(b => b.band_id === bandId);
+                            return (
+                              <div key={bandId} className="flex items-center gap-1 bg-white/10 text-xs px-2 py-1 rounded-full text-gray-300">
+                                {band ? band.name_zh || band.name : bandId}
+                                <button type="button" onClick={() => {
+                                  const nextStops = [...formData.stops];
+                                  nextStops[stopIndex] = {
+                                    ...nextStops[stopIndex],
+                                    guestBandIds: nextStops[stopIndex].guestBandIds.filter((_, i) => i !== bandIndex)
+                                  };
+                                  setFormData({...formData, stops: nextStops});
+                                }} className="hover:text-red-400 ml-1"><X size={12}/></button>
+                              </div>
+                            );
+                          })}
+                          <select onChange={e => {
+                            if (!e.target.value) return;
+                            const nextStops = [...formData.stops];
+                            if (!nextStops[stopIndex].guestBandIds.includes(e.target.value)) {
+                              nextStops[stopIndex] = {
+                                ...nextStops[stopIndex],
+                                guestBandIds: [...nextStops[stopIndex].guestBandIds, e.target.value]
+                              };
+                            }
+                            setFormData({...formData, stops: nextStops});
+                            e.target.value = '';
+                          }} className="bg-black/50 border border-white/10 rounded-full px-2 py-1 text-xs text-gray-400 focus:outline-none">
+                            <option value="">+ Add Guest</option>
+                            {bands.map(b => (
+                              <option key={b.band_id} value={b.band_id}>{b.name_zh || b.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs text-gray-400">Tickets</span>
+                          <button type="button" onClick={() => {
+                            const nextStops = [...formData.stops];
+                            nextStops[stopIndex] = {
+                              ...nextStops[stopIndex],
+                              tickets: [...nextStops[stopIndex].tickets, { label: '购票', url: '' }]
+                            };
+                            setFormData({...formData, stops: nextStops});
+                          }} className="text-xs text-[#ff4e00] hover:text-[#ff6a2b] flex items-center gap-1"><Plus size={12}/> Add Ticket</button>
+                        </div>
+                        {stop.tickets.map((ticket, ticketIndex) => (
+                          <div key={ticketIndex} className="grid grid-cols-[0.35fr_1fr_auto] gap-2 items-center">
+                            <input placeholder="Label" value={ticket.label} onChange={e => updateTicket(stopIndex, ticketIndex, { label: e.target.value })} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-xs w-full" />
+                            <input placeholder="URL" value={ticket.url} onChange={e => updateTicket(stopIndex, ticketIndex, { url: e.target.value })} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-xs w-full" />
+                            <button type="button" onClick={() => {
+                              const nextStops = [...formData.stops];
+                              nextStops[stopIndex] = {
+                                ...nextStops[stopIndex],
+                                tickets: nextStops[stopIndex].tickets.filter((_, i) => i !== ticketIndex)
+                              };
+                              setFormData({...formData, stops: nextStops});
+                            }} className="text-gray-500 hover:text-red-400"><X size={14}/></button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {activeTab === 'events' && (
+                <div className="space-y-3 border border-white/10 p-4 rounded-xl bg-black/20">
+                  <div className="flex justify-between items-center gap-3">
+                    <h3 className="text-sm font-medium text-white flex items-center gap-2"><Code2 size={15}/> Event JSON</h3>
+                    <div className="flex gap-2">
+                      <button type="button" onClick={refreshEventJson} className="text-xs bg-white/10 hover:bg-white/15 text-gray-200 rounded px-3 py-1 transition-colors">Generate</button>
+                      <button type="button" onClick={applyEventJson} className="text-xs bg-[#ff4e00] hover:bg-[#ff6a2b] text-white rounded px-3 py-1 transition-colors">Apply</button>
+                    </div>
+                  </div>
+                  <textarea
+                    placeholder="Paste event JSON here, then click Apply."
+                    value={eventJsonInput}
+                    onChange={e => setEventJsonInput(e.target.value)}
+                    className="bg-black/50 border border-white/10 rounded px-3 py-2 text-xs font-mono w-full h-44 resize-y"
+                  />
                 </div>
               )}
 
@@ -796,6 +1205,7 @@ export default function AdminPage() {
                           <>
                             <span className="bg-white/5 px-2 py-0.5 rounded">{item.date_str}</span>
                             <span className="bg-white/5 px-2 py-0.5 rounded">{item.location}</span>
+                            {item.slug && <span className="bg-white/5 px-2 py-0.5 rounded">/{item.slug}</span>}
                           </>
                         ) : (
                           <>

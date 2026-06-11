@@ -91,6 +91,7 @@ db.exec(`
 
   CREATE TABLE IF NOT EXISTS featured_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    slug TEXT UNIQUE,
     title TEXT NOT NULL,
     date_str TEXT NOT NULL,
     location TEXT NOT NULL,
@@ -99,7 +100,10 @@ db.exec(`
     image_url TEXT,
     ticket_url TEXT,
     is_active INTEGER DEFAULT 0,
-    lineup TEXT
+    lineup TEXT,
+    organizer TEXT,
+    status TEXT,
+    stops TEXT
   );
 
   CREATE TABLE IF NOT EXISTS rehearsal_rooms (
@@ -144,6 +148,10 @@ try { db.exec('ALTER TABLE bands ADD COLUMN netease_url TEXT;'); } catch (e) {}
 try { db.exec('ALTER TABLE bands ADD COLUMN xiaohongshu_url TEXT;'); } catch (e) {}
 try { db.exec('ALTER TABLE venues ADD COLUMN ticket_url TEXT;'); } catch (e) {}
 try { db.exec('ALTER TABLE featured_events ADD COLUMN lineup TEXT;'); } catch (e) {}
+try { db.exec('ALTER TABLE featured_events ADD COLUMN slug TEXT;'); } catch (e) {}
+try { db.exec('ALTER TABLE featured_events ADD COLUMN organizer TEXT;'); } catch (e) {}
+try { db.exec('ALTER TABLE featured_events ADD COLUMN status TEXT;'); } catch (e) {}
+try { db.exec('ALTER TABLE featured_events ADD COLUMN stops TEXT;'); } catch (e) {}
 
 // Seed initial data if empty
 const countBands = db.prepare('SELECT COUNT(*) as count FROM bands').get() as { count: number };
@@ -213,25 +221,6 @@ if (countVenues.count === 0) {
   insertMany(initialData);
 }
 
-const countEvents = db.prepare('SELECT COUNT(*) as count FROM featured_events').get() as { count: number };
-if (countEvents.count === 0) {
-  console.log('Seeding initial featured event data...');
-  const insert = db.prepare(`
-    INSERT INTO featured_events (title, date_str, location, address, description, image_url, ticket_url, is_active)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-  insert.run(
-    '音速革命 Sonic Revolution 3.0',
-    '2026.4.3 - 4.5',
-    'Mosh Space',
-    '上海市杨浦区三号湾广场B1',
-    '周五 4.3\nlastWeJust...\n千败1000Failures\nCAR CAR CARS\n\n周六 4.4\nyooha!\nfalling nana\nthe farmers\n\n周日 4.5\nused to be sad\nif we could stay\n奶盖儿',
-    'https://picsum.photos/seed/sonic-revolution/800/400?grayscale',
-    '',
-    1
-  );
-}
-
 // Middleware to verify JWT
 const authenticateToken = (req: express.Request, res: express.Response, next: express.NextFunction) => {
   const authHeader = req.headers['authorization'];
@@ -247,6 +236,129 @@ const authenticateToken = (req: express.Request, res: express.Response, next: ex
     (req as any).user = user;
     next();
   });
+};
+
+const normalizeDisplayCity = (cityZh: string) => {
+  return cityZh ? cityZh.replace(/(省|市|维吾尔自治区|壮族自治区|回族自治区|自治区|特别行政区|自治州|地区|盟)$/, '') : '';
+};
+
+const toBandCard = (b: any) => {
+  if (!b) return null;
+  return {
+    id: b.band_id,
+    band_id: b.band_id,
+    name: b.name,
+    name_zh: b.name_zh,
+    genre: b.genre,
+    intro: b.intro,
+    city: b.city_id,
+    city_zh: normalizeDisplayCity(b.city_zh),
+    imageUrl: b.image_url,
+    contactInfo: b.contact_info,
+    neteaseUrl: b.netease_url,
+    xiaohongshuUrl: b.xiaohongshu_url,
+    dbId: b.id
+  };
+};
+
+const toVenueCard = (v: any) => {
+  if (!v) return null;
+  return {
+    id: v.venue_id,
+    venue_id: v.venue_id,
+    name: v.name,
+    name_zh: v.name_zh,
+    address: v.address,
+    capacity: v.capacity,
+    intro: v.intro,
+    city: v.city_id,
+    city_zh: normalizeDisplayCity(v.city_zh),
+    imageUrl: v.image_url,
+    contactInfo: v.contact_info,
+    ticketUrl: v.ticket_url,
+    dbId: v.id
+  };
+};
+
+const parseJsonArray = (value: any) => {
+  if (!value) return [];
+  if (Array.isArray(value)) return value;
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    return [];
+  }
+};
+
+const populateEvent = (event: any) => {
+  if (!event) return null;
+
+  const parsedLineup = parseJsonArray(event.lineup);
+  const lineup = parsedLineup.map((dayObj: any) => {
+    const bandIds = dayObj.bandIds || [];
+    const bands = bandIds.map((id: string) => {
+      const b = db.prepare('SELECT * FROM bands WHERE band_id = ?').get(id) as any;
+      return toBandCard(b);
+    }).filter(Boolean);
+    return { ...dayObj, bandIds, bands };
+  });
+
+  const stops = parseJsonArray(event.stops).map((stop: any) => {
+    const venueId = stop.venue_id;
+    const v = venueId ? db.prepare('SELECT * FROM venues WHERE venue_id = ?').get(venueId) as any : null;
+    const guestBandIds = Array.isArray(stop.guestBandIds) ? stop.guestBandIds : [];
+    const guestBands = guestBandIds.map((id: string) => {
+      const b = db.prepare('SELECT * FROM bands WHERE band_id = ?').get(id) as any;
+      return toBandCard(b);
+    }).filter(Boolean);
+    return {
+      ...stop,
+      venue_id: venueId || '',
+      guestBandIds,
+      guestBands,
+      venue: toVenueCard(v)
+    };
+  });
+
+  return {
+    ...event,
+    lineup,
+    stops
+  };
+};
+
+const validateEventReferences = (lineup: any, stops: any) => {
+  const parsedLineup = Array.isArray(lineup) ? lineup : [];
+  const parsedStops = Array.isArray(stops) ? stops : [];
+
+  for (const day of parsedLineup) {
+    const bandIds = Array.isArray(day.bandIds) ? day.bandIds : [];
+    for (const bandId of bandIds) {
+      const band = db.prepare('SELECT id FROM bands WHERE band_id = ?').get(bandId);
+      if (!band) {
+        throw new Error(`Unknown band_id: ${bandId}`);
+      }
+    }
+  }
+
+  for (const stop of parsedStops) {
+    if (!stop.venue_id) {
+      throw new Error(`Missing venue_id for stop: ${stop.label || 'Unnamed stop'}`);
+    }
+    const venue = db.prepare('SELECT id FROM venues WHERE venue_id = ?').get(stop.venue_id);
+    if (!venue) {
+      throw new Error(`Unknown venue_id: ${stop.venue_id}`);
+    }
+
+    const guestBandIds = Array.isArray(stop.guestBandIds) ? stop.guestBandIds : [];
+    for (const bandId of guestBandIds) {
+      const band = db.prepare('SELECT id FROM bands WHERE band_id = ?').get(bandId);
+      if (!band) {
+        throw new Error(`Unknown guest band_id: ${bandId}`);
+      }
+    }
+  }
 };
 
 // API Routes
@@ -415,54 +527,31 @@ app.get('/api/featured_events', (req, res) => {
 
 app.get('/api/featured_events/active', (req, res) => {
   const event = db.prepare('SELECT * FROM featured_events WHERE is_active = 1 LIMIT 1').get() as any;
-  if (event) {
-    if (event.lineup) {
-      try {
-        const parsedLineup = JSON.parse(event.lineup);
-        // parsedLineup is an array of { day: string, bandIds: string[] }
-        const populatedLineup = parsedLineup.map((dayObj: any) => {
-          const bands = dayObj.bandIds.map((id: string) => {
-            const b = db.prepare('SELECT * FROM bands WHERE band_id = ?').get(id) as any;
-            if (!b) return null;
-            return {
-              id: b.band_id,
-              name: b.name,
-              name_zh: b.name_zh,
-              genre: b.genre,
-              intro: b.intro,
-              city: b.city_id,
-              city_zh: b.city_zh ? b.city_zh.replace(/(省|市|维吾尔自治区|壮族自治区|回族自治区|自治区|特别行政区|自治州|地区|盟)$/, '') : '',
-              imageUrl: b.image_url,
-              contactInfo: b.contact_info,
-              neteaseUrl: b.netease_url,
-              xiaohongshuUrl: b.xiaohongshu_url,
-              dbId: b.id
-            };
-          }).filter(Boolean);
-          return { ...dayObj, bands };
-        });
-        event.lineup = populatedLineup;
-      } catch (e) {
-        event.lineup = [];
-      }
-    } else {
-      event.lineup = [];
-    }
+  res.json(populateEvent(event));
+});
+
+app.get('/api/featured_events/:slugOrId', (req, res) => {
+  const { slugOrId } = req.params;
+  const event = db.prepare('SELECT * FROM featured_events WHERE slug = ? OR id = ? LIMIT 1').get(slugOrId, slugOrId) as any;
+  if (!event) {
+    return res.status(404).json({ error: 'Event not found' });
   }
-  res.json(event || null);
+  res.json(populateEvent(event));
 });
 
 app.post('/api/featured_events', authenticateToken, (req, res) => {
-  const { title, date_str, location, address, description, image_url, ticket_url, is_active, lineup } = req.body;
+  const { slug, title, date_str, location, address, description, image_url, ticket_url, is_active, lineup, organizer, status, stops } = req.body;
   try {
+    validateEventReferences(lineup, stops);
     if (is_active) {
       db.prepare('UPDATE featured_events SET is_active = 0').run();
     }
     const lineupStr = lineup ? JSON.stringify(lineup) : null;
+    const stopsStr = stops ? JSON.stringify(stops) : null;
     const info = db.prepare(`
-      INSERT INTO featured_events (title, date_str, location, address, description, image_url, ticket_url, is_active, lineup)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(title, date_str, location, address, description, image_url, ticket_url, is_active ? 1 : 0, lineupStr);
+      INSERT INTO featured_events (slug, title, date_str, location, address, description, image_url, ticket_url, is_active, lineup, organizer, status, stops)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(slug || null, title, date_str, location, address, description, image_url, ticket_url, is_active ? 1 : 0, lineupStr, organizer || '', status || 'on_sale', stopsStr);
     res.json({ id: info.lastInsertRowid });
   } catch (error: any) {
     res.status(400).json({ error: error.message });
@@ -470,17 +559,19 @@ app.post('/api/featured_events', authenticateToken, (req, res) => {
 });
 
 app.put('/api/featured_events/:id', authenticateToken, (req, res) => {
-  const { title, date_str, location, address, description, image_url, ticket_url, is_active, lineup } = req.body;
+  const { slug, title, date_str, location, address, description, image_url, ticket_url, is_active, lineup, organizer, status, stops } = req.body;
   try {
+    validateEventReferences(lineup, stops);
     if (is_active) {
       db.prepare('UPDATE featured_events SET is_active = 0').run();
     }
     const lineupStr = lineup ? JSON.stringify(lineup) : null;
+    const stopsStr = stops ? JSON.stringify(stops) : null;
     db.prepare(`
       UPDATE featured_events SET 
-        title = ?, date_str = ?, location = ?, address = ?, description = ?, image_url = ?, ticket_url = ?, is_active = ?, lineup = ?
+        slug = ?, title = ?, date_str = ?, location = ?, address = ?, description = ?, image_url = ?, ticket_url = ?, is_active = ?, lineup = ?, organizer = ?, status = ?, stops = ?
       WHERE id = ?
-    `).run(title, date_str, location, address, description, image_url, ticket_url, is_active ? 1 : 0, lineupStr, req.params.id);
+    `).run(slug || null, title, date_str, location, address, description, image_url, ticket_url, is_active ? 1 : 0, lineupStr, organizer || '', status || 'on_sale', stopsStr, req.params.id);
     res.json({ success: true });
   } catch (error: any) {
     res.status(400).json({ error: error.message });
