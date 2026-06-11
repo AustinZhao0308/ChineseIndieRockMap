@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { X, MapPin, Info, Mail, MessageCircle, Copy, CheckCircle2, Mic2, DollarSign } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { RehearsalRoom } from "../data";
+import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
 
 interface RehearsalRoomModalProps {
   room: RehearsalRoom | null;
@@ -11,6 +12,7 @@ interface RehearsalRoomModalProps {
 const RehearsalRoomModal: React.FC<RehearsalRoomModalProps> = ({ room, onClose }) => {
   const [showContact, setShowContact] = useState(false);
   const [copied, setCopied] = useState(false);
+  useBodyScrollLock(!!room);
 
   React.useEffect(() => {
     setShowContact(false);
@@ -76,7 +78,7 @@ const RehearsalRoomModal: React.FC<RehearsalRoomModalProps> = ({ room, onClose }
             <X size={24} />
           </button>
 
-          <div className="overflow-y-auto flex-1 custom-scrollbar">
+          <div className="overflow-y-auto overscroll-contain flex-1 custom-scrollbar">
             <div className="relative h-64 md:h-80 w-full shrink-0 overflow-hidden">
               <img
                 src={room.imageUrl || `https://picsum.photos/seed/${room.id}/800/400?grayscale`}

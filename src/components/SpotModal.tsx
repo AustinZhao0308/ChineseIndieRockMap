@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { X, MapPin, Info, Mail, MessageCircle, Copy, CheckCircle2, Coffee, Clock, Link as LinkIcon } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { Spot } from "../data";
+import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
 
 interface SpotModalProps {
   spot: Spot | null;
@@ -11,6 +12,7 @@ interface SpotModalProps {
 const SpotModal: React.FC<SpotModalProps> = ({ spot, onClose }) => {
   const [showContact, setShowContact] = useState(false);
   const [copied, setCopied] = useState(false);
+  useBodyScrollLock(!!spot);
 
   React.useEffect(() => {
     setShowContact(false);
@@ -76,7 +78,7 @@ const SpotModal: React.FC<SpotModalProps> = ({ spot, onClose }) => {
             <X size={24} />
           </button>
 
-          <div className="overflow-y-auto flex-1 custom-scrollbar">
+          <div className="overflow-y-auto overscroll-contain flex-1 custom-scrollbar">
             <div className="relative h-64 md:h-80 w-full shrink-0 overflow-hidden">
               <img
                 src={spot.imageUrl || `https://picsum.photos/seed/${spot.id}/800/400?grayscale`}

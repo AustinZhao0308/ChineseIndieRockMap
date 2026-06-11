@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { X, MapPin, Users, Info, Calendar, Mail, MessageCircle, Copy, CheckCircle2, Ticket } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { Venue } from "../data";
+import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
 
 interface VenueModalProps {
   venue: Venue | null;
@@ -11,6 +12,7 @@ interface VenueModalProps {
 const VenueModal: React.FC<VenueModalProps> = ({ venue, onClose }) => {
   const [showContact, setShowContact] = useState(false);
   const [copied, setCopied] = useState(false);
+  useBodyScrollLock(!!venue);
 
   // Reset showContact when venue changes
   React.useEffect(() => {
@@ -78,7 +80,7 @@ const VenueModal: React.FC<VenueModalProps> = ({ venue, onClose }) => {
             <X size={24} />
           </button>
 
-          <div className="overflow-y-auto flex-1 custom-scrollbar">
+          <div className="overflow-y-auto overscroll-contain flex-1 custom-scrollbar">
             {/* Header Image Area */}
             <div className="relative h-64 md:h-80 w-full shrink-0 overflow-hidden">
               <img

@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { X, Disc, Headphones, Music, BookHeart, Mail, MessageCircle, Copy, CheckCircle2 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { Band } from "../data";
+import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
 
 interface BandModalProps {
   band: Band | null;
@@ -11,6 +12,7 @@ interface BandModalProps {
 const BandModal: React.FC<BandModalProps> = ({ band, onClose }) => {
   const [showContact, setShowContact] = useState(false);
   const [copied, setCopied] = useState(false);
+  useBodyScrollLock(!!band);
 
   // Reset showContact when band changes
   React.useEffect(() => {
@@ -78,7 +80,7 @@ const BandModal: React.FC<BandModalProps> = ({ band, onClose }) => {
             <X size={24} />
           </button>
 
-          <div className="overflow-y-auto flex-1 custom-scrollbar">
+          <div className="overflow-y-auto overscroll-contain flex-1 custom-scrollbar">
             {/* Header Image Area */}
             <div className="relative h-64 md:h-80 w-full shrink-0 overflow-hidden">
               <img

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, CalendarDays, Copy, ExternalLink, MapPin, Music2, PenLine, Ticket, Users } from "lucide-react";
+import { ArrowLeft, CalendarDays, Copy, ExternalLink, MapPin, Music2, PenLine, QrCode, Ticket, Users } from "lucide-react";
 import BandModal from "../components/BandModal";
 import VenueModal from "../components/VenueModal";
 import { Band, Venue } from "../data";
@@ -28,6 +28,11 @@ type EventLineupDay = {
   bands?: Band[];
 };
 
+type EventQrCode = {
+  title: string;
+  image_url: string;
+};
+
 type EventDetail = {
   id: number;
   slug?: string;
@@ -43,6 +48,7 @@ type EventDetail = {
   is_active?: number;
   stops: EventStop[];
   lineup: EventLineupDay[];
+  qr_codes?: EventQrCode[];
 };
 
 const fallbackColors = {
@@ -435,6 +441,39 @@ export default function EventPage() {
             </div>
           </div>
         </section>
+
+        {!!event.qr_codes?.length && (
+          <section className="px-4 pb-20 md:px-10 md:pb-24">
+            <div className="mx-auto max-w-7xl grid gap-8 lg:grid-cols-[0.9fr_1.1fr] border-t border-white/10 pt-10 md:pt-14">
+              <div>
+                <p className="text-sm text-white/45 font-mono uppercase tracking-wider">QR Codes</p>
+                <h2 className="mt-2 text-3xl md:text-5xl font-serif">二维码</h2>
+                <div className="mt-7 flex items-center gap-3 text-white/55">
+                  <QrCode size={18} />
+                  <span>微信 / 关注 / 联系</span>
+                </div>
+              </div>
+              <div className="grid gap-8 sm:grid-cols-2">
+                {event.qr_codes.map((qrCode, index) => (
+                  <div key={`${qrCode.title}-${index}`} className="group text-center">
+                    <div className="relative mx-auto w-full max-w-56">
+                      <div className="absolute -inset-4 rounded-[2rem] bg-[linear-gradient(135deg,rgba(var(--glow-a),0.32),rgba(var(--glow-b),0.16))] blur-2xl opacity-75 transition-opacity group-hover:opacity-100" />
+                      <div className="relative aspect-square rounded-[1.35rem] border border-white/12 bg-white p-3 shadow-[0_24px_80px_rgba(0,0,0,0.5)]">
+                      <img
+                        src={qrCode.image_url}
+                        alt={qrCode.title}
+                        className="h-full w-full object-contain"
+                        referrerPolicy="no-referrer"
+                      />
+                      </div>
+                    </div>
+                    <p className="mt-5 text-base font-medium text-white">{qrCode.title}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
       </main>
 
       <BandModal band={selectedBand} onClose={() => setSelectedBand(null)} />

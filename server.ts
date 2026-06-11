@@ -103,7 +103,8 @@ db.exec(`
     lineup TEXT,
     organizer TEXT,
     status TEXT,
-    stops TEXT
+    stops TEXT,
+    qr_codes TEXT
   );
 
   CREATE TABLE IF NOT EXISTS rehearsal_rooms (
@@ -152,6 +153,7 @@ try { db.exec('ALTER TABLE featured_events ADD COLUMN slug TEXT;'); } catch (e) 
 try { db.exec('ALTER TABLE featured_events ADD COLUMN organizer TEXT;'); } catch (e) {}
 try { db.exec('ALTER TABLE featured_events ADD COLUMN status TEXT;'); } catch (e) {}
 try { db.exec('ALTER TABLE featured_events ADD COLUMN stops TEXT;'); } catch (e) {}
+try { db.exec('ALTER TABLE featured_events ADD COLUMN qr_codes TEXT;'); } catch (e) {}
 
 // Seed initial data if empty
 const countBands = db.prepare('SELECT COUNT(*) as count FROM bands').get() as { count: number };
@@ -324,7 +326,8 @@ const populateEvent = (event: any) => {
   return {
     ...event,
     lineup,
-    stops
+    stops,
+    qr_codes: parseJsonArray(event.qr_codes)
   };
 };
 
@@ -540,7 +543,7 @@ app.get('/api/featured_events/:slugOrId', (req, res) => {
 });
 
 app.post('/api/featured_events', authenticateToken, (req, res) => {
-  const { slug, title, date_str, location, address, description, image_url, ticket_url, is_active, lineup, organizer, status, stops } = req.body;
+  const { slug, title, date_str, location, address, description, image_url, ticket_url, is_active, lineup, organizer, status, stops, qr_codes } = req.body;
   try {
     validateEventReferences(lineup, stops);
     if (is_active) {
@@ -548,10 +551,11 @@ app.post('/api/featured_events', authenticateToken, (req, res) => {
     }
     const lineupStr = lineup ? JSON.stringify(lineup) : null;
     const stopsStr = stops ? JSON.stringify(stops) : null;
+    const qrCodesStr = qr_codes ? JSON.stringify(qr_codes) : null;
     const info = db.prepare(`
-      INSERT INTO featured_events (slug, title, date_str, location, address, description, image_url, ticket_url, is_active, lineup, organizer, status, stops)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(slug || null, title, date_str, location, address, description, image_url, ticket_url, is_active ? 1 : 0, lineupStr, organizer || '', status || 'on_sale', stopsStr);
+      INSERT INTO featured_events (slug, title, date_str, location, address, description, image_url, ticket_url, is_active, lineup, organizer, status, stops, qr_codes)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(slug || null, title, date_str, location, address, description, image_url, ticket_url, is_active ? 1 : 0, lineupStr, organizer || '', status || 'on_sale', stopsStr, qrCodesStr);
     res.json({ id: info.lastInsertRowid });
   } catch (error: any) {
     res.status(400).json({ error: error.message });
@@ -559,7 +563,7 @@ app.post('/api/featured_events', authenticateToken, (req, res) => {
 });
 
 app.put('/api/featured_events/:id', authenticateToken, (req, res) => {
-  const { slug, title, date_str, location, address, description, image_url, ticket_url, is_active, lineup, organizer, status, stops } = req.body;
+  const { slug, title, date_str, location, address, description, image_url, ticket_url, is_active, lineup, organizer, status, stops, qr_codes } = req.body;
   try {
     validateEventReferences(lineup, stops);
     if (is_active) {
@@ -567,11 +571,12 @@ app.put('/api/featured_events/:id', authenticateToken, (req, res) => {
     }
     const lineupStr = lineup ? JSON.stringify(lineup) : null;
     const stopsStr = stops ? JSON.stringify(stops) : null;
+    const qrCodesStr = qr_codes ? JSON.stringify(qr_codes) : null;
     db.prepare(`
       UPDATE featured_events SET 
-        slug = ?, title = ?, date_str = ?, location = ?, address = ?, description = ?, image_url = ?, ticket_url = ?, is_active = ?, lineup = ?, organizer = ?, status = ?, stops = ?
+        slug = ?, title = ?, date_str = ?, location = ?, address = ?, description = ?, image_url = ?, ticket_url = ?, is_active = ?, lineup = ?, organizer = ?, status = ?, stops = ?, qr_codes = ?
       WHERE id = ?
-    `).run(slug || null, title, date_str, location, address, description, image_url, ticket_url, is_active ? 1 : 0, lineupStr, organizer || '', status || 'on_sale', stopsStr, req.params.id);
+    `).run(slug || null, title, date_str, location, address, description, image_url, ticket_url, is_active ? 1 : 0, lineupStr, organizer || '', status || 'on_sale', stopsStr, qrCodesStr, req.params.id);
     res.json({ success: true });
   } catch (error: any) {
     res.status(400).json({ error: error.message });
@@ -580,10 +585,13 @@ app.put('/api/featured_events/:id', authenticateToken, (req, res) => {
 
 app.delete('/api/featured_events/:id', authenticateToken, (req, res) => {
   try {
-    const event = db.prepare('SELECT image_url FROM featured_events WHERE id = ?').get(req.params.id) as any;
+    const event = db.prepare('SELECT image_url, qr_codes FROM featured_events WHERE id = ?').get(req.params.id) as any;
     if (event && event.image_url) {
       deleteLocalImage(event.image_url);
     }
+    parseJsonArray(event?.qr_codes).forEach((qrCode: any) => {
+      if (qrCode?.image_url) deleteLocalImage(qrCode.image_url);
+    });
     db.prepare('DELETE FROM featured_events WHERE id = ?').run(req.params.id);
     res.json({ success: true });
   } catch (error: any) {

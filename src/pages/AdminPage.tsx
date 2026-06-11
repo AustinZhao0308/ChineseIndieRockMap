@@ -17,6 +17,11 @@ type EventStopForm = {
   tickets: EventTicketForm[];
 };
 
+type EventQrCodeForm = {
+  title: string;
+  image_url: string;
+};
+
 const createEmptyStop = (index: number): EventStopForm => ({
   label: `第 ${index + 1} 站`,
   start_at: '',
@@ -129,6 +134,28 @@ const cleanEventStopsForSave = (stops: EventStopForm[]) => {
   });
 };
 
+const normalizeQrCodesForForm = (qrCodes: any): EventQrCodeForm[] => {
+  const source = typeof qrCodes === 'string' ? (() => {
+    try { return JSON.parse(qrCodes); } catch (e) { return []; }
+  })() : qrCodes;
+
+  if (!Array.isArray(source)) return [];
+
+  return source.map(qrCode => ({
+    title: qrCode.title || '',
+    image_url: qrCode.image_url || qrCode.imageUrl || ''
+  }));
+};
+
+const cleanQrCodesForSave = (qrCodes: EventQrCodeForm[]) => {
+  return qrCodes
+    .map(qrCode => ({
+      title: qrCode.title.trim(),
+      image_url: qrCode.image_url.trim()
+    }))
+    .filter(qrCode => qrCode.title || qrCode.image_url);
+};
+
 const adminTabs = ['bands', 'venues', 'events', 'rehearsal_rooms', 'spots', 'settings'] as const;
 type AdminTab = typeof adminTabs[number];
 
@@ -201,6 +228,7 @@ export default function AdminPage() {
     is_active: false,
     lineup: [] as { day: string, bandIds: string[] }[],
     stops: [] as EventStopForm[],
+    qr_codes: [] as EventQrCodeForm[],
     // Common
     name: '',
     name_zh: '',
@@ -413,7 +441,8 @@ export default function AdminPage() {
       status: source.status,
       is_active: source.is_active,
       lineup: source.lineup,
-      stops: cleanEventStopsForSave(source.stops)
+      stops: cleanEventStopsForSave(source.stops),
+      qr_codes: cleanQrCodesForSave(source.qr_codes)
     };
   };
 
@@ -442,7 +471,8 @@ export default function AdminPage() {
           day: day.day || '全站阵容',
           bandIds: day.bandIds || []
         })) : [],
-        stops: nextStops
+        stops: nextStops,
+        qr_codes: normalizeQrCodesForForm(parsed.qr_codes || parsed.qrCodes)
       }));
       setImageInputType(parsed.image_url && !parsed.image_url.startsWith('/uploads/') ? 'url' : 'upload');
       showMessage('Event JSON applied', 'success');
@@ -463,6 +493,77 @@ export default function AdminPage() {
     tickets[ticketIndex] = { ...tickets[ticketIndex], ...patch };
     nextStops[stopIndex] = { ...nextStops[stopIndex], tickets };
     setFormData({ ...formData, stops: nextStops });
+  };
+
+  const updateQrCode = (index: number, patch: Partial<EventQrCodeForm>) => {
+    const nextQrCodes = [...formData.qr_codes];
+    nextQrCodes[index] = { ...nextQrCodes[index], ...patch };
+    setFormData({ ...formData, qr_codes: nextQrCodes });
+  };
+
+  const handleQrImageUpload = async (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 1024 * 1024) {
+      showMessage('File size exceeds 1MB limit', 'error');
+      return;
+    }
+
+    const uploadData = new FormData();
+    uploadData.append('image', file);
+
+    try {
+      showMessage('Uploading QR image...', 'success');
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: uploadData
+      });
+
+      if (res.status === 401 || res.status === 403) {
+        handleLogout();
+        showMessage('登录已过期，请重新登录', 'error');
+        return;
+      }
+
+      const data = await res.json();
+      if (res.ok) {
+        updateQrCode(index, { image_url: data.url });
+        showMessage('QR image uploaded successfully', 'success');
+      } else {
+        showMessage(data.error || 'Failed to upload QR image');
+      }
+    } catch (err) {
+      showMessage('Network error during upload');
+    } finally {
+      e.target.value = '';
+    }
+  };
+
+  const removeQrCode = async (index: number) => {
+    const qrCode = formData.qr_codes[index];
+    if (qrCode?.image_url?.startsWith('/uploads/')) {
+      try {
+        await fetch('/api/upload', {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ url: qrCode.image_url })
+        });
+      } catch (err) {
+        console.error('Failed to delete QR image from server', err);
+      }
+    }
+
+    setFormData({
+      ...formData,
+      qr_codes: formData.qr_codes.filter((_, i) => i !== index)
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -496,6 +597,7 @@ export default function AdminPage() {
         payload.description = payload.intro;
         Object.assign(payload, buildEventLegacyFields(payload, venues));
         payload.stops = cleanEventStopsForSave(payload.stops);
+        payload.qr_codes = cleanQrCodesForSave(payload.qr_codes);
       }
 
       const res = await fetch(url, {
@@ -583,6 +685,7 @@ export default function AdminPage() {
     }
 
     const parsedStops = normalizeStopsForForm(item.stops);
+    const parsedQrCodes = normalizeQrCodesForForm(item.qr_codes);
 
     const nextFormData = {
       province_id: item.province_id || '',
@@ -615,6 +718,7 @@ export default function AdminPage() {
       is_active: !!item.is_active,
       lineup: parsedLineup,
       stops: parsedStops,
+      qr_codes: parsedQrCodes,
       intro: item.intro || item.description || '',
       image_url: item.image_url || '',
       contact_info: item.contact_info || ''
@@ -638,7 +742,7 @@ export default function AdminPage() {
       province_id: '', province_zh: '', city_id: '', city_zh: '',
       band_id: '', venue_id: '', room_id: '', spot_id: '', name: '', name_zh: '', genre: '', type: '',
       netease_url: '', xiaohongshu_url: '', social_url: '', ticket_url: '',
-      slug: '', title: '', date_str: '', location: '', organizer: '', status: 'on_sale', is_active: false, lineup: [], stops: [],
+      slug: '', title: '', date_str: '', location: '', organizer: '', status: 'on_sale', is_active: false, lineup: [], stops: [], qr_codes: [],
       address: '', capacity: '', equipment: '', price_info: '', business_hours: '', intro: '', image_url: '', contact_info: ''
     });
     setEventJsonInput('');
@@ -1076,6 +1180,52 @@ export default function AdminPage() {
                           </div>
                         ))}
                       </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {activeTab === 'events' && (
+                <div className="space-y-4 border border-white/10 p-4 rounded-xl bg-black/20">
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-sm font-medium text-white">QR Codes</h3>
+                    <button type="button" onClick={() => setFormData({...formData, qr_codes: [...formData.qr_codes, { title: '', image_url: '' }]})} className="text-xs text-[#ff4e00] hover:text-[#ff6a2b] flex items-center gap-1"><Plus size={14}/> Add QR</button>
+                  </div>
+
+                  {formData.qr_codes.map((qrCode, qrIndex) => (
+                    <div key={qrIndex} className="space-y-3 border border-white/5 p-3 rounded-lg bg-black/40">
+                      <div className="flex justify-between items-center gap-2">
+                        <input
+                          placeholder="Title (e.g. 厂牌微信 / 乐队微信)"
+                          value={qrCode.title}
+                          onChange={e => updateQrCode(qrIndex, { title: e.target.value })}
+                          className="bg-transparent border-b border-white/10 px-1 py-1 text-sm text-[#ff4e00] font-mono focus:outline-none focus:border-[#ff4e00] flex-1"
+                        />
+                        <button type="button" onClick={() => removeQrCode(qrIndex)} className="text-gray-500 hover:text-red-400"><X size={14}/></button>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-2">
+                        <input
+                          placeholder="QR Image URL"
+                          value={qrCode.image_url}
+                          onChange={e => updateQrCode(qrIndex, { image_url: e.target.value })}
+                          className="bg-black/50 border border-white/10 rounded px-3 py-2 text-xs w-full"
+                        />
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={e => handleQrImageUpload(qrIndex, e)}
+                          className="bg-black/50 border border-white/10 rounded px-3 py-2 text-xs w-full md:w-44 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-white/10 file:text-white hover:file:bg-white/20"
+                        />
+                      </div>
+
+                      {qrCode.image_url && (
+                        <img
+                          src={qrCode.image_url}
+                          alt={qrCode.title || 'QR Code'}
+                          className="h-24 w-24 rounded-lg border border-white/10 bg-white object-cover"
+                        />
+                      )}
                     </div>
                   ))}
                 </div>
