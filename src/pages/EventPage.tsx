@@ -221,7 +221,7 @@ export default function EventPage() {
 
   if (loading) {
     return (
-      <div className="min-h-[100dvh] bg-[#080705] flex items-center justify-center text-[#ff6a2b] font-mono">
+      <div className="min-h-[100svh] bg-[#080705] flex items-center justify-center text-[#ff6a2b] font-mono">
         Loading Event...
       </div>
     );
@@ -229,7 +229,7 @@ export default function EventPage() {
 
   if (error || !event) {
     return (
-      <div className="min-h-[100dvh] bg-[#080705] flex flex-col items-center justify-center gap-5 px-6 text-center">
+      <div className="min-h-[100svh] bg-[#080705] flex flex-col items-center justify-center gap-5 px-6 text-center">
         <p className="text-xl text-white font-serif">没有找到这场演出</p>
         <p className="text-sm text-gray-400">{error}</p>
         <button onClick={() => navigate("/")} className="px-5 py-2 rounded-full bg-white text-black text-sm font-medium">
@@ -241,7 +241,7 @@ export default function EventPage() {
 
   return (
     <div
-      className="min-h-[100dvh] bg-[#080705] text-white font-sans overflow-hidden"
+      className="min-h-[100svh] bg-[#080705] text-white font-sans overflow-hidden"
       style={{
         ["--glow-a" as string]: colors.a,
         ["--glow-b" as string]: colors.b,
@@ -267,7 +267,7 @@ export default function EventPage() {
       </header>
 
       <main className="relative z-10">
-        <section className="min-h-[100dvh] px-4 pt-24 pb-12 md:px-10 md:pt-28 md:pb-16 flex items-center">
+        <section className="min-h-[100svh] px-4 pt-24 pb-8 md:min-h-screen md:px-10 md:pt-28 md:pb-16 flex items-center">
           <div className="mx-auto w-full max-w-7xl grid gap-8 md:grid-cols-[minmax(320px,0.86fr)_minmax(420px,1.14fr)] md:items-center">
             <div className="relative mx-auto w-full max-w-[420px] md:max-w-[520px]">
               <div className="absolute -inset-5 rounded-[2rem] bg-[linear-gradient(135deg,rgba(var(--glow-a),0.42),rgba(var(--glow-b),0.18))] blur-2xl opacity-80" />
@@ -276,7 +276,7 @@ export default function EventPage() {
                 src={posterUrl}
                 alt={event.title}
                 onLoad={extractPosterColors}
-                className="relative block mx-auto max-w-full max-h-[74dvh] rounded-[1.35rem] object-contain shadow-[0_30px_100px_rgba(0,0,0,0.65)] border border-white/12 bg-black/30"
+                className="relative block mx-auto max-w-full max-h-[68svh] md:max-h-[74vh] rounded-[1.35rem] object-contain shadow-[0_30px_100px_rgba(0,0,0,0.65)] border border-white/12 bg-black/30"
                 referrerPolicy="no-referrer"
               />
             </div>
@@ -293,7 +293,7 @@ export default function EventPage() {
                 {event.organizer ? `${event.organizer} 呈现` : "Catbeer Presents"} · {stops.length ? `${stops.length}站巡演` : event.location}
               </p>
 
-              <div className="mt-8 grid gap-3 sm:grid-cols-2">
+              <div className="mt-8 hidden gap-3 md:grid md:grid-cols-2">
                 {stops.map((stop, index) => (
                   <a
                     key={`${stop.label}-${index}`}
