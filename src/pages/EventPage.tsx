@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, CalendarDays, Copy, ExternalLink, MapPin, Music2, PenLine, QrCode, Ticket, Users } from "lucide-react";
+import { ArrowLeft, CalendarDays, Copy, ExternalLink, MapPin, PenLine, QrCode, Ticket, Users } from "lucide-react";
 import BandModal from "../components/BandModal";
 import VenueModal from "../components/VenueModal";
 import { Band, Venue } from "../data";
@@ -431,10 +431,6 @@ export default function EventPage() {
             <div>
               <p className="text-sm text-white/45 font-mono uppercase tracking-wider">Story</p>
               <h2 className="mt-2 text-3xl md:text-5xl font-serif">演出介绍</h2>
-              <div className="mt-7 flex items-center gap-3 text-white/55">
-                <Music2 size={18} />
-                <span>{event.organizer || "Catbeer"}</span>
-              </div>
             </div>
             <div className="whitespace-pre-wrap text-base md:text-lg leading-9 text-white/72">
               {event.description}
