@@ -453,21 +453,21 @@ export default function EventPage() {
                   <span>微信 / 关注 / 联系</span>
                 </div>
               </div>
-              <div className="grid gap-8 sm:grid-cols-2">
+              <div className="grid grid-cols-3 gap-x-3 gap-y-6 sm:gap-x-5 md:grid-cols-2 md:gap-8 xl:grid-cols-3">
                 {event.qr_codes.map((qrCode, index) => (
                   <div key={`${qrCode.title}-${index}`} className="group text-center">
-                    <div className="relative mx-auto w-full max-w-56">
-                      <div className="absolute -inset-4 rounded-[2rem] bg-[linear-gradient(135deg,rgba(var(--glow-a),0.32),rgba(var(--glow-b),0.16))] blur-2xl opacity-75 transition-opacity group-hover:opacity-100" />
-                      <div className="relative aspect-square rounded-[1.35rem] border border-white/12 bg-white p-3 shadow-[0_24px_80px_rgba(0,0,0,0.5)]">
-                      <img
-                        src={qrCode.image_url}
-                        alt={qrCode.title}
-                        className="h-full w-full object-contain"
-                        referrerPolicy="no-referrer"
-                      />
+                    <div className="relative mx-auto w-full max-w-24 sm:max-w-32 md:max-w-52">
+                      <div className="absolute -inset-2 rounded-3xl bg-[linear-gradient(135deg,rgba(var(--glow-a),0.3),rgba(var(--glow-b),0.14))] blur-xl opacity-70 transition-opacity group-hover:opacity-100 md:-inset-4 md:rounded-[2rem] md:blur-2xl" />
+                      <div className="relative aspect-square rounded-2xl border border-white/12 bg-white p-1.5 shadow-[0_18px_52px_rgba(0,0,0,0.42)] sm:p-2 md:rounded-[1.35rem] md:p-3 md:shadow-[0_24px_80px_rgba(0,0,0,0.5)]">
+                        <img
+                          src={qrCode.image_url}
+                          alt={qrCode.title}
+                          className="h-full w-full object-contain"
+                          referrerPolicy="no-referrer"
+                        />
                       </div>
                     </div>
-                    <p className="mt-5 text-base font-medium text-white">{qrCode.title}</p>
+                    <p className="mt-2 text-xs font-medium leading-snug text-white/85 md:mt-5 md:text-base md:text-white">{qrCode.title}</p>
                   </div>
                 ))}
               </div>
