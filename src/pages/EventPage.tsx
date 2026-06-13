@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, CalendarDays, Copy, ExternalLink, MapPin, PenLine, QrCode, Ticket, Users } from "lucide-react";
+import { ArrowLeft, CalendarDays, ChevronLeft, ChevronRight, Copy, ExternalLink, MapPin, PenLine, QrCode, Ticket, Users } from "lucide-react";
 import BandModal from "../components/BandModal";
 import VenueModal from "../components/VenueModal";
 import { Band, Venue } from "../data";
@@ -11,7 +11,19 @@ type EventTicket = {
   url: string;
 };
 
+type EventRecapPhoto = {
+  title?: string;
+  caption?: string;
+  image_url: string;
+};
+
+type EventRecapVideo = {
+  title?: string;
+  url?: string;
+};
+
 type EventStop = {
+  id?: string;
   label: string;
   start_at?: string;
   venue_id?: string;
@@ -19,6 +31,8 @@ type EventStop = {
   guestBands?: Band[];
   price_text?: string;
   tickets?: EventTicket[];
+  recap_photos?: EventRecapPhoto[];
+  recap_video?: EventRecapVideo;
   venue?: Venue;
 };
 
@@ -93,6 +107,34 @@ const ticketLabel = (ticket: EventTicket) => {
   return ticket.label || "购票";
 };
 
+const stopKey = (stop: EventStop, index: number) => stop.id || stop.label || `stop-${index}`;
+
+const hasStopRecap = (stop: EventStop) => {
+  return !!stop.recap_photos?.some(photo => photo.image_url) || !!stop.recap_video?.url;
+};
+
+const getBilibiliEmbedUrl = (url?: string) => {
+  if (!url) return "";
+  const playerOptions = "page=1&autoplay=0&high_quality=1&quality=80";
+  const bvMatch = url.match(/\/video\/(BV[a-zA-Z0-9]+)/i) || url.match(/[?&]bvid=(BV[a-zA-Z0-9]+)/i);
+  if (bvMatch?.[1]) {
+    return `https://player.bilibili.com/player.html?bvid=${bvMatch[1]}&${playerOptions}`;
+  }
+
+  try {
+    const parsed = new URL(url);
+    const aid = parsed.searchParams.get("aid");
+    const cid = parsed.searchParams.get("cid");
+    if (aid && cid) {
+      return `https://player.bilibili.com/player.html?aid=${aid}&cid=${cid}&${playerOptions}`;
+    }
+  } catch (err) {
+    return "";
+  }
+
+  return "";
+};
+
 export default function EventPage() {
   const { slug } = useParams();
   const navigate = useNavigate();
@@ -104,10 +146,26 @@ export default function EventPage() {
   const [selectedBand, setSelectedBand] = useState<Band | null>(null);
   const [selectedVenue, setSelectedVenue] = useState<Venue | null>(null);
   const [ticketMessage, setTicketMessage] = useState("");
+  const [activeRecapKey, setActiveRecapKey] = useState("");
+  const [recapPhotoIndexes, setRecapPhotoIndexes] = useState<Record<string, number>>({});
 
   const isAdmin = typeof window !== "undefined" && !!localStorage.getItem("adminToken");
   const posterUrl = resolvePosterUrl(event?.image_url);
   const stops = event?.stops?.length ? event.stops : [];
+  const recapStops = useMemo(() => {
+    if (event?.status !== "ended") return [];
+    return stops.filter(hasStopRecap);
+  }, [event?.status, stops]);
+  const activeRecapStop = recapStops.find((stop, index) => stopKey(stop, index) === activeRecapKey) || recapStops[0];
+  const activeRecapStopKey = activeRecapStop ? stopKey(activeRecapStop, stops.indexOf(activeRecapStop)) : "";
+  const activeRecapPhotos = activeRecapStop?.recap_photos?.filter(photo => photo.image_url) || [];
+  const activeRecapPhotoIndex = Math.min(recapPhotoIndexes[activeRecapStopKey] || 0, Math.max(activeRecapPhotos.length - 1, 0));
+  const activeRecapPhoto = activeRecapPhotos[activeRecapPhotoIndex];
+  const hasActiveRecapPhoto = !!activeRecapPhoto;
+  const hasActiveRecapVideo = !!activeRecapStop?.recap_video?.url;
+  const recapMediaGridClass = hasActiveRecapPhoto && hasActiveRecapVideo
+    ? "grid gap-5 lg:grid-cols-2 lg:items-start"
+    : "grid gap-5 max-w-5xl";
   const lineupBands = useMemo(() => {
     const bandMap = new Map<string, { band: Band; notes: Set<string>; isGuest: boolean }>();
 
@@ -134,6 +192,16 @@ export default function EventPage() {
       notes: Array.from(entry.notes)
     }));
   }, [event]);
+
+  useEffect(() => {
+    if (!recapStops.length) {
+      setActiveRecapKey("");
+      return;
+    }
+    if (!recapStops.some((stop, index) => stopKey(stop, index) === activeRecapKey)) {
+      setActiveRecapKey(stopKey(recapStops[0], stops.indexOf(recapStops[0])));
+    }
+  }, [activeRecapKey, recapStops, stops]);
 
   useEffect(() => {
     setLoading(true);
@@ -225,6 +293,12 @@ export default function EventPage() {
     setTimeout(() => setTicketMessage(""), 2600);
   };
 
+  const moveRecapPhoto = (direction: number) => {
+    if (!activeRecapStopKey || activeRecapPhotos.length <= 1) return;
+    const nextIndex = (activeRecapPhotoIndex + direction + activeRecapPhotos.length) % activeRecapPhotos.length;
+    setRecapPhotoIndexes(prev => ({ ...prev, [activeRecapStopKey]: nextIndex }));
+  };
+
   if (loading) {
     return (
       <div className="min-h-[100svh] bg-[#080705] flex items-center justify-center text-[#ff6a2b] font-mono">
@@ -272,8 +346,8 @@ export default function EventPage() {
         )}
       </header>
 
-      <main className="relative z-10">
-        <section className="min-h-[100svh] px-4 pt-24 pb-8 md:min-h-screen md:px-10 md:pt-28 md:pb-16 flex items-center">
+      <main className="relative z-10 flex flex-col">
+        <section className="order-0 min-h-[100svh] px-4 pt-24 pb-8 md:min-h-screen md:px-10 md:pt-28 md:pb-16 flex items-center">
           <div className="mx-auto w-full max-w-7xl grid gap-8 md:grid-cols-[minmax(320px,0.86fr)_minmax(420px,1.14fr)] md:items-center">
             <div className="relative mx-auto w-full max-w-[420px] md:max-w-[520px]">
               <div className="absolute -inset-5 rounded-[2rem] bg-[linear-gradient(135deg,rgba(var(--glow-a),0.42),rgba(var(--glow-b),0.18))] blur-2xl opacity-80" />
@@ -319,7 +393,7 @@ export default function EventPage() {
           </div>
         </section>
 
-        <section className="px-4 pb-10 md:px-10 md:pb-16">
+        <section className="order-2 px-4 pb-10 md:px-10 md:pb-16">
           <div className="mx-auto max-w-7xl border-t border-white/10 pt-10 md:pt-14">
             <div className="flex items-end justify-between gap-5">
               <div>
@@ -389,7 +463,149 @@ export default function EventPage() {
           </div>
         </section>
 
-        <section className="px-4 pb-10 md:px-10 md:pb-16">
+        {!!recapStops.length && activeRecapStop && (
+          <section className="order-1 px-4 pb-10 md:px-10 md:pb-16">
+            <div className="mx-auto max-w-7xl border-t border-white/10 pt-10 md:pt-14">
+              <div>
+                <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+                  <div>
+                  <p className="text-sm text-white/45 font-mono uppercase tracking-wider">Recap</p>
+                  <h2 className="mt-2 text-3xl md:text-5xl font-serif">演出回顾</h2>
+                  <p className="mt-5 max-w-sm text-sm leading-7 text-white/55">
+                    现场照片与视频记录，按巡演站点归档。
+                  </p>
+                  </div>
+
+                  <div className="flex gap-2 overflow-x-auto pb-1 lg:justify-end lg:overflow-visible lg:pb-0">
+                    {recapStops.map((stop, index) => {
+                      const key = stopKey(stop, stops.indexOf(stop));
+                      const isActive = key === activeRecapStopKey;
+                      return (
+                        <button
+                          key={key}
+                          type="button"
+                          onClick={() => setActiveRecapKey(key)}
+                          className={`min-w-[8.5rem] rounded-2xl border px-4 py-3 text-left transition-colors md:min-w-[10rem] ${
+                            isActive
+                              ? "border-white/25 bg-white/16 text-white"
+                              : "border-white/10 bg-white/[0.06] text-white/62 hover:bg-white/[0.1]"
+                          }`}
+                        >
+                          <span className="block text-sm font-medium">{stop.label}</span>
+                          <span className="mt-1 block text-xs text-white/45">
+                            {[formatStopTime(stop.start_at), stop.venue?.name_zh || stop.venue?.name].filter(Boolean).join(" · ")}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="mt-9">
+                  <div className="mb-5">
+                    <p className="text-sm text-white/50">{activeRecapStop.venue?.name_zh || activeRecapStop.venue?.name}</p>
+                    <h3 className="mt-1 text-2xl md:text-4xl font-serif">{activeRecapStop.label}回顾</h3>
+                  </div>
+
+                  <div className={recapMediaGridClass}>
+                    {hasActiveRecapPhoto && (
+                      <div className="group relative">
+                        <div className="absolute -inset-4 rounded-[2rem] bg-[linear-gradient(135deg,rgba(var(--glow-a),0.34),rgba(var(--glow-b),0.16))] blur-2xl opacity-70" />
+                        <div className="relative overflow-hidden rounded-[1.6rem] border border-white/12 bg-white/[0.06] shadow-[0_30px_90px_rgba(0,0,0,0.5)]">
+                          <img
+                            src={activeRecapPhoto.image_url}
+                            alt={activeRecapPhoto.title || `${activeRecapStop.label}回顾照片`}
+                            className="aspect-video w-full object-cover"
+                            referrerPolicy="no-referrer"
+                          />
+                          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/78 to-transparent px-4 pb-16 pt-10 md:px-6 md:pb-16 md:pt-14">
+                            {(activeRecapPhoto.title || activeRecapPhoto.caption) && (
+                              <div>
+                                {activeRecapPhoto.title && <p className="text-base md:text-lg font-medium text-white">{activeRecapPhoto.title}</p>}
+                                {activeRecapPhoto.caption && <p className="mt-1 text-sm text-white/65">{activeRecapPhoto.caption}</p>}
+                              </div>
+                            )}
+                          </div>
+                          {activeRecapPhotos.length > 1 && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => moveRecapPhoto(-1)}
+                                className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full border border-white/15 bg-black/35 p-2 text-white/80 backdrop-blur-xl hover:bg-white/15"
+                                aria-label="上一张回顾照片"
+                              >
+                                <ChevronLeft size={18} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => moveRecapPhoto(1)}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full border border-white/15 bg-black/35 p-2 text-white/80 backdrop-blur-xl hover:bg-white/15"
+                                aria-label="下一张回顾照片"
+                              >
+                                <ChevronRight size={18} />
+                              </button>
+                            </>
+                          )}
+                          {activeRecapPhotos.length > 1 && (
+                            <div className="absolute left-1/2 bottom-4 flex -translate-x-1/2 items-center gap-3 rounded-full border border-white/15 bg-black/45 px-3 py-2 shadow-[0_10px_32px_rgba(0,0,0,0.45)] backdrop-blur-xl md:bottom-5">
+                              <div className="flex items-center justify-center gap-1.5">
+                                {activeRecapPhotos.map((photo, index) => (
+                                  <button
+                                    key={`${photo.image_url}-${index}`}
+                                    type="button"
+                                    onClick={() => setRecapPhotoIndexes(prev => ({ ...prev, [activeRecapStopKey]: index }))}
+                                    className={`h-2.5 rounded-full transition-all ${index === activeRecapPhotoIndex ? "w-8 bg-white shadow-[0_0_14px_rgba(255,255,255,0.5)]" : "w-2.5 bg-white/45 hover:bg-white/75"}`}
+                                    aria-label={`查看第 ${index + 1} 张回顾照片`}
+                                  />
+                                ))}
+                              </div>
+                              <span className="font-mono text-[11px] leading-none text-white/70">
+                                {activeRecapPhotoIndex + 1}/{activeRecapPhotos.length}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {hasActiveRecapVideo && (
+                      <div className="relative">
+                        <div className="absolute -inset-4 rounded-[2rem] bg-[linear-gradient(135deg,rgba(var(--glow-b),0.28),rgba(var(--glow-c),0.12))] blur-2xl opacity-60" />
+                        <div className="relative aspect-video overflow-hidden rounded-[1.6rem] border border-white/12 bg-white/[0.06] shadow-[0_30px_90px_rgba(0,0,0,0.45)]">
+                          {getBilibiliEmbedUrl(activeRecapStop.recap_video.url) ? (
+                            <iframe
+                              src={getBilibiliEmbedUrl(activeRecapStop.recap_video.url)}
+                              title={activeRecapStop.recap_video.title || `${activeRecapStop.label} B站回顾`}
+                              className="h-full w-full"
+                              allow="fullscreen; autoplay; encrypted-media; picture-in-picture"
+                              allowFullScreen
+                              referrerPolicy="no-referrer"
+                            />
+                          ) : (
+                            <div className="grid h-full place-items-center px-6 text-center text-sm text-white/55">
+                              当前视频链接暂不支持内嵌播放
+                            </div>
+                          )}
+                          <a
+                            href={activeRecapStop.recap_video.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="absolute right-3 top-3 rounded-full border border-white/15 bg-black/35 p-2 text-white/70 backdrop-blur-xl transition-colors hover:bg-white/15 hover:text-white"
+                            aria-label="打开 B站视频"
+                          >
+                            <ExternalLink size={17} className="text-white/45" />
+                          </a>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
+
+        <section className="order-3 px-4 pb-10 md:px-10 md:pb-16">
           <div className="mx-auto max-w-7xl grid gap-8 lg:grid-cols-[0.9fr_1.1fr] border-t border-white/10 pt-10 md:pt-14">
             <div>
               <p className="text-sm text-white/45 font-mono uppercase tracking-wider">Lineup</p>
@@ -426,7 +642,7 @@ export default function EventPage() {
           </div>
         </section>
 
-        <section className="px-4 pb-20 md:px-10 md:pb-24">
+        <section className="order-4 px-4 pb-20 md:px-10 md:pb-24">
           <div className="mx-auto max-w-7xl grid gap-8 lg:grid-cols-[0.9fr_1.1fr] border-t border-white/10 pt-10 md:pt-14">
             <div>
               <p className="text-sm text-white/45 font-mono uppercase tracking-wider">Story</p>
@@ -439,7 +655,7 @@ export default function EventPage() {
         </section>
 
         {!!event.qr_codes?.length && (
-          <section className="px-4 pb-20 md:px-10 md:pb-24">
+          <section className="order-5 px-4 pb-20 md:px-10 md:pb-24">
             <div className="mx-auto max-w-7xl grid gap-8 lg:grid-cols-[0.9fr_1.1fr] border-t border-white/10 pt-10 md:pt-14">
               <div>
                 <p className="text-sm text-white/45 font-mono uppercase tracking-wider">QR Codes</p>

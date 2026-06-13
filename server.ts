@@ -26,6 +26,15 @@ if (!fs.existsSync(uploadsDir)) {
 // Serve uploaded files statically
 app.use('/uploads', express.static(uploadsDir));
 
+const sanitizePathSegment = (value: any, fallback: string) => {
+  const segment = String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9\u4e00-\u9fa5_-]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return segment || fallback;
+};
+
 // Configure multer for image uploads (max 1MB)
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
@@ -41,6 +50,39 @@ const storage = multer.diskStorage({
 const upload = multer({ 
   storage: storage,
   limits: { fileSize: 1024 * 1024 }, // 1MB limit
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Not an image! Please upload an image.'));
+    }
+  }
+});
+
+const eventStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const slug = sanitizePathSegment(req.params.slug, 'untitled-event');
+    const category = sanitizePathSegment(req.params.category, 'misc');
+    const stopId = sanitizePathSegment(req.params.stopId, 'general');
+    const allowedCategories = new Set(['poster', 'qr', 'recap']);
+    const safeCategory = allowedCategories.has(category) ? category : 'misc';
+    const parts = safeCategory === 'recap'
+      ? [uploadsDir, 'events', slug, safeCategory, stopId]
+      : [uploadsDir, 'events', slug, safeCategory];
+    const destination = path.join(...parts);
+    fs.mkdirSync(destination, { recursive: true });
+    cb(null, destination);
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const ext = path.extname(file.originalname);
+    cb(null, file.fieldname + '-' + uniqueSuffix + ext);
+  }
+});
+
+const eventUpload = multer({
+  storage: eventStorage,
+  limits: { fileSize: 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     if (file.mimetype.startsWith('image/')) {
       cb(null, true);
@@ -379,8 +421,8 @@ app.post('/api/login', async (req, res) => {
 // Helper to delete local image
 const deleteLocalImage = (imageUrl: string) => {
   if (imageUrl && imageUrl.startsWith('/uploads/')) {
-    const filename = path.basename(imageUrl);
-    const filepath = path.join(uploadsDir, filename);
+    const relativePath = decodeURIComponent(imageUrl.replace(/^\/uploads\//, '').split('?')[0]);
+    const filepath = path.join(uploadsDir, relativePath);
     // Basic security check to prevent directory traversal
     if (filepath.startsWith(uploadsDir) && fs.existsSync(filepath)) {
       try {
@@ -416,6 +458,36 @@ app.post('/api/upload', authenticateToken, (req, res) => {
     res.json({ url: fileUrl });
   });
 });
+
+const handleUploadError = (err: any, res: express.Response) => {
+  if (err instanceof multer.MulterError) {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({ error: 'File size exceeds 1MB limit' });
+    }
+    return res.status(400).json({ error: err.message });
+  }
+  if (err) {
+    return res.status(400).json({ error: err.message });
+  }
+  return null;
+};
+
+const handleEventUpload = (req: express.Request, res: express.Response) => {
+  eventUpload.single('image')(req, res, function (err) {
+    const handled = handleUploadError(err, res);
+    if (handled) return;
+
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    const fileUrl = `/uploads/${path.relative(uploadsDir, req.file.path).split(path.sep).join('/')}`;
+    res.json({ url: fileUrl });
+  });
+};
+
+app.post('/api/events/:slug/upload/:category', authenticateToken, handleEventUpload);
+app.post('/api/events/:slug/upload/:category/:stopId', authenticateToken, handleEventUpload);
 
 app.delete('/api/upload', authenticateToken, (req, res) => {
   const { url } = req.body;
@@ -585,12 +657,19 @@ app.put('/api/featured_events/:id', authenticateToken, (req, res) => {
 
 app.delete('/api/featured_events/:id', authenticateToken, (req, res) => {
   try {
-    const event = db.prepare('SELECT image_url, qr_codes FROM featured_events WHERE id = ?').get(req.params.id) as any;
+    const event = db.prepare('SELECT image_url, qr_codes, stops FROM featured_events WHERE id = ?').get(req.params.id) as any;
     if (event && event.image_url) {
       deleteLocalImage(event.image_url);
     }
     parseJsonArray(event?.qr_codes).forEach((qrCode: any) => {
       if (qrCode?.image_url) deleteLocalImage(qrCode.image_url);
+    });
+    parseJsonArray(event?.stops).forEach((stop: any) => {
+      if (Array.isArray(stop?.recap_photos)) {
+        stop.recap_photos.forEach((photo: any) => {
+          if (photo?.image_url) deleteLocalImage(photo.image_url);
+        });
+      }
     });
     db.prepare('DELETE FROM featured_events WHERE id = ?').run(req.params.id);
     res.json({ success: true });

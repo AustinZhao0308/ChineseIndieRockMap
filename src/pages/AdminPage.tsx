@@ -8,13 +8,27 @@ type EventTicketForm = {
   url: string;
 };
 
+type EventRecapPhotoForm = {
+  title: string;
+  caption: string;
+  image_url: string;
+};
+
+type EventRecapVideoForm = {
+  title: string;
+  url: string;
+};
+
 type EventStopForm = {
+  id: string;
   label: string;
   start_at: string;
   venue_id: string;
   guestBandIds: string[];
   price_text: string;
   tickets: EventTicketForm[];
+  recap_photos: EventRecapPhotoForm[];
+  recap_video: EventRecapVideoForm;
 };
 
 type EventQrCodeForm = {
@@ -23,12 +37,15 @@ type EventQrCodeForm = {
 };
 
 const createEmptyStop = (index: number): EventStopForm => ({
+  id: '',
   label: `第 ${index + 1} 站`,
   start_at: '',
   venue_id: '',
   guestBandIds: [],
   price_text: '',
-  tickets: []
+  tickets: [],
+  recap_photos: [],
+  recap_video: { title: '', url: '' }
 });
 
 const normalizeStopsForForm = (stops: any): EventStopForm[] => {
@@ -39,6 +56,7 @@ const normalizeStopsForForm = (stops: any): EventStopForm[] => {
   if (!Array.isArray(source)) return [];
 
   return source.map((stop, index) => ({
+    id: stop.id || '',
     label: stop.label || `第 ${index + 1} 站`,
     start_at: stop.start_at || '',
     venue_id: stop.venue_id || '',
@@ -49,8 +67,28 @@ const normalizeStopsForForm = (stops: any): EventStopForm[] => {
           label: ticket.label || '购票',
           url: ticket.url || ''
         }))
-      : []
+      : [],
+    recap_photos: Array.isArray(stop.recap_photos || stop.recapPhotos)
+      ? (stop.recap_photos || stop.recapPhotos).map((photo: any) => ({
+          title: photo.title || '',
+          caption: photo.caption || '',
+          image_url: photo.image_url || photo.imageUrl || ''
+        }))
+      : [],
+    recap_video: {
+      title: stop.recap_video?.title || stop.recapVideo?.title || '',
+      url: stop.recap_video?.url || stop.recapVideo?.url || ''
+    }
   }));
+};
+
+const slugifySegment = (value: string, fallback: string) => {
+  const segment = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9\u4e00-\u9fa5_-]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return segment || fallback;
 };
 
 const toDateTimeLocalValue = (value: string) => {
@@ -122,14 +160,29 @@ const buildEventLegacyFields = (source: {
 };
 
 const cleanEventStopsForSave = (stops: EventStopForm[]) => {
-  return stops.map(stop => {
+  return stops.map((stop, index) => {
+    const recapPhotos = stop.recap_photos
+      .map(photo => ({
+        title: photo.title.trim(),
+        caption: photo.caption.trim(),
+        image_url: photo.image_url.trim()
+      }))
+      .filter(photo => photo.title || photo.caption || photo.image_url);
+    const recapVideo = {
+      title: stop.recap_video.title.trim(),
+      url: stop.recap_video.url.trim()
+    };
+
     return {
+      id: stop.id || slugifySegment(stop.label, `stop-${index + 1}`),
       label: stop.label,
       start_at: stop.start_at,
       venue_id: stop.venue_id,
       guestBandIds: stop.guestBandIds || [],
       price_text: stop.price_text,
-      tickets: stop.tickets
+      tickets: stop.tickets,
+      recap_photos: recapPhotos,
+      recap_video: recapVideo.title || recapVideo.url ? recapVideo : undefined
     };
   });
 };
@@ -344,43 +397,62 @@ export default function AdminPage() {
     }
   };
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
+  const uploadImageFile = async (file: File, options?: { eventCategory?: 'poster' | 'qr' | 'recap'; stopId?: string }) => {
     if (file.size > 1024 * 1024) {
       showMessage('File size exceeds 1MB limit', 'error');
-      return;
+      return null;
     }
 
     const uploadData = new FormData();
     uploadData.append('image', file);
 
+    const endpoint = options?.eventCategory
+      ? `/api/events/${encodeURIComponent(slugifySegment(formData.slug, 'untitled-event'))}/upload/${options.eventCategory}${options.stopId ? `/${encodeURIComponent(slugifySegment(options.stopId, 'general'))}` : ''}`
+      : '/api/upload';
+
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
+      body: uploadData
+    });
+
+    if (res.status === 401 || res.status === 403) {
+      handleLogout();
+      showMessage('登录已过期，请重新登录', 'error');
+      return null;
+    }
+
+    const data = await res.json();
+    if (!res.ok) {
+      showMessage(data.error || 'Failed to upload image');
+      return null;
+    }
+
+    return data.url as string;
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (activeTab === 'events' && !formData.slug.trim()) {
+      showMessage('Please set event slug before uploading event images');
+      return;
+    }
+
     try {
       showMessage('Uploading image...', 'success');
-      const res = await fetch('/api/upload', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
-        body: uploadData
-      });
-      
-      if (res.status === 401 || res.status === 403) {
-        handleLogout();
-        showMessage('登录已过期，请重新登录', 'error');
-        return;
-      }
-
-      const data = await res.json();
-      if (res.ok) {
-        setFormData(prev => ({ ...prev, image_url: data.url }));
+      const url = await uploadImageFile(file, activeTab === 'events' ? { eventCategory: 'poster' } : undefined);
+      if (url) {
+        setFormData(prev => ({ ...prev, image_url: url }));
         showMessage('Image uploaded successfully', 'success');
-      } else {
-        showMessage(data.error || 'Failed to upload image');
       }
     } catch (err) {
       showMessage('Network error during upload');
+    } finally {
+      e.target.value = '';
     }
   };
 
@@ -501,46 +573,95 @@ export default function AdminPage() {
     setFormData({ ...formData, qr_codes: nextQrCodes });
   };
 
+  const updateRecapPhoto = (stopIndex: number, photoIndex: number, patch: Partial<EventRecapPhotoForm>) => {
+    const nextStops = [...formData.stops];
+    const photos = [...nextStops[stopIndex].recap_photos];
+    photos[photoIndex] = { ...photos[photoIndex], ...patch };
+    nextStops[stopIndex] = { ...nextStops[stopIndex], recap_photos: photos };
+    setFormData({ ...formData, stops: nextStops });
+  };
+
+  const updateRecapVideo = (stopIndex: number, patch: Partial<EventRecapVideoForm>) => {
+    const nextStops = [...formData.stops];
+    nextStops[stopIndex] = {
+      ...nextStops[stopIndex],
+      recap_video: { ...nextStops[stopIndex].recap_video, ...patch }
+    };
+    setFormData({ ...formData, stops: nextStops });
+  };
+
   const handleQrImageUpload = async (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 1024 * 1024) {
-      showMessage('File size exceeds 1MB limit', 'error');
+    if (!formData.slug.trim()) {
+      showMessage('Please set event slug before uploading QR images');
       return;
     }
 
-    const uploadData = new FormData();
-    uploadData.append('image', file);
-
     try {
       showMessage('Uploading QR image...', 'success');
-      const res = await fetch('/api/upload', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
-        body: uploadData
-      });
-
-      if (res.status === 401 || res.status === 403) {
-        handleLogout();
-        showMessage('登录已过期，请重新登录', 'error');
-        return;
-      }
-
-      const data = await res.json();
-      if (res.ok) {
-        updateQrCode(index, { image_url: data.url });
+      const url = await uploadImageFile(file, { eventCategory: 'qr' });
+      if (url) {
+        updateQrCode(index, { image_url: url });
         showMessage('QR image uploaded successfully', 'success');
-      } else {
-        showMessage(data.error || 'Failed to upload QR image');
       }
     } catch (err) {
       showMessage('Network error during upload');
     } finally {
       e.target.value = '';
     }
+  };
+
+  const handleRecapPhotoUpload = async (stopIndex: number, photoIndex: number, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!formData.slug.trim()) {
+      showMessage('Please set event slug before uploading recap photos');
+      return;
+    }
+
+    const stop = formData.stops[stopIndex];
+    const stopId = stop.id || stop.label || `stop-${stopIndex + 1}`;
+
+    try {
+      showMessage('Uploading recap photo...', 'success');
+      const url = await uploadImageFile(file, { eventCategory: 'recap', stopId });
+      if (url) {
+        updateRecapPhoto(stopIndex, photoIndex, { image_url: url });
+        showMessage('Recap photo uploaded successfully', 'success');
+      }
+    } catch (err) {
+      showMessage('Network error during upload');
+    } finally {
+      e.target.value = '';
+    }
+  };
+
+  const removeRecapPhoto = async (stopIndex: number, photoIndex: number) => {
+    const photo = formData.stops[stopIndex].recap_photos[photoIndex];
+    if (photo?.image_url?.startsWith('/uploads/')) {
+      try {
+        await fetch('/api/upload', {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ url: photo.image_url })
+        });
+      } catch (err) {
+        console.error('Failed to delete recap photo from server', err);
+      }
+    }
+
+    const nextStops = [...formData.stops];
+    nextStops[stopIndex] = {
+      ...nextStops[stopIndex],
+      recap_photos: nextStops[stopIndex].recap_photos.filter((_, i) => i !== photoIndex)
+    };
+    setFormData({ ...formData, stops: nextStops });
   };
 
   const removeQrCode = async (index: number) => {
@@ -1079,6 +1200,13 @@ export default function AdminPage() {
                         }} className="text-gray-500 hover:text-red-400"><X size={14}/></button>
                       </div>
 
+                      <input
+                        placeholder="Stop ID for uploads (e.g. ningbo)"
+                        value={stop.id}
+                        onChange={e => updateStop(stopIndex, { id: e.target.value })}
+                        className="bg-black/50 border border-white/10 rounded px-3 py-2 text-xs w-full"
+                      />
+
                       <div>
                         <input
                           type="datetime-local"
@@ -1179,6 +1307,45 @@ export default function AdminPage() {
                             }} className="text-gray-500 hover:text-red-400"><X size={14}/></button>
                           </div>
                         ))}
+                      </div>
+
+                      <div className="space-y-3 border-t border-white/10 pt-3">
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs text-gray-400">Recap Photos</span>
+                          <button type="button" onClick={() => {
+                            const nextStops = [...formData.stops];
+                            nextStops[stopIndex] = {
+                              ...nextStops[stopIndex],
+                              recap_photos: [...nextStops[stopIndex].recap_photos, { title: '', caption: '', image_url: '' }]
+                            };
+                            setFormData({...formData, stops: nextStops});
+                          }} className="text-xs text-[#ff4e00] hover:text-[#ff6a2b] flex items-center gap-1"><Plus size={12}/> Add Photo</button>
+                        </div>
+
+                        {stop.recap_photos.map((photo, photoIndex) => (
+                          <div key={photoIndex} className="space-y-2 rounded-lg border border-white/5 bg-black/30 p-3">
+                            <div className="grid grid-cols-[1fr_auto] gap-2 items-center">
+                              <input placeholder="Photo Title" value={photo.title} onChange={e => updateRecapPhoto(stopIndex, photoIndex, { title: e.target.value })} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-xs w-full" />
+                              <button type="button" onClick={() => removeRecapPhoto(stopIndex, photoIndex)} className="text-gray-500 hover:text-red-400"><X size={14}/></button>
+                            </div>
+                            <input placeholder="Caption" value={photo.caption} onChange={e => updateRecapPhoto(stopIndex, photoIndex, { caption: e.target.value })} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-xs w-full" />
+                            <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-2">
+                              <input placeholder="Photo Image URL" value={photo.image_url} onChange={e => updateRecapPhoto(stopIndex, photoIndex, { image_url: e.target.value })} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-xs w-full" />
+                              <input type="file" accept="image/*" onChange={e => handleRecapPhotoUpload(stopIndex, photoIndex, e)} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-xs w-full md:w-44 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-white/10 file:text-white hover:file:bg-white/20" />
+                            </div>
+                            {photo.image_url && (
+                              <img src={photo.image_url} alt={photo.title || 'Recap photo'} className="h-24 w-32 rounded-lg border border-white/10 object-cover" />
+                            )}
+                          </div>
+                        ))}
+
+                        <div className="space-y-2">
+                          <span className="text-xs text-gray-400">Bilibili Recap Video</span>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                            <input placeholder="Video Title" value={stop.recap_video.title} onChange={e => updateRecapVideo(stopIndex, { title: e.target.value })} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-xs w-full" />
+                            <input placeholder="Bilibili URL" value={stop.recap_video.url} onChange={e => updateRecapVideo(stopIndex, { url: e.target.value })} className="bg-black/50 border border-white/10 rounded px-3 py-2 text-xs w-full" />
+                          </div>
+                        </div>
                       </div>
                     </div>
                   ))}
