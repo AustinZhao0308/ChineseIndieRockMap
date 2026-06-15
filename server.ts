@@ -335,6 +335,97 @@ const parseJsonArray = (value: any) => {
   }
 };
 
+const normalizeUploadUrl = (imageUrl: any) => {
+  if (!imageUrl || typeof imageUrl !== 'string' || !imageUrl.startsWith('/uploads/')) return '';
+  return `/uploads/${decodeURIComponent(imageUrl.replace(/^\/uploads\//, '').split('?')[0]).split(path.sep).join('/')}`;
+};
+
+const collectUploadFiles = (dir: string, rootDir = dir): any[] => {
+  if (!fs.existsSync(dir)) return [];
+
+  return fs.readdirSync(dir, { withFileTypes: true }).flatMap(entry => {
+    const fullPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) return collectUploadFiles(fullPath, rootDir);
+    if (!entry.isFile()) return [];
+
+    const stat = fs.statSync(fullPath);
+    const relativePath = path.relative(rootDir, fullPath).split(path.sep).join('/');
+    return [{
+      filename: entry.name,
+      path: relativePath,
+      url: `/uploads/${relativePath}`,
+      size: stat.size,
+      modifiedAt: stat.mtime.toISOString()
+    }];
+  });
+};
+
+const addImageReference = (
+  refs: Map<string, any[]>,
+  imageUrl: any,
+  reference: { type: string; id: number | string; title: string; field: string }
+) => {
+  const normalizedUrl = normalizeUploadUrl(imageUrl);
+  if (!normalizedUrl) return;
+  const current = refs.get(normalizedUrl) || [];
+  current.push(reference);
+  refs.set(normalizedUrl, current);
+};
+
+const collectImageReferences = () => {
+  const refs = new Map<string, any[]>();
+  const entityTables = [
+    { table: 'bands', type: 'Band', titleField: 'name_zh' },
+    { table: 'venues', type: 'Venue', titleField: 'name_zh' },
+    { table: 'rehearsal_rooms', type: 'Rehearsal Room', titleField: 'name_zh' },
+    { table: 'spots', type: 'Spot', titleField: 'name_zh' }
+  ];
+
+  entityTables.forEach(({ table, type, titleField }) => {
+    const rows = db.prepare(`SELECT id, ${titleField} AS title, name, image_url FROM ${table}`).all() as any[];
+    rows.forEach(row => {
+      addImageReference(refs, row.image_url, {
+        type,
+        id: row.id,
+        title: row.title || row.name || `${type} #${row.id}`,
+        field: 'image_url'
+      });
+    });
+  });
+
+  const events = db.prepare('SELECT id, title, image_url, qr_codes, stops FROM featured_events').all() as any[];
+  events.forEach(event => {
+    addImageReference(refs, event.image_url, {
+      type: 'Event',
+      id: event.id,
+      title: event.title || `Event #${event.id}`,
+      field: 'image_url'
+    });
+
+    parseJsonArray(event.qr_codes).forEach((qrCode: any, index: number) => {
+      addImageReference(refs, qrCode?.image_url || qrCode?.imageUrl, {
+        type: 'Event QR',
+        id: event.id,
+        title: `${event.title || `Event #${event.id}`} · ${qrCode?.title || `QR ${index + 1}`}`,
+        field: `qr_codes[${index}].image_url`
+      });
+    });
+
+    parseJsonArray(event.stops).forEach((stop: any, stopIndex: number) => {
+      parseJsonArray(stop?.recap_photos || stop?.recapPhotos).forEach((photo: any, photoIndex: number) => {
+        addImageReference(refs, photo?.image_url || photo?.imageUrl, {
+          type: 'Event Recap',
+          id: event.id,
+          title: `${event.title || `Event #${event.id}`} · ${stop?.label || `Stop ${stopIndex + 1}`} · ${photo?.title || `Photo ${photoIndex + 1}`}`,
+          field: `stops[${stopIndex}].recap_photos[${photoIndex}].image_url`
+        });
+      });
+    });
+  });
+
+  return refs;
+};
+
 const populateEvent = (event: any) => {
   if (!event) return null;
 
@@ -488,6 +579,40 @@ const handleEventUpload = (req: express.Request, res: express.Response) => {
 
 app.post('/api/events/:slug/upload/:category', authenticateToken, handleEventUpload);
 app.post('/api/events/:slug/upload/:category/:stopId', authenticateToken, handleEventUpload);
+
+app.get('/api/admin/assets', authenticateToken, (req, res) => {
+  try {
+    const references = collectImageReferences();
+    const assets = collectUploadFiles(uploadsDir)
+      .map(asset => {
+        const refs = references.get(asset.url) || [];
+        return {
+          ...asset,
+          used: refs.length > 0,
+          references: refs
+        };
+      })
+      .sort((a, b) => b.size - a.size);
+
+    const totalSize = assets.reduce((sum, asset) => sum + asset.size, 0);
+    const unusedAssets = assets.filter(asset => !asset.used);
+    const unusedSize = unusedAssets.reduce((sum, asset) => sum + asset.size, 0);
+
+    res.json({
+      assets,
+      summary: {
+        totalCount: assets.length,
+        totalSize,
+        usedCount: assets.length - unusedAssets.length,
+        unusedCount: unusedAssets.length,
+        unusedSize
+      }
+    });
+  } catch (err: any) {
+    console.error('Failed to inspect assets:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
 
 app.delete('/api/upload', authenticateToken, (req, res) => {
   const { url } = req.body;

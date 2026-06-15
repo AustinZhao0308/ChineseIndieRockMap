@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Code2, Lock, LogOut, Plus, Trash2, Edit2, Music, MapPin, X, Calendar, Star, Mic2, Coffee, Search, Upload } from 'lucide-react';
+import { Code2, Lock, LogOut, Plus, Trash2, Edit2, Music, MapPin, X, Calendar, Star, Mic2, Coffee, Search, Upload, Image as ImageIcon, HardDrive, Link as LinkIcon } from 'lucide-react';
 import BulkImportModal from '../components/BulkImportModal';
+import ImageAssetPicker from '../components/ImageAssetPicker';
 
 type EventTicketForm = {
   label: string;
@@ -34,6 +35,31 @@ type EventStopForm = {
 type EventQrCodeForm = {
   title: string;
   image_url: string;
+};
+
+type ImageAssetReference = {
+  type: string;
+  id: number | string;
+  title: string;
+  field: string;
+};
+
+type ImageAsset = {
+  filename: string;
+  path: string;
+  url: string;
+  size: number;
+  modifiedAt: string;
+  used: boolean;
+  references: ImageAssetReference[];
+};
+
+type ImageAssetSummary = {
+  totalCount: number;
+  totalSize: number;
+  usedCount: number;
+  unusedCount: number;
+  unusedSize: number;
 };
 
 const createEmptyStop = (index: number): EventStopForm => ({
@@ -209,12 +235,20 @@ const cleanQrCodesForSave = (qrCodes: EventQrCodeForm[]) => {
     .filter(qrCode => qrCode.title || qrCode.image_url);
 };
 
-const adminTabs = ['bands', 'venues', 'events', 'rehearsal_rooms', 'spots', 'settings'] as const;
+const adminTabs = ['bands', 'venues', 'events', 'rehearsal_rooms', 'spots', 'assets', 'settings'] as const;
 type AdminTab = typeof adminTabs[number];
 
 const inputClass = "bg-black/50 border border-white/10 rounded-lg px-3 py-2.5 text-sm w-full text-white placeholder:text-gray-600 focus:outline-none focus:border-[#ff4e00]";
 const compactInputClass = "bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-xs w-full text-white placeholder:text-gray-600 focus:outline-none focus:border-[#ff4e00]";
 const labelClass = "block text-xs font-medium uppercase tracking-wide text-gray-400";
+const emptyAssetSummary: ImageAssetSummary = { totalCount: 0, totalSize: 0, usedCount: 0, unusedCount: 0, unusedSize: 0 };
+
+const formatBytes = (bytes: number) => {
+  if (!bytes) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB'];
+  const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  return `${(bytes / Math.pow(1024, index)).toFixed(index === 0 ? 0 : 1)} ${units[index]}`;
+};
 
 function Field({ label, children, className = '' }: { label: string; children: React.ReactNode; className?: string }) {
   return (
@@ -251,6 +285,10 @@ export default function AdminPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
   const [eventJsonInput, setEventJsonInput] = useState('');
+  const [imageAssets, setImageAssets] = useState<ImageAsset[]>([]);
+  const [imageAssetSummary, setImageAssetSummary] = useState<ImageAssetSummary>(emptyAssetSummary);
+  const [assetFilter, setAssetFilter] = useState<'all' | 'unused'>('all');
+  const [imageAssetPicker, setImageAssetPicker] = useState<null | { onSelect: (url: string) => void }>(null);
 
   const showMessage = (text: string, type: 'error' | 'success' = 'error') => {
     setMessage({ text, type });
@@ -328,6 +366,28 @@ export default function AdminPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
+      if (activeTab === 'assets') {
+        const res = await fetch('/api/admin/assets', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (res.status === 401 || res.status === 403) {
+          handleLogout();
+          showMessage('登录已过期，请重新登录', 'error');
+          return;
+        }
+
+        const data = await res.json();
+        if (!res.ok) {
+          showMessage(data.error || 'Failed to load image assets');
+          return;
+        }
+
+        setImageAssets(data.assets || []);
+        setImageAssetSummary(data.summary || emptyAssetSummary);
+        return;
+      }
+
       if (activeTab === 'events') {
         const [eventsData, bandsData, venuesData] = await Promise.all([
           fetch('/api/featured_events').then(res => res.json()),
@@ -444,6 +504,10 @@ export default function AdminPage() {
     }
 
     return data.url as string;
+  };
+
+  const openImageAssetPicker = (onSelect: (url: string) => void) => {
+    setImageAssetPicker({ onSelect });
   };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -922,7 +986,7 @@ export default function AdminPage() {
     );
   }
 
-  const currentList = activeTab === 'bands' ? bands : activeTab === 'venues' ? venues : activeTab === 'events' ? events : activeTab === 'rehearsal_rooms' ? rehearsalRooms : spots;
+  const currentList = activeTab === 'bands' ? bands : activeTab === 'venues' ? venues : activeTab === 'events' ? events : activeTab === 'rehearsal_rooms' ? rehearsalRooms : activeTab === 'spots' ? spots : [];
 
   const filteredList = currentList.filter(item => {
     if (!searchQuery) return true;
@@ -935,6 +999,15 @@ export default function AdminPage() {
              item.province_zh?.toLowerCase().includes(query) || 
              item.city_zh?.toLowerCase().includes(query);
     }
+  });
+
+  const filteredAssets = imageAssets.filter(asset => {
+    if (assetFilter === 'unused' && asset.used) return false;
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return asset.path.toLowerCase().includes(query) ||
+      asset.url.toLowerCase().includes(query) ||
+      asset.references.some(ref => ref.title.toLowerCase().includes(query) || ref.type.toLowerCase().includes(query));
   });
 
   return (
@@ -986,6 +1059,12 @@ export default function AdminPage() {
           >
             <Calendar size={18} /> Manage Events
           </button>
+          <button
+            onClick={() => { setActiveTab('assets'); resetForm(); }}
+            className={`flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-colors ${activeTab === 'assets' ? 'bg-[#ff4e00] text-white' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}
+          >
+            <ImageIcon size={18} /> Image Assets
+          </button>
           <button 
             onClick={() => { setActiveTab('settings'); resetForm(); }}
             className={`flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-colors ${activeTab === 'settings' ? 'bg-[#ff4e00] text-white' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}
@@ -1029,6 +1108,123 @@ export default function AdminPage() {
                 Update Password
               </button>
             </form>
+          </div>
+        ) : activeTab === 'assets' ? (
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="bg-[#1a1a1a] p-5 rounded-2xl border border-white/10">
+                <div className="flex items-center gap-2 text-gray-400 text-xs uppercase tracking-wide mb-2">
+                  <ImageIcon size={15} /> Total Images
+                </div>
+                <div className="text-2xl font-semibold">{imageAssetSummary.totalCount}</div>
+              </div>
+              <div className="bg-[#1a1a1a] p-5 rounded-2xl border border-white/10">
+                <div className="flex items-center gap-2 text-gray-400 text-xs uppercase tracking-wide mb-2">
+                  <HardDrive size={15} /> Total Size
+                </div>
+                <div className="text-2xl font-semibold">{formatBytes(imageAssetSummary.totalSize)}</div>
+              </div>
+              <div className="bg-[#1a1a1a] p-5 rounded-2xl border border-white/10">
+                <div className="flex items-center gap-2 text-gray-400 text-xs uppercase tracking-wide mb-2">
+                  <LinkIcon size={15} /> Used
+                </div>
+                <div className="text-2xl font-semibold text-green-400">{imageAssetSummary.usedCount}</div>
+              </div>
+              <div className="bg-[#1a1a1a] p-5 rounded-2xl border border-white/10">
+                <div className="flex items-center gap-2 text-gray-400 text-xs uppercase tracking-wide mb-2">
+                  <Trash2 size={15} /> Unused
+                </div>
+                <div className="text-2xl font-semibold text-yellow-400">{imageAssetSummary.unusedCount}</div>
+                <div className="text-xs text-gray-500 mt-1">{formatBytes(imageAssetSummary.unusedSize)}</div>
+              </div>
+            </div>
+
+            <div className="bg-[#1a1a1a] p-5 md:p-6 rounded-2xl border border-white/10">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                <div>
+                  <h2 className="text-xl font-medium flex items-center gap-2">
+                    <ImageIcon size={20} className="text-[#ff4e00]" />
+                    Image Assets / 图片资源
+                  </h2>
+                  <p className="text-sm text-gray-500 mt-1">Sorted by file size. Only local /uploads images are audited.</p>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <div className="flex gap-2 bg-black/50 rounded-lg p-1 border border-white/10">
+                    <button
+                      type="button"
+                      onClick={() => setAssetFilter('all')}
+                      className={`px-3 py-1.5 text-xs rounded-md transition-colors ${assetFilter === 'all' ? 'bg-[#ff4e00] text-white' : 'text-gray-400 hover:text-white'}`}
+                    >
+                      All
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAssetFilter('unused')}
+                      className={`px-3 py-1.5 text-xs rounded-md transition-colors ${assetFilter === 'unused' ? 'bg-[#ff4e00] text-white' : 'text-gray-400 hover:text-white'}`}
+                    >
+                      Unused
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={fetchData}
+                    className="px-4 py-2 text-sm rounded-lg bg-white/10 text-white hover:bg-white/15 transition-colors"
+                  >
+                    Refresh
+                  </button>
+                </div>
+              </div>
+
+              <div className="relative mb-5">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
+                <input
+                  type="text"
+                  placeholder="Search path or reference..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="bg-black/50 border border-white/10 rounded-lg pl-9 pr-4 py-2 text-sm text-white focus:outline-none focus:border-[#ff4e00] w-full"
+                />
+              </div>
+
+              {loading ? (
+                <div className="text-center py-12 text-gray-500">Loading image assets...</div>
+              ) : filteredAssets.length === 0 ? (
+                <div className="text-center py-12 text-gray-500">No image assets found.</div>
+              ) : (
+                <div className="space-y-3">
+                  {filteredAssets.map(asset => (
+                    <div key={asset.url} className={`grid grid-cols-1 lg:grid-cols-[96px_minmax(0,1fr)_180px] gap-4 rounded-lg border p-4 bg-black/30 ${asset.used ? 'border-white/5' : 'border-yellow-500/30'}`}>
+                      <a href={asset.url} target="_blank" rel="noreferrer" className="block h-24 w-24 overflow-hidden rounded-lg border border-white/10 bg-black/50">
+                        <img src={asset.url} alt={asset.filename} className="h-full w-full object-cover" />
+                      </a>
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2 mb-2">
+                          <span className="font-medium text-white truncate">{asset.filename}</span>
+                          <span className={`text-[10px] px-2 py-0.5 rounded-full ${asset.used ? 'bg-green-500/10 text-green-400' : 'bg-yellow-500/10 text-yellow-400'}`}>
+                            {asset.used ? 'Used' : 'Unused'}
+                          </span>
+                        </div>
+                        <div className="text-xs text-gray-500 font-mono break-all">{asset.url}</div>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {asset.references.length > 0 ? asset.references.map((ref, index) => (
+                            <span key={`${ref.field}-${index}`} className="text-xs bg-white/5 text-gray-300 px-2 py-1 rounded">
+                              {ref.type}: {ref.title}
+                            </span>
+                          )) : (
+                            <span className="text-xs bg-yellow-500/10 text-yellow-400 px-2 py-1 rounded">No database reference</span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="lg:text-right text-sm">
+                        <div className="text-lg font-semibold text-white">{formatBytes(asset.size)}</div>
+                        <div className="text-xs text-gray-500 mt-1">{new Date(asset.modifiedAt).toLocaleString()}</div>
+                        <div className="text-xs text-gray-600 mt-2 font-mono break-all">{asset.path}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         ) : (
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.65fr)_minmax(320px,0.9fr)] gap-8 items-start">
@@ -1364,7 +1560,16 @@ export default function AdminPage() {
                             <input placeholder="Caption" value={photo.caption} onChange={e => updateRecapPhoto(stopIndex, photoIndex, { caption: e.target.value })} className={compactInputClass} />
                             <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-2">
                               <input placeholder="Photo Image URL" value={photo.image_url} onChange={e => updateRecapPhoto(stopIndex, photoIndex, { image_url: e.target.value })} className={compactInputClass} />
-                              <input type="file" accept="image/*" onChange={e => handleRecapPhotoUpload(stopIndex, photoIndex, e)} className={`${compactInputClass} md:w-44 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-white/10 file:text-white hover:file:bg-white/20`} />
+                              <div className="flex flex-col sm:flex-row gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => openImageAssetPicker(url => updateRecapPhoto(stopIndex, photoIndex, { image_url: url }))}
+                                  className="bg-white/10 hover:bg-white/15 text-white rounded-lg px-3 py-2 text-xs transition-colors whitespace-nowrap"
+                                >
+                                  Choose Existing
+                                </button>
+                                <input type="file" accept="image/*" onChange={e => handleRecapPhotoUpload(stopIndex, photoIndex, e)} className={`${compactInputClass} md:w-44 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-white/10 file:text-white hover:file:bg-white/20`} />
+                              </div>
                             </div>
                             {photo.image_url && (
                               <img src={photo.image_url} alt={photo.title || 'Recap photo'} className="h-24 w-32 rounded-lg border border-white/10 object-cover" />
@@ -1411,12 +1616,21 @@ export default function AdminPage() {
                           onChange={e => updateQrCode(qrIndex, { image_url: e.target.value })}
                           className={compactInputClass}
                         />
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={e => handleQrImageUpload(qrIndex, e)}
-                          className={`${compactInputClass} md:w-44 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-white/10 file:text-white hover:file:bg-white/20`}
-                        />
+                        <div className="flex flex-col sm:flex-row gap-2">
+                          <button
+                            type="button"
+                            onClick={() => openImageAssetPicker(url => updateQrCode(qrIndex, { image_url: url }))}
+                            className="bg-white/10 hover:bg-white/15 text-white rounded-lg px-3 py-2 text-xs transition-colors whitespace-nowrap"
+                          >
+                            Choose Existing
+                          </button>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={e => handleQrImageUpload(qrIndex, e)}
+                            className={`${compactInputClass} md:w-44 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-white/10 file:text-white hover:file:bg-white/20`}
+                          />
+                        </div>
                       </div>
 
                       {qrCode.image_url && (
@@ -1471,7 +1685,16 @@ export default function AdminPage() {
                 </div>
                 <div className="flex flex-col gap-2">
                   {imageInputType === 'upload' ? (
-                    <input type="file" accept="image/*" onChange={handleImageUpload} className={`${inputClass} file:mr-4 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:bg-white/10 file:text-white hover:file:bg-white/20`} />
+                    <div className="grid grid-cols-1 md:grid-cols-[auto_1fr] gap-2">
+                      <button
+                        type="button"
+                        onClick={() => openImageAssetPicker(url => setFormData(prev => ({ ...prev, image_url: url })))}
+                        className="bg-white/10 hover:bg-white/15 text-white rounded-lg px-4 py-2 text-sm transition-colors"
+                      >
+                        Choose Existing
+                      </button>
+                      <input type="file" accept="image/*" onChange={handleImageUpload} className={`${inputClass} file:mr-4 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:bg-white/10 file:text-white hover:file:bg-white/20`} />
+                    </div>
                   ) : (
                     <input placeholder="Enter Image URL (e.g. https://...)" value={formData.image_url} onChange={e => setFormData({...formData, image_url: e.target.value})} className={inputClass} />
                   )}
@@ -1623,6 +1846,13 @@ export default function AdminPage() {
           fetchData();
           showMessage('Bulk import successful', 'success');
         }}
+      />
+
+      <ImageAssetPicker
+        isOpen={!!imageAssetPicker}
+        token={token || ''}
+        onClose={() => setImageAssetPicker(null)}
+        onSelect={(url) => imageAssetPicker?.onSelect(url)}
       />
     </div>
   );

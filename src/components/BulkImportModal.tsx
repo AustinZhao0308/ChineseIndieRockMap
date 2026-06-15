@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { X, Upload, Download, AlertCircle, CheckCircle2, Image as ImageIcon, Edit2, Trash2 } from 'lucide-react';
 import Papa from 'papaparse';
+import ImageAssetPicker from './ImageAssetPicker';
 
 interface BulkImportModalProps {
   isOpen: boolean;
@@ -91,6 +92,7 @@ export default function BulkImportModal({ isOpen, onClose, activeTab, currentLis
   const [imageInputType, setImageInputType] = useState<'upload' | 'url'>('upload');
   const [contactType, setContactType] = useState<'wechat' | 'email'>('wechat');
   const [contactValue, setContactValue] = useState('');
+  const [isImageAssetPickerOpen, setIsImageAssetPickerOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!isOpen) return null;
@@ -567,7 +569,14 @@ export default function BulkImportModal({ isOpen, onClose, activeTab, currentLis
                   <button type="button" onClick={() => setImageInputType('url')} className={`text-sm px-3 py-1 rounded ${imageInputType === 'url' ? 'bg-[#ff4e00] text-white' : 'bg-white/10 text-gray-400'}`}>URL</button>
                 </div>
                 {imageInputType === 'upload' ? (
-                  <div className="flex items-center gap-4">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setIsImageAssetPickerOpen(true)}
+                      className="flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded cursor-pointer text-sm transition-colors"
+                    >
+                      <ImageIcon size={16} /> Choose Existing
+                    </button>
                     <label className="flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded cursor-pointer text-sm transition-colors">
                       <ImageIcon size={16} /> Choose Image
                       <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
@@ -826,6 +835,13 @@ export default function BulkImportModal({ isOpen, onClose, activeTab, currentLis
           </div>
         </div>
       )}
+
+      <ImageAssetPicker
+        isOpen={isImageAssetPickerOpen}
+        token={token}
+        onClose={() => setIsImageAssetPickerOpen(false)}
+        onSelect={(url) => setEditFormData({ ...editFormData, image_url: url })}
+      />
     </div>
   );
 }
