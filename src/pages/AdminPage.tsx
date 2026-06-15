@@ -1043,6 +1043,12 @@ export default function AdminPage() {
       asset.references.some(ref => ref.title.toLowerCase().includes(query) || ref.type.toLowerCase().includes(query));
   });
 
+  const organizerOptions = Array.from(new Set(
+    events
+      .map(event => (event.organizer || '').trim())
+      .filter(Boolean)
+  )).sort((a, b) => a.localeCompare(b, 'zh-Hans-CN'));
+
   return (
     <div className="min-h-[100dvh] bg-[#0a0502] text-white p-5 md:p-8 font-sans">
       <div className="max-w-7xl mx-auto">
@@ -1350,7 +1356,33 @@ export default function AdminPage() {
                   </Field>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <Field label="Organizer / 主办方">
-                      <input placeholder="e.g. 猫啤 Catbeer" value={formData.organizer} onChange={e => setFormData({...formData, organizer: e.target.value})} className={inputClass} />
+                      <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_auto] gap-2">
+                        <input
+                          list="event-organizer-options"
+                          placeholder="e.g. 猫啤 Catbeer"
+                          value={formData.organizer}
+                          onChange={e => setFormData({...formData, organizer: e.target.value})}
+                          className={inputClass}
+                        />
+                        <select
+                          value=""
+                          onChange={e => {
+                            if (!e.target.value) return;
+                            setFormData({...formData, organizer: e.target.value});
+                          }}
+                          className={`${inputClass} sm:w-44`}
+                        >
+                          <option value="">Choose</option>
+                          {organizerOptions.map(organizer => (
+                            <option key={organizer} value={organizer}>{organizer}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <datalist id="event-organizer-options">
+                        {organizerOptions.map(organizer => (
+                          <option key={organizer} value={organizer} />
+                        ))}
+                      </datalist>
                     </Field>
                     <Field label="Status / 状态">
                       <select value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})} className={inputClass}>
