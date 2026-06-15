@@ -290,6 +290,8 @@ export default function AdminPage() {
   const [assetFilter, setAssetFilter] = useState<'all' | 'unused'>('all');
   const [imageAssetPicker, setImageAssetPicker] = useState<null | { onSelect: (url: string) => void }>(null);
   const [confirmDeleteAssetUrl, setConfirmDeleteAssetUrl] = useState<string | null>(null);
+  const [lineupBandQuery, setLineupBandQuery] = useState('');
+  const [guestBandQueries, setGuestBandQueries] = useState<Record<number, string>>({});
 
   const showMessage = (text: string, type: 'error' | 'success' = 'error') => {
     setMessage({ text, type });
@@ -969,6 +971,8 @@ export default function AdminPage() {
     setContactValue('');
     setImageInputType('upload');
     setSearchQuery('');
+    setLineupBandQuery('');
+    setGuestBandQueries({});
     setFormData({
       province_id: '', province_zh: '', city_id: '', city_zh: '',
       band_id: '', venue_id: '', room_id: '', spot_id: '', name: '', name_zh: '', genre: '', type: '',
@@ -1048,6 +1052,21 @@ export default function AdminPage() {
       .map(event => (event.organizer || '').trim())
       .filter(Boolean)
   )).sort((a, b) => a.localeCompare(b, 'zh-Hans-CN'));
+  const mainLineupBandIds = Array.from(new Set(formData.lineup.flatMap(day => day.bandIds || [])));
+  const filteredLineupBands = bands.filter(band => {
+    if (mainLineupBandIds.includes(band.band_id)) return false;
+    const query = lineupBandQuery.trim().toLowerCase();
+    if (!query) return true;
+    return band.band_id?.toLowerCase().includes(query) ||
+      band.name?.toLowerCase().includes(query) ||
+      band.name_zh?.toLowerCase().includes(query);
+  });
+  const setMainLineupBandIds = (bandIds: string[]) => {
+    setFormData({
+      ...formData,
+      lineup: bandIds.length ? [{ day: '主要阵容', bandIds }] : []
+    });
+  };
 
   return (
     <div className="min-h-[100dvh] bg-[#0a0502] text-white p-5 md:p-8 font-sans">
@@ -1458,54 +1477,73 @@ export default function AdminPage() {
               
               {activeTab === 'events' && (
                 <div className="space-y-4 border border-white/10 p-4 rounded-xl bg-black/20">
-                  <div className="flex justify-between items-center">
+                  <div>
                     <h3 className="text-sm font-medium text-white">Lineup Configuration</h3>
-                    <button type="button" onClick={() => setFormData({...formData, lineup: [...formData.lineup, { day: `Day ${formData.lineup.length + 1}`, bandIds: [] }]})} className="text-xs text-[#ff4e00] hover:text-[#ff6a2b] flex items-center gap-1"><Plus size={14}/> Add Day</button>
+                    <p className="mt-1 text-xs text-gray-500">Main performing band(s). Stop-specific guests are configured inside Tour Stops.</p>
                   </div>
-                  {formData.lineup.map((dayObj, dayIndex) => (
-                    <div key={dayIndex} className="space-y-2 border border-white/5 p-3 rounded-lg bg-black/40">
-                      <div className="flex justify-between items-center">
-                        <input value={dayObj.day} onChange={e => {
-                          const newLineup = [...formData.lineup];
-                          newLineup[dayIndex].day = e.target.value;
-                          setFormData({...formData, lineup: newLineup});
-                        }} className="bg-transparent border-b border-white/10 px-1 py-1 text-sm text-[#ff4e00] font-mono focus:outline-none focus:border-[#ff4e00] w-1/2" placeholder="e.g. Day 1 - Friday" />
-                        <button type="button" onClick={() => {
-                          const newLineup = formData.lineup.filter((_, i) => i !== dayIndex);
-                          setFormData({...formData, lineup: newLineup});
-                        }} className="text-gray-500 hover:text-red-400"><X size={14}/></button>
-                      </div>
-                      <div className="flex flex-wrap gap-2 mt-2">
-                        {dayObj.bandIds.map((bandId, bandIndex) => {
-                          const band = bands.find(b => b.band_id === bandId);
-                          return (
-                            <div key={bandIndex} className="flex items-center gap-1 bg-white/10 text-xs px-2 py-1 rounded-full text-gray-300">
-                              {band ? band.name_zh || band.name : bandId}
-                              <button type="button" onClick={() => {
-                                const newLineup = [...formData.lineup];
-                                newLineup[dayIndex].bandIds = newLineup[dayIndex].bandIds.filter((_, i) => i !== bandIndex);
-                                setFormData({...formData, lineup: newLineup});
-                              }} className="hover:text-red-400 ml-1"><X size={12}/></button>
-                            </div>
-                          );
-                        })}
-                        <select onChange={e => {
-                          if (!e.target.value) return;
-                          const newLineup = [...formData.lineup];
-                          if (!newLineup[dayIndex].bandIds.includes(e.target.value)) {
-                            newLineup[dayIndex].bandIds.push(e.target.value);
-                          }
-                          setFormData({...formData, lineup: newLineup});
-                          e.target.value = '';
-                        }} className="bg-black/50 border border-white/10 rounded-full px-2 py-1 text-xs text-gray-400 focus:outline-none">
-                          <option value="">+ Add Band</option>
-                          {bands.map(b => (
-                            <option key={b.band_id} value={b.band_id}>{b.name_zh || b.name}</option>
-                          ))}
-                        </select>
-                      </div>
+
+                  <div className="space-y-3 border border-white/5 p-3 rounded-lg bg-black/40">
+                    <div className="flex flex-wrap gap-2">
+                      {mainLineupBandIds.length > 0 ? mainLineupBandIds.map((bandId, bandIndex) => {
+                        const band = bands.find(b => b.band_id === bandId);
+                        return (
+                          <div key={bandId} className="flex items-center gap-1 bg-white/10 text-xs px-2 py-1 rounded-full text-gray-300">
+                            {band ? band.name_zh || band.name : bandId}
+                            <button
+                              type="button"
+                              onClick={() => setMainLineupBandIds(mainLineupBandIds.filter((_, i) => i !== bandIndex))}
+                              className="hover:text-red-400 ml-1"
+                            >
+                              <X size={12}/>
+                            </button>
+                          </div>
+                        );
+                      }) : (
+                        <span className="text-xs text-gray-500">No main lineup bands selected.</span>
+                      )}
                     </div>
-                  ))}
+
+                    <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_minmax(180px,0.5fr)] gap-2">
+                      <input
+                        value={lineupBandQuery}
+                        onChange={e => setLineupBandQuery(e.target.value)}
+                        placeholder="Search band by name / ID..."
+                        className={compactInputClass}
+                      />
+                      <select
+                        value=""
+                        onChange={e => {
+                          if (!e.target.value) return;
+                          setMainLineupBandIds([...mainLineupBandIds, e.target.value]);
+                          setLineupBandQuery('');
+                        }}
+                        className={compactInputClass}
+                      >
+                        <option value="">+ Add Band</option>
+                        {filteredLineupBands.map(b => (
+                          <option key={b.band_id} value={b.band_id}>{b.name_zh || b.name} ({b.band_id})</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {lineupBandQuery && filteredLineupBands.length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {filteredLineupBands.slice(0, 8).map(band => (
+                          <button
+                            key={band.band_id}
+                            type="button"
+                            onClick={() => {
+                              setMainLineupBandIds([...mainLineupBandIds, band.band_id]);
+                              setLineupBandQuery('');
+                            }}
+                            className="text-xs rounded-full border border-white/10 bg-white/5 px-3 py-1 text-gray-300 hover:bg-white/10 hover:text-white transition-colors"
+                          >
+                            {band.name_zh || band.name}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -1586,24 +1624,76 @@ export default function AdminPage() {
                               </div>
                             );
                           })}
-                          <select onChange={e => {
-                            if (!e.target.value) return;
-                            const nextStops = [...formData.stops];
-                            if (!nextStops[stopIndex].guestBandIds.includes(e.target.value)) {
-                              nextStops[stopIndex] = {
-                                ...nextStops[stopIndex],
-                                guestBandIds: [...nextStops[stopIndex].guestBandIds, e.target.value]
-                              };
-                            }
-                            setFormData({...formData, stops: nextStops});
-                            e.target.value = '';
-                          }} className="bg-black/50 border border-white/10 rounded-full px-2 py-1 text-xs text-gray-400 focus:outline-none">
-                            <option value="">+ Add Guest</option>
-                            {bands.map(b => (
-                              <option key={b.band_id} value={b.band_id}>{b.name_zh || b.name}</option>
-                            ))}
-                          </select>
                         </div>
+                        {(() => {
+                          const guestQuery = (guestBandQueries[stopIndex] || '').trim().toLowerCase();
+                          const guestOptions = bands.filter(band => {
+                            if (stop.guestBandIds.includes(band.band_id)) return false;
+                            if (!guestQuery) return true;
+                            return band.band_id?.toLowerCase().includes(guestQuery) ||
+                              band.name?.toLowerCase().includes(guestQuery) ||
+                              band.name_zh?.toLowerCase().includes(guestQuery);
+                          });
+
+                          return (
+                            <div className="space-y-2">
+                              <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_minmax(180px,0.5fr)] gap-2">
+                                <input
+                                  value={guestBandQueries[stopIndex] || ''}
+                                  onChange={e => setGuestBandQueries(prev => ({ ...prev, [stopIndex]: e.target.value }))}
+                                  placeholder="Search guest band..."
+                                  className={compactInputClass}
+                                />
+                                <select
+                                  value=""
+                                  onChange={e => {
+                                    if (!e.target.value) return;
+                                    const nextStops = [...formData.stops];
+                                    if (!nextStops[stopIndex].guestBandIds.includes(e.target.value)) {
+                                      nextStops[stopIndex] = {
+                                        ...nextStops[stopIndex],
+                                        guestBandIds: [...nextStops[stopIndex].guestBandIds, e.target.value]
+                                      };
+                                    }
+                                    setFormData({...formData, stops: nextStops});
+                                    setGuestBandQueries(prev => ({ ...prev, [stopIndex]: '' }));
+                                  }}
+                                  className={compactInputClass}
+                                >
+                                  <option value="">+ Add Guest</option>
+                                  {guestOptions.map(b => (
+                                    <option key={b.band_id} value={b.band_id}>{b.name_zh || b.name} ({b.band_id})</option>
+                                  ))}
+                                </select>
+                              </div>
+
+                              {guestQuery && guestOptions.length > 0 && (
+                                <div className="flex flex-wrap gap-2">
+                                  {guestOptions.slice(0, 8).map(band => (
+                                    <button
+                                      key={band.band_id}
+                                      type="button"
+                                      onClick={() => {
+                                        const nextStops = [...formData.stops];
+                                        if (!nextStops[stopIndex].guestBandIds.includes(band.band_id)) {
+                                          nextStops[stopIndex] = {
+                                            ...nextStops[stopIndex],
+                                            guestBandIds: [...nextStops[stopIndex].guestBandIds, band.band_id]
+                                          };
+                                        }
+                                        setFormData({...formData, stops: nextStops});
+                                        setGuestBandQueries(prev => ({ ...prev, [stopIndex]: '' }));
+                                      }}
+                                      className="text-xs rounded-full border border-white/10 bg-white/5 px-3 py-1 text-gray-300 hover:bg-white/10 hover:text-white transition-colors"
+                                    >
+                                      {band.name_zh || band.name}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </div>
 
                       <div className="space-y-2">

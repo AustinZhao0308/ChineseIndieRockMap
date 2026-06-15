@@ -166,13 +166,14 @@ export default function EventPage() {
   const recapMediaGridClass = hasActiveRecapPhoto && hasActiveRecapVideo
     ? "grid gap-5 lg:grid-cols-2 lg:items-start"
     : "grid gap-5 max-w-5xl";
+  const isTour = stops.length > 1;
   const lineupBands = useMemo(() => {
     const bandMap = new Map<string, { band: Band; notes: Set<string>; isGuest: boolean }>();
 
     event?.lineup?.forEach(day => {
       day.bands?.forEach(band => {
         const entry = bandMap.get(band.id) || { band, notes: new Set<string>(), isGuest: false };
-        if (day.day && day.day !== '全站阵容') entry.notes.add(day.day);
+        if (day.day && day.day !== '全站阵容' && day.day !== '主要阵容') entry.notes.add(day.day);
         entry.isGuest = false;
         bandMap.set(band.id, entry);
       });
@@ -370,10 +371,10 @@ export default function EventPage() {
                 {event.title}
               </h1>
               <p className="mt-6 max-w-xl text-base md:text-lg leading-8 text-white/68">
-                {event.organizer ? `${event.organizer} 呈现` : "Catbeer Presents"} · {stops.length ? `${stops.length}站巡演` : event.location}
+                {event.organizer ? `${event.organizer} 呈现` : "Catbeer Presents"} · {isTour ? `${stops.length}站巡演` : (stops[0]?.venue?.name_zh || event.location)}
               </p>
 
-              <div className="mt-8 hidden gap-3 md:grid md:grid-cols-2">
+              {isTour && <div className="mt-8 hidden gap-3 md:grid md:grid-cols-2">
                 {stops.map((stop, index) => (
                   <a
                     key={`${stop.label}-${index}`}
@@ -388,7 +389,7 @@ export default function EventPage() {
                     )}
                   </a>
                 ))}
-              </div>
+              </div>}
             </div>
           </div>
         </section>
@@ -397,8 +398,8 @@ export default function EventPage() {
           <div className="mx-auto max-w-7xl border-t border-white/10 pt-10 md:pt-14">
             <div className="flex items-end justify-between gap-5">
               <div>
-                <p className="text-sm text-white/45 font-mono uppercase tracking-wider">Stops</p>
-                <h2 className="mt-2 text-3xl md:text-5xl font-serif">巡演站点</h2>
+                <p className="text-sm text-white/45 font-mono uppercase tracking-wider">{isTour ? 'Stops' : 'Details'}</p>
+                <h2 className="mt-2 text-3xl md:text-5xl font-serif">{isTour ? '巡演站点' : '演出信息'}</h2>
               </div>
               {ticketMessage && <p className="text-sm text-white/70">{ticketMessage}</p>}
             </div>
@@ -472,7 +473,7 @@ export default function EventPage() {
                   <p className="text-sm text-white/45 font-mono uppercase tracking-wider">Recap</p>
                   <h2 className="mt-2 text-3xl md:text-5xl font-serif">演出回顾</h2>
                   <p className="mt-5 max-w-sm text-sm leading-7 text-white/55">
-                    现场照片与视频记录，按巡演站点归档。
+                    现场照片与视频记录，{isTour ? '按巡演站点归档。' : '记录这一场演出。'}
                   </p>
                   </div>
 
