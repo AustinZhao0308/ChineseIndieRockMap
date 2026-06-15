@@ -12,6 +12,76 @@ interface BulkImportModalProps {
   onImportComplete: () => void;
 }
 
+const fieldLabels: Record<string, { en: string; zh: string }> = {
+  band_id: { en: 'Band ID', zh: '乐队 ID' },
+  venue_id: { en: 'Venue ID', zh: '场地 ID' },
+  room_id: { en: 'Room ID', zh: '排练室 ID' },
+  spot_id: { en: 'Spot ID', zh: '地点 ID' },
+  slug: { en: 'Slug', zh: '链接标识' },
+  title: { en: 'Event Title', zh: '活动标题' },
+  name: { en: 'Name', zh: '名称' },
+  name_zh: { en: 'Chinese Name', zh: '中文名' },
+  province_zh: { en: 'Province', zh: '省份' },
+  city_zh: { en: 'City', zh: '城市' },
+  intro: { en: 'Introduction', zh: '介绍' },
+  contact_info: { en: 'Contact Info', zh: '联系方式' },
+  image_url: { en: 'Image URL', zh: '图片链接' },
+  genre: { en: 'Genre', zh: '风格' },
+  netease_url: { en: 'NetEase URL', zh: '网易云链接' },
+  xiaohongshu_url: { en: 'Xiaohongshu URL', zh: '小红书链接' },
+  address: { en: 'Address', zh: '地址' },
+  capacity: { en: 'Capacity', zh: '容量' },
+  ticket_url: { en: 'Ticket URL', zh: '购票链接' },
+  equipment: { en: 'Equipment', zh: '设备' },
+  price_info: { en: 'Price Info', zh: '价格信息' },
+  type: { en: 'Type', zh: '类型' },
+  business_hours: { en: 'Business Hours', zh: '营业时间' },
+  social_url: { en: 'Social URL', zh: '社交链接' },
+  date_str: { en: 'Date', zh: '日期' },
+  location: { en: 'Location', zh: '地点' }
+};
+
+const getFieldLabel = (field: string, activeTab?: string) => {
+  if (field === 'intro' && activeTab === 'events') return 'Event Description / 活动介绍';
+  const label = fieldLabels[field];
+  return label ? `${label.en} / ${label.zh}` : field;
+};
+
+const normalizeHeaderName = (value: string) => value.replace(/^\uFEFF/, '').trim().toLowerCase();
+
+const resolveFieldKey = (header: string) => {
+  const normalized = normalizeHeaderName(header);
+  const legacyAliases: Record<string, string> = {
+    main_title: 'name_zh',
+    subtitle: 'name'
+  };
+
+  if (legacyAliases[normalized]) return legacyAliases[normalized];
+
+  for (const [field, label] of Object.entries(fieldLabels)) {
+    const aliases = [
+      field,
+      label.en,
+      label.zh,
+      `${label.en} / ${label.zh}`,
+      `${label.en}/${label.zh}`
+    ].map(normalizeHeaderName);
+
+    if (field === 'intro') {
+      aliases.push(
+        normalizeHeaderName('Event Description'),
+        normalizeHeaderName('活动介绍'),
+        normalizeHeaderName('Event Description / 活动介绍'),
+        normalizeHeaderName('Event Description/活动介绍')
+      );
+    }
+
+    if (aliases.includes(normalized)) return field;
+  }
+
+  return header;
+};
+
 export default function BulkImportModal({ isOpen, onClose, activeTab, currentList, locations, token, onImportComplete }: BulkImportModalProps) {
   const [parsedData, setParsedData] = useState<any[]>([]);
   const [isImporting, setIsImporting] = useState(false);
@@ -28,7 +98,7 @@ export default function BulkImportModal({ isOpen, onClose, activeTab, currentLis
   const getColumnsForTab = () => {
     const common = ['name', 'name_zh', 'province_zh', 'city_zh', 'intro', 'contact_info', 'image_url'];
     switch (activeTab) {
-      case 'bands': return ['band_id', 'main_title', 'subtitle', 'province_zh', 'city_zh', 'intro', 'contact_info', 'image_url', 'genre', 'netease_url', 'xiaohongshu_url'];
+      case 'bands': return ['band_id', 'name', 'name_zh', 'province_zh', 'city_zh', 'intro', 'contact_info', 'image_url', 'genre', 'netease_url', 'xiaohongshu_url'];
       case 'venues': return ['venue_id', ...common, 'address', 'capacity', 'ticket_url'];
       case 'rehearsal_rooms': return ['room_id', ...common, 'equipment', 'price_info'];
       case 'spots': return ['spot_id', ...common, 'type', 'business_hours', 'social_url'];
@@ -38,23 +108,16 @@ export default function BulkImportModal({ isOpen, onClose, activeTab, currentLis
   };
 
   const normalizeCsvRow = (row: any) => {
-    if (activeTab !== 'bands') return row;
+    const normalized = Object.entries(row).reduce((acc, [header, value]) => {
+      acc[resolveFieldKey(header)] = value;
+      return acc;
+    }, {} as Record<string, any>);
 
-    return {
-      ...row,
-      name_zh: row.name_zh || row.main_title || '',
-      name: row.name || row.subtitle || ''
-    };
-  };
-
-  const getCsvFieldLabel = (field: string) => {
-    if (activeTab === 'bands' && field === 'name_zh') return 'main_title';
-    if (activeTab === 'bands' && field === 'name') return 'subtitle';
-    return field;
+    return normalized;
   };
 
   const downloadTemplate = () => {
-    const cols = getColumnsForTab();
+    const cols = getColumnsForTab().map(field => getFieldLabel(field, activeTab));
     const csv = Papa.unparse([cols]);
     const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' }); // Add BOM for Excel
     const url = URL.createObjectURL(blob);
@@ -114,12 +177,12 @@ export default function BulkImportModal({ isOpen, onClose, activeTab, currentLis
     // Check required fields
     const nameField = activeTab === 'events' ? 'title' : 'name_zh';
     if (!row[nameField]) {
-      errors.push(`Missing required field: ${getCsvFieldLabel(nameField)}`);
+      errors.push(`Missing required field: ${getFieldLabel(nameField, activeTab)}`);
       fieldErrors[nameField] = 'Required';
       status = 'error';
     }
     if (activeTab !== 'events' && !row.name) {
-      errors.push(`Missing required field: ${getCsvFieldLabel('name')}`);
+      errors.push(`Missing required field: ${getFieldLabel('name', activeTab)}`);
       fieldErrors.name = 'Required';
       status = 'error';
     }
@@ -133,24 +196,24 @@ export default function BulkImportModal({ isOpen, onClose, activeTab, currentLis
       }
     };
 
-    checkRequired('intro', 'Intro');
+    checkRequired('intro', getFieldLabel('intro', activeTab));
 
     if (activeTab === 'bands') {
-      checkRequired('genre', 'Genre');
+      checkRequired('genre', getFieldLabel('genre', activeTab));
     } else if (activeTab === 'venues') {
-      checkRequired('address', 'Address');
-      checkRequired('capacity', 'Capacity');
+      checkRequired('address', getFieldLabel('address', activeTab));
+      checkRequired('capacity', getFieldLabel('capacity', activeTab));
     } else if (activeTab === 'rehearsal_rooms') {
-      checkRequired('address', 'Address');
-      checkRequired('equipment', 'Equipment');
-      checkRequired('price_info', 'Price Info');
+      checkRequired('address', getFieldLabel('address', activeTab));
+      checkRequired('equipment', getFieldLabel('equipment', activeTab));
+      checkRequired('price_info', getFieldLabel('price_info', activeTab));
     } else if (activeTab === 'spots') {
-      checkRequired('type', 'Type');
-      checkRequired('address', 'Address');
-      checkRequired('business_hours', 'Business Hours');
+      checkRequired('type', getFieldLabel('type', activeTab));
+      checkRequired('address', getFieldLabel('address', activeTab));
+      checkRequired('business_hours', getFieldLabel('business_hours', activeTab));
     } else if (activeTab === 'events') {
-      checkRequired('date_str', 'Date');
-      checkRequired('location', 'Location');
+      checkRequired('date_str', getFieldLabel('date_str', activeTab));
+      checkRequired('location', getFieldLabel('location', activeTab));
     }
 
     // Check duplicates
@@ -388,11 +451,11 @@ export default function BulkImportModal({ isOpen, onClose, activeTab, currentLis
               <table className="w-full text-left text-sm text-gray-300">
                 <thead className="text-xs text-gray-400 uppercase bg-white/5 sticky top-0 z-10">
                   <tr>
-                    <th className="px-4 py-3">Status</th>
-                    <th className="px-4 py-3">Name</th>
-                    {activeTab !== 'events' && <th className="px-4 py-3">Location</th>}
-                    <th className="px-4 py-3">Image</th>
-                    <th className="px-4 py-3 text-right">Actions</th>
+                    <th className="px-4 py-3">Status / 状态</th>
+                    <th className="px-4 py-3">{activeTab === 'events' ? getFieldLabel('title', activeTab) : getFieldLabel('name_zh', activeTab)}</th>
+                    {activeTab !== 'events' && <th className="px-4 py-3">Location / 地区</th>}
+                    <th className="px-4 py-3">Image / 图片</th>
+                    <th className="px-4 py-3 text-right">Actions / 操作</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -498,7 +561,7 @@ export default function BulkImportModal({ isOpen, onClose, activeTab, currentLis
             <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
               {/* Image Upload Section */}
               <div className="bg-black/30 p-4 rounded-lg border border-white/5">
-                <label className="block text-sm text-gray-400 mb-2">Image</label>
+                <label className="block text-sm text-gray-400 mb-2">Image / 图片</label>
                 <div className="flex gap-4 mb-3">
                   <button type="button" onClick={() => setImageInputType('upload')} className={`text-sm px-3 py-1 rounded ${imageInputType === 'upload' ? 'bg-[#ff4e00] text-white' : 'bg-white/10 text-gray-400'}`}>Upload</button>
                   <button type="button" onClick={() => setImageInputType('url')} className={`text-sm px-3 py-1 rounded ${imageInputType === 'url' ? 'bg-[#ff4e00] text-white' : 'bg-white/10 text-gray-400'}`}>URL</button>
@@ -528,7 +591,7 @@ export default function BulkImportModal({ isOpen, onClose, activeTab, currentLis
                 {activeTab !== 'events' && (
                   <>
                     <div>
-                      <label className="block text-xs text-gray-500 mb-1 uppercase">Province</label>
+                      <label className="block text-xs text-gray-500 mb-1 uppercase">{getFieldLabel('province_zh', activeTab)}</label>
                       <select
                         value={editFormData.province_id || ''}
                         onChange={(e) => {
@@ -545,7 +608,7 @@ export default function BulkImportModal({ isOpen, onClose, activeTab, currentLis
                       {fieldErrors.province_id && <span className="text-red-500 text-xs mt-1">{fieldErrors.province_id}</span>}
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-500 mb-1 uppercase">City</label>
+                      <label className="block text-xs text-gray-500 mb-1 uppercase">{getFieldLabel('city_zh', activeTab)}</label>
                       <select
                         value={editFormData.city_id || ''}
                         onChange={(e) => {
@@ -569,28 +632,28 @@ export default function BulkImportModal({ isOpen, onClose, activeTab, currentLis
                 {/* IDs */}
                 {activeTab === 'bands' && (
                   <div className="col-span-2">
-                    <label className="block text-xs text-gray-500 mb-1 uppercase">Band ID</label>
+                    <label className="block text-xs text-gray-500 mb-1 uppercase">{getFieldLabel('band_id', activeTab)}</label>
                     <input type="text" value={editFormData.band_id || ''} onChange={e => setEditFormData({...editFormData, band_id: e.target.value})} className={`w-full bg-black/50 border ${fieldErrors.band_id ? 'border-red-500 focus:border-red-500' : 'border-white/10 focus:border-[#ff4e00]'} rounded px-3 py-2 text-sm text-white focus:outline-none`} />
                     {fieldErrors.band_id && <span className="text-red-500 text-xs mt-1">{fieldErrors.band_id}</span>}
                   </div>
                 )}
                 {activeTab === 'venues' && (
                   <div className="col-span-2">
-                    <label className="block text-xs text-gray-500 mb-1 uppercase">Venue ID</label>
+                    <label className="block text-xs text-gray-500 mb-1 uppercase">{getFieldLabel('venue_id', activeTab)}</label>
                     <input type="text" value={editFormData.venue_id || ''} onChange={e => setEditFormData({...editFormData, venue_id: e.target.value})} className={`w-full bg-black/50 border ${fieldErrors.venue_id ? 'border-red-500 focus:border-red-500' : 'border-white/10 focus:border-[#ff4e00]'} rounded px-3 py-2 text-sm text-white focus:outline-none`} />
                     {fieldErrors.venue_id && <span className="text-red-500 text-xs mt-1">{fieldErrors.venue_id}</span>}
                   </div>
                 )}
                 {activeTab === 'rehearsal_rooms' && (
                   <div className="col-span-2">
-                    <label className="block text-xs text-gray-500 mb-1 uppercase">Room ID</label>
+                    <label className="block text-xs text-gray-500 mb-1 uppercase">{getFieldLabel('room_id', activeTab)}</label>
                     <input type="text" value={editFormData.room_id || ''} onChange={e => setEditFormData({...editFormData, room_id: e.target.value})} className={`w-full bg-black/50 border ${fieldErrors.room_id ? 'border-red-500 focus:border-red-500' : 'border-white/10 focus:border-[#ff4e00]'} rounded px-3 py-2 text-sm text-white focus:outline-none`} />
                     {fieldErrors.room_id && <span className="text-red-500 text-xs mt-1">{fieldErrors.room_id}</span>}
                   </div>
                 )}
                 {activeTab === 'spots' && (
                   <div className="col-span-2">
-                    <label className="block text-xs text-gray-500 mb-1 uppercase">Spot ID</label>
+                    <label className="block text-xs text-gray-500 mb-1 uppercase">{getFieldLabel('spot_id', activeTab)}</label>
                     <input type="text" value={editFormData.spot_id || ''} onChange={e => setEditFormData({...editFormData, spot_id: e.target.value})} className={`w-full bg-black/50 border ${fieldErrors.spot_id ? 'border-red-500 focus:border-red-500' : 'border-white/10 focus:border-[#ff4e00]'} rounded px-3 py-2 text-sm text-white focus:outline-none`} />
                     {fieldErrors.spot_id && <span className="text-red-500 text-xs mt-1">{fieldErrors.spot_id}</span>}
                   </div>
@@ -600,17 +663,17 @@ export default function BulkImportModal({ isOpen, onClose, activeTab, currentLis
                 {activeTab === 'events' && (
                   <>
                     <div className="col-span-2">
-                      <label className="block text-xs text-gray-500 mb-1 uppercase">Event Title</label>
+                      <label className="block text-xs text-gray-500 mb-1 uppercase">{getFieldLabel('title', activeTab)}</label>
                       <input type="text" value={editFormData.title || ''} onChange={e => setEditFormData({...editFormData, title: e.target.value})} className={`w-full bg-black/50 border ${fieldErrors.title ? 'border-red-500 focus:border-red-500' : 'border-white/10 focus:border-[#ff4e00]'} rounded px-3 py-2 text-sm text-white focus:outline-none`} />
                       {fieldErrors.title && <span className="text-red-500 text-xs mt-1">{fieldErrors.title}</span>}
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-500 mb-1 uppercase">Date</label>
+                      <label className="block text-xs text-gray-500 mb-1 uppercase">{getFieldLabel('date_str', activeTab)}</label>
                       <input type="text" value={editFormData.date_str || ''} onChange={e => setEditFormData({...editFormData, date_str: e.target.value})} className={`w-full bg-black/50 border ${fieldErrors.date_str ? 'border-red-500 focus:border-red-500' : 'border-white/10 focus:border-[#ff4e00]'} rounded px-3 py-2 text-sm text-white focus:outline-none`} />
                       {fieldErrors.date_str && <span className="text-red-500 text-xs mt-1">{fieldErrors.date_str}</span>}
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-500 mb-1 uppercase">Location Name</label>
+                      <label className="block text-xs text-gray-500 mb-1 uppercase">{getFieldLabel('location', activeTab)}</label>
                       <input type="text" value={editFormData.location || ''} onChange={e => setEditFormData({...editFormData, location: e.target.value})} className={`w-full bg-black/50 border ${fieldErrors.location ? 'border-red-500 focus:border-red-500' : 'border-white/10 focus:border-[#ff4e00]'} rounded px-3 py-2 text-sm text-white focus:outline-none`} />
                       {fieldErrors.location && <span className="text-red-500 text-xs mt-1">{fieldErrors.location}</span>}
                     </div>
@@ -621,12 +684,12 @@ export default function BulkImportModal({ isOpen, onClose, activeTab, currentLis
                 {activeTab !== 'events' && (
                   <>
                     <div>
-                      <label className="block text-xs text-gray-500 mb-1 uppercase">Name (副标题)</label>
+                      <label className="block text-xs text-gray-500 mb-1 uppercase">{getFieldLabel('name', activeTab)}</label>
                       <input type="text" value={editFormData.name || ''} onChange={e => setEditFormData({...editFormData, name: e.target.value})} className={`w-full bg-black/50 border ${fieldErrors.name ? 'border-red-500 focus:border-red-500' : 'border-white/10 focus:border-[#ff4e00]'} rounded px-3 py-2 text-sm text-white focus:outline-none`} />
                       {fieldErrors.name && <span className="text-red-500 text-xs mt-1">{fieldErrors.name}</span>}
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-500 mb-1 uppercase">Name (主标题)</label>
+                      <label className="block text-xs text-gray-500 mb-1 uppercase">{getFieldLabel('name_zh', activeTab)}</label>
                       <input type="text" value={editFormData.name_zh || ''} onChange={e => setEditFormData({...editFormData, name_zh: e.target.value})} className={`w-full bg-black/50 border ${fieldErrors.name_zh ? 'border-red-500 focus:border-red-500' : 'border-white/10 focus:border-[#ff4e00]'} rounded px-3 py-2 text-sm text-white focus:outline-none`} />
                       {fieldErrors.name_zh && <span className="text-red-500 text-xs mt-1">{fieldErrors.name_zh}</span>}
                     </div>
@@ -637,16 +700,16 @@ export default function BulkImportModal({ isOpen, onClose, activeTab, currentLis
                 {activeTab === 'bands' && (
                   <>
                     <div className="col-span-2">
-                      <label className="block text-xs text-gray-500 mb-1 uppercase">Genre</label>
+                      <label className="block text-xs text-gray-500 mb-1 uppercase">{getFieldLabel('genre', activeTab)}</label>
                       <input type="text" value={editFormData.genre || ''} onChange={e => setEditFormData({...editFormData, genre: e.target.value})} className={`w-full bg-black/50 border ${fieldErrors.genre ? 'border-red-500 focus:border-red-500' : 'border-white/10 focus:border-[#ff4e00]'} rounded px-3 py-2 text-sm text-white focus:outline-none`} />
                       {fieldErrors.genre && <span className="text-red-500 text-xs mt-1">{fieldErrors.genre}</span>}
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-500 mb-1 uppercase">NetEase URL</label>
+                      <label className="block text-xs text-gray-500 mb-1 uppercase">{getFieldLabel('netease_url', activeTab)}</label>
                       <input type="text" value={editFormData.netease_url || ''} onChange={e => setEditFormData({...editFormData, netease_url: e.target.value})} className="w-full bg-black/50 border border-white/10 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-[#ff4e00]" />
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-500 mb-1 uppercase">Xiaohongshu URL</label>
+                      <label className="block text-xs text-gray-500 mb-1 uppercase">{getFieldLabel('xiaohongshu_url', activeTab)}</label>
                       <input type="text" value={editFormData.xiaohongshu_url || ''} onChange={e => setEditFormData({...editFormData, xiaohongshu_url: e.target.value})} className="w-full bg-black/50 border border-white/10 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-[#ff4e00]" />
                     </div>
                   </>
@@ -655,17 +718,17 @@ export default function BulkImportModal({ isOpen, onClose, activeTab, currentLis
                 {activeTab === 'venues' && (
                   <>
                     <div className="col-span-2">
-                      <label className="block text-xs text-gray-500 mb-1 uppercase">Address</label>
+                      <label className="block text-xs text-gray-500 mb-1 uppercase">{getFieldLabel('address', activeTab)}</label>
                       <input type="text" value={editFormData.address || ''} onChange={e => setEditFormData({...editFormData, address: e.target.value})} className={`w-full bg-black/50 border ${fieldErrors.address ? 'border-red-500 focus:border-red-500' : 'border-white/10 focus:border-[#ff4e00]'} rounded px-3 py-2 text-sm text-white focus:outline-none`} />
                       {fieldErrors.address && <span className="text-red-500 text-xs mt-1">{fieldErrors.address}</span>}
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-500 mb-1 uppercase">Capacity</label>
+                      <label className="block text-xs text-gray-500 mb-1 uppercase">{getFieldLabel('capacity', activeTab)}</label>
                       <input type="number" value={editFormData.capacity || ''} onChange={e => setEditFormData({...editFormData, capacity: e.target.value})} className={`w-full bg-black/50 border ${fieldErrors.capacity ? 'border-red-500 focus:border-red-500' : 'border-white/10 focus:border-[#ff4e00]'} rounded px-3 py-2 text-sm text-white focus:outline-none`} />
                       {fieldErrors.capacity && <span className="text-red-500 text-xs mt-1">{fieldErrors.capacity}</span>}
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-500 mb-1 uppercase">Ticket URL</label>
+                      <label className="block text-xs text-gray-500 mb-1 uppercase">{getFieldLabel('ticket_url', activeTab)}</label>
                       <input type="text" value={editFormData.ticket_url || ''} onChange={e => setEditFormData({...editFormData, ticket_url: e.target.value})} className="w-full bg-black/50 border border-white/10 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-[#ff4e00]" />
                     </div>
                   </>
@@ -674,17 +737,17 @@ export default function BulkImportModal({ isOpen, onClose, activeTab, currentLis
                 {activeTab === 'rehearsal_rooms' && (
                   <>
                     <div className="col-span-2">
-                      <label className="block text-xs text-gray-500 mb-1 uppercase">Address</label>
+                      <label className="block text-xs text-gray-500 mb-1 uppercase">{getFieldLabel('address', activeTab)}</label>
                       <input type="text" value={editFormData.address || ''} onChange={e => setEditFormData({...editFormData, address: e.target.value})} className={`w-full bg-black/50 border ${fieldErrors.address ? 'border-red-500 focus:border-red-500' : 'border-white/10 focus:border-[#ff4e00]'} rounded px-3 py-2 text-sm text-white focus:outline-none`} />
                       {fieldErrors.address && <span className="text-red-500 text-xs mt-1">{fieldErrors.address}</span>}
                     </div>
                     <div className="col-span-2">
-                      <label className="block text-xs text-gray-500 mb-1 uppercase">Equipment</label>
+                      <label className="block text-xs text-gray-500 mb-1 uppercase">{getFieldLabel('equipment', activeTab)}</label>
                       <textarea value={editFormData.equipment || ''} onChange={e => setEditFormData({...editFormData, equipment: e.target.value})} className={`w-full bg-black/50 border ${fieldErrors.equipment ? 'border-red-500 focus:border-red-500' : 'border-white/10 focus:border-[#ff4e00]'} rounded px-3 py-2 text-sm text-white focus:outline-none h-24 resize-none`} />
                       {fieldErrors.equipment && <span className="text-red-500 text-xs mt-1">{fieldErrors.equipment}</span>}
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-500 mb-1 uppercase">Price Info</label>
+                      <label className="block text-xs text-gray-500 mb-1 uppercase">{getFieldLabel('price_info', activeTab)}</label>
                       <input type="text" value={editFormData.price_info || ''} onChange={e => setEditFormData({...editFormData, price_info: e.target.value})} className={`w-full bg-black/50 border ${fieldErrors.price_info ? 'border-red-500 focus:border-red-500' : 'border-white/10 focus:border-[#ff4e00]'} rounded px-3 py-2 text-sm text-white focus:outline-none`} />
                       {fieldErrors.price_info && <span className="text-red-500 text-xs mt-1">{fieldErrors.price_info}</span>}
                     </div>
@@ -694,22 +757,22 @@ export default function BulkImportModal({ isOpen, onClose, activeTab, currentLis
                 {activeTab === 'spots' && (
                   <>
                     <div className="col-span-2">
-                      <label className="block text-xs text-gray-500 mb-1 uppercase">Type</label>
+                      <label className="block text-xs text-gray-500 mb-1 uppercase">{getFieldLabel('type', activeTab)}</label>
                       <input type="text" value={editFormData.type || ''} onChange={e => setEditFormData({...editFormData, type: e.target.value})} className={`w-full bg-black/50 border ${fieldErrors.type ? 'border-red-500 focus:border-red-500' : 'border-white/10 focus:border-[#ff4e00]'} rounded px-3 py-2 text-sm text-white focus:outline-none`} />
                       {fieldErrors.type && <span className="text-red-500 text-xs mt-1">{fieldErrors.type}</span>}
                     </div>
                     <div className="col-span-2">
-                      <label className="block text-xs text-gray-500 mb-1 uppercase">Address</label>
+                      <label className="block text-xs text-gray-500 mb-1 uppercase">{getFieldLabel('address', activeTab)}</label>
                       <input type="text" value={editFormData.address || ''} onChange={e => setEditFormData({...editFormData, address: e.target.value})} className={`w-full bg-black/50 border ${fieldErrors.address ? 'border-red-500 focus:border-red-500' : 'border-white/10 focus:border-[#ff4e00]'} rounded px-3 py-2 text-sm text-white focus:outline-none`} />
                       {fieldErrors.address && <span className="text-red-500 text-xs mt-1">{fieldErrors.address}</span>}
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-500 mb-1 uppercase">Business Hours</label>
+                      <label className="block text-xs text-gray-500 mb-1 uppercase">{getFieldLabel('business_hours', activeTab)}</label>
                       <input type="text" value={editFormData.business_hours || ''} onChange={e => setEditFormData({...editFormData, business_hours: e.target.value})} className={`w-full bg-black/50 border ${fieldErrors.business_hours ? 'border-red-500 focus:border-red-500' : 'border-white/10 focus:border-[#ff4e00]'} rounded px-3 py-2 text-sm text-white focus:outline-none`} />
                       {fieldErrors.business_hours && <span className="text-red-500 text-xs mt-1">{fieldErrors.business_hours}</span>}
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-500 mb-1 uppercase">Social URL</label>
+                      <label className="block text-xs text-gray-500 mb-1 uppercase">{getFieldLabel('social_url', activeTab)}</label>
                       <input type="text" value={editFormData.social_url || ''} onChange={e => setEditFormData({...editFormData, social_url: e.target.value})} className="w-full bg-black/50 border border-white/10 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-[#ff4e00]" />
                     </div>
                   </>
@@ -717,7 +780,7 @@ export default function BulkImportModal({ isOpen, onClose, activeTab, currentLis
 
                 {/* Intro */}
                 <div className="col-span-2">
-                  <label className="block text-xs text-gray-500 mb-1 uppercase">Intro</label>
+                  <label className="block text-xs text-gray-500 mb-1 uppercase">{getFieldLabel('intro', activeTab)}</label>
                   <textarea value={editFormData.intro || ''} onChange={e => setEditFormData({...editFormData, intro: e.target.value})} className={`w-full bg-black/50 border ${fieldErrors.intro ? 'border-red-500 focus:border-red-500' : 'border-white/10 focus:border-[#ff4e00]'} rounded px-3 py-2 text-sm text-white focus:outline-none h-24 resize-none`} />
                   {fieldErrors.intro && <span className="text-red-500 text-xs mt-1">{fieldErrors.intro}</span>}
                 </div>
@@ -725,7 +788,7 @@ export default function BulkImportModal({ isOpen, onClose, activeTab, currentLis
                 {/* Contact Info */}
                 {activeTab !== 'events' && (
                   <div className="col-span-2">
-                    <label className="block text-xs text-gray-500 mb-1 uppercase">Contact Info</label>
+                    <label className="block text-xs text-gray-500 mb-1 uppercase">{getFieldLabel('contact_info', activeTab)}</label>
                     <div className="flex gap-2">
                       <select
                         value={contactType}
