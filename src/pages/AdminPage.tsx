@@ -289,6 +289,7 @@ export default function AdminPage() {
   const [imageAssetSummary, setImageAssetSummary] = useState<ImageAssetSummary>(emptyAssetSummary);
   const [assetFilter, setAssetFilter] = useState<'all' | 'unused'>('all');
   const [imageAssetPicker, setImageAssetPicker] = useState<null | { onSelect: (url: string) => void }>(null);
+  const [confirmDeleteAssetUrl, setConfirmDeleteAssetUrl] = useState<string | null>(null);
 
   const showMessage = (text: string, type: 'error' | 'success' = 'error') => {
     setMessage({ text, type });
@@ -508,6 +509,38 @@ export default function AdminPage() {
 
   const openImageAssetPicker = (onSelect: (url: string) => void) => {
     setImageAssetPicker({ onSelect });
+  };
+
+  const handleDeleteUnusedAsset = async (asset: ImageAsset) => {
+    try {
+      const res = await fetch('/api/admin/assets', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ url: asset.url })
+      });
+
+      if (res.status === 401 || res.status === 403) {
+        handleLogout();
+        showMessage('登录已过期，请重新登录', 'error');
+        return;
+      }
+
+      const data = await res.json();
+      if (!res.ok) {
+        showMessage(data.error || 'Failed to delete image asset');
+        if (res.status === 409) fetchData();
+        return;
+      }
+
+      setConfirmDeleteAssetUrl(null);
+      showMessage('Image asset deleted', 'success');
+      fetchData();
+    } catch (err) {
+      showMessage('Network error');
+    }
   };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1193,7 +1226,7 @@ export default function AdminPage() {
               ) : (
                 <div className="space-y-3">
                   {filteredAssets.map(asset => (
-                    <div key={asset.url} className={`grid grid-cols-1 lg:grid-cols-[96px_minmax(0,1fr)_180px] gap-4 rounded-lg border p-4 bg-black/30 ${asset.used ? 'border-white/5' : 'border-yellow-500/30'}`}>
+                    <div key={asset.url} className={`grid grid-cols-1 lg:grid-cols-[96px_minmax(0,1fr)_220px] gap-4 rounded-lg border p-4 bg-black/30 ${asset.used ? 'border-white/5' : 'border-yellow-500/30'}`}>
                       <a href={asset.url} target="_blank" rel="noreferrer" className="block h-24 w-24 overflow-hidden rounded-lg border border-white/10 bg-black/50">
                         <img src={asset.url} alt={asset.filename} className="h-full w-full object-cover" />
                       </a>
@@ -1219,6 +1252,37 @@ export default function AdminPage() {
                         <div className="text-lg font-semibold text-white">{formatBytes(asset.size)}</div>
                         <div className="text-xs text-gray-500 mt-1">{new Date(asset.modifiedAt).toLocaleString()}</div>
                         <div className="text-xs text-gray-600 mt-2 font-mono break-all">{asset.path}</div>
+                        {!asset.used && (
+                          <div className="mt-4 flex justify-start lg:justify-end">
+                            {confirmDeleteAssetUrl === asset.url ? (
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-red-400">Delete?</span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteUnusedAsset(asset)}
+                                  className="px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
+                                >
+                                  Yes
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setConfirmDeleteAssetUrl(null)}
+                                  className="px-2 py-1 text-xs bg-white/10 text-white rounded hover:bg-white/20 transition-colors"
+                                >
+                                  No
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => setConfirmDeleteAssetUrl(asset.url)}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors"
+                              >
+                                <Trash2 size={13} /> Delete Unused
+                              </button>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}

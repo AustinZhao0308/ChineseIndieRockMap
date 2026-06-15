@@ -614,6 +614,39 @@ app.get('/api/admin/assets', authenticateToken, (req, res) => {
   }
 });
 
+app.delete('/api/admin/assets', authenticateToken, (req, res) => {
+  const { url } = req.body;
+  const normalizedUrl = normalizeUploadUrl(url);
+
+  if (!normalizedUrl) {
+    return res.status(400).json({ error: 'Invalid image URL' });
+  }
+
+  try {
+    const references = collectImageReferences();
+    const refs = references.get(normalizedUrl) || [];
+    if (refs.length > 0) {
+      return res.status(409).json({ error: 'Image is still in use', references: refs });
+    }
+
+    const relativePath = normalizedUrl.replace(/^\/uploads\//, '');
+    const filepath = path.join(uploadsDir, relativePath);
+    if (!filepath.startsWith(uploadsDir)) {
+      return res.status(400).json({ error: 'Invalid image path' });
+    }
+
+    if (!fs.existsSync(filepath)) {
+      return res.status(404).json({ error: 'Image file not found' });
+    }
+
+    fs.unlinkSync(filepath);
+    res.json({ success: true });
+  } catch (err: any) {
+    console.error('Failed to delete unused asset:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.delete('/api/upload', authenticateToken, (req, res) => {
   const { url } = req.body;
   if (!url || !url.startsWith('/uploads/')) {
