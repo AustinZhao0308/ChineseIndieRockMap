@@ -12,6 +12,13 @@ export interface Band {
   neteaseUrl?: string;
   xiaohongshuUrl?: string;
   contactInfo?: string;
+  labelAccountId?: number;
+  label?: {
+    id: number;
+    display_name: string;
+    username: string;
+    status: string;
+  } | null;
   dbId?: number;
 }
 

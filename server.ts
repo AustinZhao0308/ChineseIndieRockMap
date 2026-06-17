@@ -111,7 +111,8 @@ db.exec(`
     image_url TEXT,
     contact_info TEXT,
     netease_url TEXT,
-    xiaohongshu_url TEXT
+    xiaohongshu_url TEXT,
+    label_account_id INTEGER
   );
 
   CREATE TABLE IF NOT EXISTS venues (
@@ -146,7 +147,8 @@ db.exec(`
     organizer TEXT,
     status TEXT,
     stops TEXT,
-    qr_codes TEXT
+    qr_codes TEXT,
+    label_account_id INTEGER
   );
 
   CREATE TABLE IF NOT EXISTS rehearsal_rooms (
@@ -183,12 +185,28 @@ db.exec(`
     contact_info TEXT,
     social_url TEXT
   );
+
+  CREATE TABLE IF NOT EXISTS accounts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    account_type TEXT NOT NULL CHECK(account_type IN ('artist', 'label')),
+    username TEXT NOT NULL UNIQUE,
+    display_name TEXT NOT NULL,
+    password_hash TEXT NOT NULL,
+    contact_name TEXT,
+    contact_info TEXT,
+    linked_entity_id TEXT,
+    status TEXT NOT NULL DEFAULT 'active',
+    notes TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  );
 `);
 
 // Add columns to existing tables if they don't exist (migration)
 try { db.exec('ALTER TABLE bands ADD COLUMN contact_info TEXT;'); } catch (e) {}
 try { db.exec('ALTER TABLE bands ADD COLUMN netease_url TEXT;'); } catch (e) {}
 try { db.exec('ALTER TABLE bands ADD COLUMN xiaohongshu_url TEXT;'); } catch (e) {}
+try { db.exec('ALTER TABLE bands ADD COLUMN label_account_id INTEGER;'); } catch (e) {}
 try { db.exec('ALTER TABLE venues ADD COLUMN ticket_url TEXT;'); } catch (e) {}
 try { db.exec('ALTER TABLE featured_events ADD COLUMN lineup TEXT;'); } catch (e) {}
 try { db.exec('ALTER TABLE featured_events ADD COLUMN slug TEXT;'); } catch (e) {}
@@ -196,6 +214,18 @@ try { db.exec('ALTER TABLE featured_events ADD COLUMN organizer TEXT;'); } catch
 try { db.exec('ALTER TABLE featured_events ADD COLUMN status TEXT;'); } catch (e) {}
 try { db.exec('ALTER TABLE featured_events ADD COLUMN stops TEXT;'); } catch (e) {}
 try { db.exec('ALTER TABLE featured_events ADD COLUMN qr_codes TEXT;'); } catch (e) {}
+try { db.exec('ALTER TABLE featured_events ADD COLUMN label_account_id INTEGER;'); } catch (e) {}
+try { db.exec("ALTER TABLE accounts ADD COLUMN account_type TEXT NOT NULL DEFAULT 'artist';"); } catch (e) {}
+try { db.exec('ALTER TABLE accounts ADD COLUMN username TEXT;'); } catch (e) {}
+try { db.exec('ALTER TABLE accounts ADD COLUMN display_name TEXT;'); } catch (e) {}
+try { db.exec('ALTER TABLE accounts ADD COLUMN password_hash TEXT;'); } catch (e) {}
+try { db.exec('ALTER TABLE accounts ADD COLUMN contact_name TEXT;'); } catch (e) {}
+try { db.exec('ALTER TABLE accounts ADD COLUMN contact_info TEXT;'); } catch (e) {}
+try { db.exec('ALTER TABLE accounts ADD COLUMN linked_entity_id TEXT;'); } catch (e) {}
+try { db.exec("ALTER TABLE accounts ADD COLUMN status TEXT NOT NULL DEFAULT 'active';"); } catch (e) {}
+try { db.exec('ALTER TABLE accounts ADD COLUMN notes TEXT;'); } catch (e) {}
+try { db.exec('ALTER TABLE accounts ADD COLUMN created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP;'); } catch (e) {}
+try { db.exec('ALTER TABLE accounts ADD COLUMN updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP;'); } catch (e) {}
 
 // Seed initial data if empty
 const countBands = db.prepare('SELECT COUNT(*) as count FROM bands').get() as { count: number };
@@ -286,8 +316,37 @@ const normalizeDisplayCity = (cityZh: string) => {
   return cityZh ? cityZh.replace(/(省|市|维吾尔自治区|壮族自治区|回族自治区|自治区|特别行政区|自治州|地区|盟)$/, '') : '';
 };
 
+const toLabelSummary = (label: any) => {
+  if (!label) return null;
+  return {
+    id: label.id,
+    display_name: label.display_name,
+    username: label.username,
+    status: label.status
+  };
+};
+
+const getLabelAccount = (labelAccountId: any) => {
+  if (!labelAccountId) return null;
+  return db.prepare("SELECT id, display_name, username, status FROM accounts WHERE id = ? AND account_type = 'label'").get(labelAccountId) as any;
+};
+
+const normalizeOptionalLabelAccountId = (value: any) => {
+  if (value === undefined || value === null || value === '') return null;
+  const id = Number(value);
+  if (!Number.isInteger(id) || id <= 0) {
+    throw new Error('Invalid label account.');
+  }
+  const label = getLabelAccount(id);
+  if (!label) {
+    throw new Error('Unknown label account.');
+  }
+  return id;
+};
+
 const toBandCard = (b: any) => {
   if (!b) return null;
+  const label = getLabelAccount(b.label_account_id);
   return {
     id: b.band_id,
     band_id: b.band_id,
@@ -301,6 +360,8 @@ const toBandCard = (b: any) => {
     contactInfo: b.contact_info,
     neteaseUrl: b.netease_url,
     xiaohongshuUrl: b.xiaohongshu_url,
+    labelAccountId: b.label_account_id,
+    label: toLabelSummary(label),
     dbId: b.id
   };
 };
@@ -428,6 +489,7 @@ const collectImageReferences = () => {
 
 const populateEvent = (event: any) => {
   if (!event) return null;
+  const label = getLabelAccount(event.label_account_id);
 
   const parsedLineup = parseJsonArray(event.lineup);
   const lineup = parsedLineup.map((dayObj: any) => {
@@ -458,6 +520,7 @@ const populateEvent = (event: any) => {
 
   return {
     ...event,
+    label: toLabelSummary(label),
     lineup,
     stops,
     qr_codes: parseJsonArray(event.qr_codes)
@@ -497,6 +560,15 @@ const validateEventReferences = (lineup: any, stops: any) => {
   }
 };
 
+const toPublicAccount = (account: any) => {
+  const { password_hash, ...safeAccount } = account;
+  return safeAccount;
+};
+
+const normalizeAccountType = (value: any) => {
+  return value === 'label' ? 'label' : 'artist';
+};
+
 // API Routes
 app.post('/api/login', async (req, res) => {
   const { password } = req.body;
@@ -506,6 +578,121 @@ app.post('/api/login', async (req, res) => {
     res.json({ token });
   } else {
     res.status(401).json({ error: 'Invalid password' });
+  }
+});
+
+app.get('/api/accounts', authenticateToken, (req, res) => {
+  const accounts = db
+    .prepare('SELECT * FROM accounts ORDER BY updated_at DESC, id DESC')
+    .all()
+    .map(toPublicAccount);
+  res.json(accounts);
+});
+
+app.post('/api/accounts', authenticateToken, async (req, res) => {
+  const {
+    account_type,
+    username,
+    display_name,
+    password,
+    contact_name,
+    contact_info,
+    linked_entity_id,
+    status,
+    notes
+  } = req.body;
+
+  if (!username?.trim() || !display_name?.trim() || !password?.trim()) {
+    return res.status(400).json({ error: 'Username, display name, and initial password are required.' });
+  }
+
+  try {
+    const passwordHash = await bcrypt.hash(password, 10);
+    const info = db.prepare(`
+      INSERT INTO accounts (account_type, username, display_name, password_hash, contact_name, contact_info, linked_entity_id, status, notes, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    `).run(
+      normalizeAccountType(account_type),
+      username.trim(),
+      display_name.trim(),
+      passwordHash,
+      contact_name || '',
+      contact_info || '',
+      linked_entity_id || '',
+      status || 'active',
+      notes || ''
+    );
+    res.json({ id: info.lastInsertRowid });
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.put('/api/accounts/:id', authenticateToken, async (req, res) => {
+  const {
+    account_type,
+    username,
+    display_name,
+    password,
+    contact_name,
+    contact_info,
+    linked_entity_id,
+    status,
+    notes
+  } = req.body;
+
+  if (!username?.trim() || !display_name?.trim()) {
+    return res.status(400).json({ error: 'Username and display name are required.' });
+  }
+
+  try {
+    if (password?.trim()) {
+      const passwordHash = await bcrypt.hash(password, 10);
+      db.prepare(`
+        UPDATE accounts SET
+          account_type = ?, username = ?, display_name = ?, password_hash = ?, contact_name = ?, contact_info = ?, linked_entity_id = ?, status = ?, notes = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).run(
+        normalizeAccountType(account_type),
+        username.trim(),
+        display_name.trim(),
+        passwordHash,
+        contact_name || '',
+        contact_info || '',
+        linked_entity_id || '',
+        status || 'active',
+        notes || '',
+        req.params.id
+      );
+    } else {
+      db.prepare(`
+        UPDATE accounts SET
+          account_type = ?, username = ?, display_name = ?, contact_name = ?, contact_info = ?, linked_entity_id = ?, status = ?, notes = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).run(
+        normalizeAccountType(account_type),
+        username.trim(),
+        display_name.trim(),
+        contact_name || '',
+        contact_info || '',
+        linked_entity_id || '',
+        status || 'active',
+        notes || '',
+        req.params.id
+      );
+    }
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.delete('/api/accounts/:id', authenticateToken, (req, res) => {
+  try {
+    db.prepare('DELETE FROM accounts WHERE id = ?').run(req.params.id);
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
   }
 });
 
@@ -662,17 +849,25 @@ app.delete('/api/upload', authenticateToken, (req, res) => {
 
 // Bands API
 app.get('/api/bands', (req, res) => {
-  const bands = db.prepare('SELECT * FROM bands').all();
+  const bands = (db.prepare('SELECT * FROM bands').all() as any[]).map(band => {
+    const label = getLabelAccount(band.label_account_id);
+    return {
+      ...band,
+      labelAccountId: band.label_account_id,
+      label: toLabelSummary(label)
+    };
+  });
   res.json(bands);
 });
 
 app.post('/api/bands', authenticateToken, (req, res) => {
-  const { province_id, province_zh, city_id, city_zh, band_id, name, name_zh, genre, intro, image_url, contact_info, netease_url, xiaohongshu_url } = req.body;
+  const { province_id, province_zh, city_id, city_zh, band_id, name, name_zh, genre, intro, image_url, contact_info, netease_url, xiaohongshu_url, label_account_id } = req.body;
   try {
+    const normalizedLabelAccountId = normalizeOptionalLabelAccountId(label_account_id);
     const info = db.prepare(`
-      INSERT INTO bands (province_id, province_zh, city_id, city_zh, band_id, name, name_zh, genre, intro, image_url, contact_info, netease_url, xiaohongshu_url)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(province_id, province_zh, city_id, city_zh, band_id, name, name_zh, genre, intro, image_url, contact_info, netease_url, xiaohongshu_url);
+      INSERT INTO bands (province_id, province_zh, city_id, city_zh, band_id, name, name_zh, genre, intro, image_url, contact_info, netease_url, xiaohongshu_url, label_account_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(province_id, province_zh, city_id, city_zh, band_id, name, name_zh, genre, intro, image_url, contact_info, netease_url, xiaohongshu_url, normalizedLabelAccountId);
     res.json({ id: info.lastInsertRowid });
   } catch (error: any) {
     res.status(400).json({ error: error.message });
@@ -680,13 +875,14 @@ app.post('/api/bands', authenticateToken, (req, res) => {
 });
 
 app.put('/api/bands/:id', authenticateToken, (req, res) => {
-  const { province_id, province_zh, city_id, city_zh, band_id, name, name_zh, genre, intro, image_url, contact_info, netease_url, xiaohongshu_url } = req.body;
+  const { province_id, province_zh, city_id, city_zh, band_id, name, name_zh, genre, intro, image_url, contact_info, netease_url, xiaohongshu_url, label_account_id } = req.body;
   try {
+    const normalizedLabelAccountId = normalizeOptionalLabelAccountId(label_account_id);
     db.prepare(`
       UPDATE bands SET 
-        province_id = ?, province_zh = ?, city_id = ?, city_zh = ?, band_id = ?, name = ?, name_zh = ?, genre = ?, intro = ?, image_url = ?, contact_info = ?, netease_url = ?, xiaohongshu_url = ?
+        province_id = ?, province_zh = ?, city_id = ?, city_zh = ?, band_id = ?, name = ?, name_zh = ?, genre = ?, intro = ?, image_url = ?, contact_info = ?, netease_url = ?, xiaohongshu_url = ?, label_account_id = ?
       WHERE id = ?
-    `).run(province_id, province_zh, city_id, city_zh, band_id, name, name_zh, genre, intro, image_url, contact_info, netease_url, xiaohongshu_url, req.params.id);
+    `).run(province_id, province_zh, city_id, city_zh, band_id, name, name_zh, genre, intro, image_url, contact_info, netease_url, xiaohongshu_url, normalizedLabelAccountId, req.params.id);
     res.json({ success: true });
   } catch (error: any) {
     res.status(400).json({ error: error.message });
@@ -773,8 +969,10 @@ app.get('/api/featured_events/:slugOrId', (req, res) => {
 });
 
 app.post('/api/featured_events', authenticateToken, (req, res) => {
-  const { slug, title, date_str, location, address, description, image_url, ticket_url, is_active, lineup, organizer, status, stops, qr_codes } = req.body;
+  const { slug, title, date_str, location, address, description, image_url, ticket_url, is_active, lineup, organizer, status, stops, qr_codes, label_account_id } = req.body;
   try {
+    const normalizedLabelAccountId = normalizeOptionalLabelAccountId(label_account_id);
+    const label = getLabelAccount(normalizedLabelAccountId);
     validateEventReferences(lineup, stops);
     if (is_active) {
       db.prepare('UPDATE featured_events SET is_active = 0').run();
@@ -783,9 +981,9 @@ app.post('/api/featured_events', authenticateToken, (req, res) => {
     const stopsStr = stops ? JSON.stringify(stops) : null;
     const qrCodesStr = qr_codes ? JSON.stringify(qr_codes) : null;
     const info = db.prepare(`
-      INSERT INTO featured_events (slug, title, date_str, location, address, description, image_url, ticket_url, is_active, lineup, organizer, status, stops, qr_codes)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(slug || null, title, date_str, location, address, description, image_url, ticket_url, is_active ? 1 : 0, lineupStr, organizer || '', status || 'on_sale', stopsStr, qrCodesStr);
+      INSERT INTO featured_events (slug, title, date_str, location, address, description, image_url, ticket_url, is_active, lineup, organizer, status, stops, qr_codes, label_account_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(slug || null, title, date_str, location, address, description, image_url, ticket_url, is_active ? 1 : 0, lineupStr, label?.display_name || organizer || '', status || 'on_sale', stopsStr, qrCodesStr, normalizedLabelAccountId);
     res.json({ id: info.lastInsertRowid });
   } catch (error: any) {
     res.status(400).json({ error: error.message });
@@ -793,8 +991,10 @@ app.post('/api/featured_events', authenticateToken, (req, res) => {
 });
 
 app.put('/api/featured_events/:id', authenticateToken, (req, res) => {
-  const { slug, title, date_str, location, address, description, image_url, ticket_url, is_active, lineup, organizer, status, stops, qr_codes } = req.body;
+  const { slug, title, date_str, location, address, description, image_url, ticket_url, is_active, lineup, organizer, status, stops, qr_codes, label_account_id } = req.body;
   try {
+    const normalizedLabelAccountId = normalizeOptionalLabelAccountId(label_account_id);
+    const label = getLabelAccount(normalizedLabelAccountId);
     validateEventReferences(lineup, stops);
     if (is_active) {
       db.prepare('UPDATE featured_events SET is_active = 0').run();
@@ -804,9 +1004,9 @@ app.put('/api/featured_events/:id', authenticateToken, (req, res) => {
     const qrCodesStr = qr_codes ? JSON.stringify(qr_codes) : null;
     db.prepare(`
       UPDATE featured_events SET 
-        slug = ?, title = ?, date_str = ?, location = ?, address = ?, description = ?, image_url = ?, ticket_url = ?, is_active = ?, lineup = ?, organizer = ?, status = ?, stops = ?, qr_codes = ?
+        slug = ?, title = ?, date_str = ?, location = ?, address = ?, description = ?, image_url = ?, ticket_url = ?, is_active = ?, lineup = ?, organizer = ?, status = ?, stops = ?, qr_codes = ?, label_account_id = ?
       WHERE id = ?
-    `).run(slug || null, title, date_str, location, address, description, image_url, ticket_url, is_active ? 1 : 0, lineupStr, organizer || '', status || 'on_sale', stopsStr, qrCodesStr, req.params.id);
+    `).run(slug || null, title, date_str, location, address, description, image_url, ticket_url, is_active ? 1 : 0, lineupStr, label?.display_name || organizer || '', status || 'on_sale', stopsStr, qrCodesStr, normalizedLabelAccountId, req.params.id);
     res.json({ success: true });
   } catch (error: any) {
     res.status(400).json({ error: error.message });
