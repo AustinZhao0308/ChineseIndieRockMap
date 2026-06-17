@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import MapPage from "./pages/MapPage";
 import AdminPage from "./pages/AdminPage";
 import EventPage from "./pages/EventPage";
+import LabelArchivePage from "./pages/LabelArchivePage";
 
 export default function App() {
   return (
@@ -10,6 +11,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<MapPage />} />
         <Route path="/events/:slug" element={<EventPage />} />
+        <Route path="/labels/:username" element={<LabelArchivePage />} />
         <Route path="/admin" element={<AdminPage />} />
       </Routes>
     </BrowserRouter>

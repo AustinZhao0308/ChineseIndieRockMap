@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, CalendarDays, ChevronLeft, ChevronRight, Copy, ExternalLink, MapPin, PenLine, QrCode, Ticket, Users } from "lucide-react";
 import BandModal from "../components/BandModal";
 import VenueModal from "../components/VenueModal";
@@ -138,6 +138,7 @@ const getBilibiliEmbedUrl = (url?: string) => {
 export default function EventPage() {
   const { slug } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const posterRef = useRef<HTMLImageElement | null>(null);
   const [event, setEvent] = useState<EventDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -300,6 +301,14 @@ export default function EventPage() {
     setRecapPhotoIndexes(prev => ({ ...prev, [activeRecapStopKey]: nextIndex }));
   };
 
+  const handleBack = () => {
+    if (location.key && location.key !== "default") {
+      navigate(-1);
+      return;
+    }
+    navigate("/");
+  };
+
   if (loading) {
     return (
       <div className="min-h-[100svh] bg-[#080705] flex items-center justify-center text-[#ff6a2b] font-mono">
@@ -313,7 +322,7 @@ export default function EventPage() {
       <div className="min-h-[100svh] bg-[#080705] flex flex-col items-center justify-center gap-5 px-6 text-center">
         <p className="text-xl text-white font-serif">没有找到这场演出</p>
         <p className="text-sm text-gray-400">{error}</p>
-        <button onClick={() => navigate("/")} className="px-5 py-2 rounded-full bg-white text-black text-sm font-medium">
+        <button onClick={handleBack} className="px-5 py-2 rounded-full bg-white text-black text-sm font-medium">
           回到地图
         </button>
       </div>
@@ -335,10 +344,10 @@ export default function EventPage() {
       </div>
 
       <header className="fixed top-0 left-0 right-0 z-30 px-4 py-4 md:px-8 md:py-6 flex items-center justify-between pointer-events-none">
-        <Link to="/" className="pointer-events-auto inline-flex items-center gap-2 rounded-full border border-white/15 bg-black/30 px-4 py-2 text-sm text-white/85 backdrop-blur-xl hover:bg-white/10 transition-colors">
+        <button type="button" onClick={handleBack} className="pointer-events-auto inline-flex items-center gap-2 rounded-full border border-white/15 bg-black/30 px-4 py-2 text-sm text-white/85 backdrop-blur-xl hover:bg-white/10 transition-colors">
           <ArrowLeft size={16} />
-          地图
-        </Link>
+          返回
+        </button>
         {isAdmin && (
           <Link to={`/admin?tab=events&edit=${encodeURIComponent(event.slug || String(event.id))}`} className="pointer-events-auto inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm text-white/85 backdrop-blur-xl hover:bg-white/15 transition-colors">
             <PenLine size={16} />

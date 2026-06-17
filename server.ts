@@ -192,6 +192,7 @@ db.exec(`
     username TEXT NOT NULL UNIQUE,
     display_name TEXT NOT NULL,
     password_hash TEXT NOT NULL,
+    logo_url TEXT,
     contact_name TEXT,
     contact_info TEXT,
     linked_entity_id TEXT,
@@ -219,6 +220,7 @@ try { db.exec("ALTER TABLE accounts ADD COLUMN account_type TEXT NOT NULL DEFAUL
 try { db.exec('ALTER TABLE accounts ADD COLUMN username TEXT;'); } catch (e) {}
 try { db.exec('ALTER TABLE accounts ADD COLUMN display_name TEXT;'); } catch (e) {}
 try { db.exec('ALTER TABLE accounts ADD COLUMN password_hash TEXT;'); } catch (e) {}
+try { db.exec('ALTER TABLE accounts ADD COLUMN logo_url TEXT;'); } catch (e) {}
 try { db.exec('ALTER TABLE accounts ADD COLUMN contact_name TEXT;'); } catch (e) {}
 try { db.exec('ALTER TABLE accounts ADD COLUMN contact_info TEXT;'); } catch (e) {}
 try { db.exec('ALTER TABLE accounts ADD COLUMN linked_entity_id TEXT;'); } catch (e) {}
@@ -322,13 +324,14 @@ const toLabelSummary = (label: any) => {
     id: label.id,
     display_name: label.display_name,
     username: label.username,
+    logo_url: label.logo_url,
     status: label.status
   };
 };
 
 const getLabelAccount = (labelAccountId: any) => {
   if (!labelAccountId) return null;
-  return db.prepare("SELECT id, display_name, username, status FROM accounts WHERE id = ? AND account_type = 'label'").get(labelAccountId) as any;
+  return db.prepare("SELECT id, display_name, username, logo_url, status FROM accounts WHERE id = ? AND account_type = 'label'").get(labelAccountId) as any;
 };
 
 const normalizeOptionalLabelAccountId = (value: any) => {
@@ -451,6 +454,16 @@ const collectImageReferences = () => {
         title: row.title || row.name || `${type} #${row.id}`,
         field: 'image_url'
       });
+    });
+  });
+
+  const accounts = db.prepare('SELECT id, display_name AS title, username, logo_url FROM accounts').all() as any[];
+  accounts.forEach(account => {
+    addImageReference(refs, account.logo_url, {
+      type: 'Account Logo',
+      id: account.id,
+      title: account.title || account.username || `Account #${account.id}`,
+      field: 'logo_url'
     });
   });
 
@@ -581,6 +594,32 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
+app.get('/api/labels/:username/archive', (req, res) => {
+  try {
+    const label = db.prepare(`
+      SELECT id, username, display_name, logo_url, status, created_at
+      FROM accounts
+      WHERE username = ? AND account_type = 'label' AND status = 'active'
+      LIMIT 1
+    `).get(req.params.username) as any;
+
+    if (!label) {
+      return res.status(404).json({ error: 'Label not found' });
+    }
+
+    const events = (db.prepare(`
+      SELECT *
+      FROM featured_events
+      WHERE label_account_id = ?
+      ORDER BY id DESC
+    `).all(label.id) as any[]).map(populateEvent);
+
+    res.json({ label, events });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.get('/api/accounts', authenticateToken, (req, res) => {
   const accounts = db
     .prepare('SELECT * FROM accounts ORDER BY updated_at DESC, id DESC')
@@ -595,6 +634,7 @@ app.post('/api/accounts', authenticateToken, async (req, res) => {
     username,
     display_name,
     password,
+    logo_url,
     contact_name,
     contact_info,
     linked_entity_id,
@@ -609,13 +649,14 @@ app.post('/api/accounts', authenticateToken, async (req, res) => {
   try {
     const passwordHash = await bcrypt.hash(password, 10);
     const info = db.prepare(`
-      INSERT INTO accounts (account_type, username, display_name, password_hash, contact_name, contact_info, linked_entity_id, status, notes, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+      INSERT INTO accounts (account_type, username, display_name, password_hash, logo_url, contact_name, contact_info, linked_entity_id, status, notes, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
     `).run(
       normalizeAccountType(account_type),
       username.trim(),
       display_name.trim(),
       passwordHash,
+      logo_url || '',
       contact_name || '',
       contact_info || '',
       linked_entity_id || '',
@@ -634,6 +675,7 @@ app.put('/api/accounts/:id', authenticateToken, async (req, res) => {
     username,
     display_name,
     password,
+    logo_url,
     contact_name,
     contact_info,
     linked_entity_id,
@@ -650,13 +692,14 @@ app.put('/api/accounts/:id', authenticateToken, async (req, res) => {
       const passwordHash = await bcrypt.hash(password, 10);
       db.prepare(`
         UPDATE accounts SET
-          account_type = ?, username = ?, display_name = ?, password_hash = ?, contact_name = ?, contact_info = ?, linked_entity_id = ?, status = ?, notes = ?, updated_at = CURRENT_TIMESTAMP
+          account_type = ?, username = ?, display_name = ?, password_hash = ?, logo_url = ?, contact_name = ?, contact_info = ?, linked_entity_id = ?, status = ?, notes = ?, updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
       `).run(
         normalizeAccountType(account_type),
         username.trim(),
         display_name.trim(),
         passwordHash,
+        logo_url || '',
         contact_name || '',
         contact_info || '',
         linked_entity_id || '',
@@ -667,12 +710,13 @@ app.put('/api/accounts/:id', authenticateToken, async (req, res) => {
     } else {
       db.prepare(`
         UPDATE accounts SET
-          account_type = ?, username = ?, display_name = ?, contact_name = ?, contact_info = ?, linked_entity_id = ?, status = ?, notes = ?, updated_at = CURRENT_TIMESTAMP
+          account_type = ?, username = ?, display_name = ?, logo_url = ?, contact_name = ?, contact_info = ?, linked_entity_id = ?, status = ?, notes = ?, updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
       `).run(
         normalizeAccountType(account_type),
         username.trim(),
         display_name.trim(),
+        logo_url || '',
         contact_name || '',
         contact_info || '',
         linked_entity_id || '',

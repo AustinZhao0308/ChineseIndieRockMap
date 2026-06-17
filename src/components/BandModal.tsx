@@ -101,9 +101,9 @@ const BandModal: React.FC<BandModalProps> = ({ band, onClose }) => {
                       {band.city_zh}
                     </span>
                     {band.label && (
-                      <span className="inline-block px-3 py-1 bg-blue-500/15 text-blue-200 border border-blue-300/20 rounded-full text-xs font-medium tracking-widest mb-3 ml-2">
+                      <a href={`/labels/${band.label.username}`} className="inline-block px-3 py-1 bg-blue-500/15 text-blue-200 border border-blue-300/20 rounded-full text-xs font-medium tracking-widest mb-3 ml-2 hover:bg-blue-500/25 transition-colors">
                         厂牌 {band.label.display_name}
-                      </span>
+                      </a>
                     )}
                     <h2 className="text-4xl md:text-5xl font-serif text-white tracking-tight mb-1">
                       {band.name_zh}

@@ -318,6 +318,7 @@ export default function AdminPage() {
     username: '',
     password: '',
     display_name: '',
+    logo_url: '',
     contact_name: '',
     linked_entity_id: '',
     notes: '',
@@ -612,6 +613,46 @@ export default function AdminPage() {
     } finally {
       e.target.value = '';
     }
+  };
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      showMessage('Uploading logo...', 'success');
+      const url = await uploadImageFile(file);
+      if (url) {
+        setFormData(prev => ({ ...prev, logo_url: url }));
+        showMessage('Logo uploaded successfully', 'success');
+      }
+    } catch (err) {
+      showMessage('Network error during upload');
+    } finally {
+      e.target.value = '';
+    }
+  };
+
+  const handleRemoveLogo = async () => {
+    const currentUrl = formData.logo_url;
+    if (!currentUrl) return;
+
+    if (currentUrl.startsWith('/uploads/')) {
+      try {
+        await fetch('/api/upload', {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ url: currentUrl })
+        });
+      } catch (err) {
+        console.error('Failed to delete logo from server', err);
+      }
+    }
+
+    setFormData(prev => ({ ...prev, logo_url: '' }));
   };
 
   const handleRemoveImage = async () => {
@@ -993,6 +1034,7 @@ export default function AdminPage() {
       username: item.username || '',
       password: '',
       display_name: item.display_name || '',
+      logo_url: item.logo_url || '',
       contact_name: item.contact_name || '',
       linked_entity_id: item.linked_entity_id || '',
       notes: item.notes || '',
@@ -1045,7 +1087,7 @@ export default function AdminPage() {
       province_id: '', province_zh: '', city_id: '', city_zh: '',
       band_id: '', venue_id: '', room_id: '', spot_id: '', name: '', name_zh: '', genre: '', type: '',
       label_account_id: '',
-      account_type: 'artist', username: '', password: '', display_name: '', contact_name: '', linked_entity_id: '', notes: '',
+      account_type: 'artist', username: '', password: '', display_name: '', logo_url: '', contact_name: '', linked_entity_id: '', notes: '',
       netease_url: '', xiaohongshu_url: '', social_url: '', ticket_url: '',
       slug: '', title: '', date_str: '', location: '', organizer: '', status: activeTab === 'accounts' ? 'active' : 'on_sale', is_active: false, lineup: [], stops: [], qr_codes: [],
       address: '', capacity: '', equipment: '', price_info: '', business_hours: '', intro: '', image_url: '', contact_info: ''
@@ -1542,6 +1584,30 @@ export default function AdminPage() {
                   <Field label="Display Name / 显示名称">
                     <input required placeholder="e.g. Maybe Mars / 兵马司" value={formData.display_name} onChange={e => setFormData({...formData, display_name: e.target.value})} className={inputClass} />
                   </Field>
+                  <div className="space-y-2 rounded-xl border border-white/10 bg-black/20 p-4">
+                    <div className="flex items-center justify-between">
+                      <span className={labelClass}>Logo / 标志（建议方形，1MB 内）</span>
+                      {formData.logo_url && (
+                        <button type="button" onClick={handleRemoveLogo} className="text-xs text-red-400 hover:text-red-300">
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-[auto_1fr] gap-2">
+                      <button
+                        type="button"
+                        onClick={() => openImageAssetPicker(url => setFormData(prev => ({ ...prev, logo_url: url })))}
+                        className="bg-white/10 hover:bg-white/15 text-white rounded-lg px-4 py-2 text-sm transition-colors"
+                      >
+                        Choose Existing
+                      </button>
+                      <input type="file" accept="image/*" onChange={handleLogoUpload} className={`${inputClass} file:mr-4 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:bg-white/10 file:text-white hover:file:bg-white/20`} />
+                    </div>
+                    <input placeholder="Or paste logo URL" value={formData.logo_url} onChange={e => setFormData({...formData, logo_url: e.target.value})} className={inputClass} />
+                    {formData.logo_url && (
+                      <img src={formData.logo_url} alt="Logo preview" className="h-20 w-20 rounded-xl border border-white/10 bg-white object-contain p-2" />
+                    )}
+                  </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <Field label="Linked Entity ID / 关联艺人或厂牌 ID">
                       <input placeholder={formData.account_type === 'label' ? "label slug, optional" : "band_id, optional"} value={formData.linked_entity_id} onChange={e => setFormData({...formData, linked_entity_id: e.target.value})} className={inputClass} />
