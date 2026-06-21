@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Code2, Lock, LogOut, Plus, Trash2, Edit2, Music, MapPin, X, Calendar, Star, Mic2, Coffee, Search, Upload, Image as ImageIcon, HardDrive, Link as LinkIcon, Users } from 'lucide-react';
+import { Code2, Lock, LogOut, Plus, Trash2, Edit2, Music, MapPin, X, Calendar, Star, Mic2, Coffee, Search, Upload, Image as ImageIcon, HardDrive, Link as LinkIcon, Users, Languages } from 'lucide-react';
 import BulkImportModal from '../components/BulkImportModal';
 import ImageAssetPicker from '../components/ImageAssetPicker';
 
@@ -62,9 +62,12 @@ type ImageAssetSummary = {
   unusedSize: number;
 };
 
-const createEmptyStop = (index: number): EventStopForm => ({
+type AdminLanguage = 'zh' | 'en';
+type EventMode = 'single' | 'tour';
+
+const createEmptyStop = (index: number, mode: EventMode = 'tour'): EventStopForm => ({
   id: '',
-  label: `第 ${index + 1} 站`,
+  label: mode === 'single' ? '' : `第 ${index + 1} 站`,
   start_at: '',
   venue_id: '',
   guestBandIds: [],
@@ -157,6 +160,7 @@ const buildEventLegacyFields = (source: {
   };
 
   const stops = source.stops.filter(stop => stop.label || stop.start_at || stop.venue_id);
+  const isTour = stops.length > 1;
   if (stops.length === 0) {
     return {
       date_str: source.date_str,
@@ -167,7 +171,7 @@ const buildEventLegacyFields = (source: {
 
   return {
     date_str: stops
-      .map(stop => [stop.label, formatStopDateTime(stop.start_at)].filter(Boolean).join(' '))
+      .map(stop => [isTour ? stop.label : '', formatStopDateTime(stop.start_at)].filter(Boolean).join(' '))
       .filter(Boolean)
       .join(' / '),
     location: stops
@@ -176,7 +180,7 @@ const buildEventLegacyFields = (source: {
       .join(' / '),
     address: stops
       .map(stop => {
-        const label = stop.label || getVenueCity(stop) || getVenueName(stop);
+        const label = isTour ? (stop.label || getVenueCity(stop) || getVenueName(stop)) : '';
         const place = getVenueAddress(stop);
         return [label, place].filter(Boolean).join('：');
       })
@@ -186,6 +190,7 @@ const buildEventLegacyFields = (source: {
 };
 
 const cleanEventStopsForSave = (stops: EventStopForm[]) => {
+  const isTour = stops.length > 1;
   return stops.map((stop, index) => {
     const recapPhotos = stop.recap_photos
       .map(photo => ({
@@ -201,7 +206,7 @@ const cleanEventStopsForSave = (stops: EventStopForm[]) => {
 
     return {
       id: stop.id || slugifySegment(stop.label, `stop-${index + 1}`),
-      label: stop.label,
+      label: stop.label || (isTour ? `第 ${index + 1} 站` : '演出现场'),
       start_at: stop.start_at,
       venue_id: stop.venue_id,
       guestBandIds: stop.guestBandIds || [],
@@ -242,6 +247,337 @@ const inputClass = "bg-black/50 border border-white/10 rounded-lg px-3 py-2.5 te
 const compactInputClass = "bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-xs w-full text-white placeholder:text-gray-600 focus:outline-none focus:border-[#ff4e00]";
 const labelClass = "block text-xs font-medium uppercase tracking-wide text-gray-400";
 const emptyAssetSummary: ImageAssetSummary = { totalCount: 0, totalSize: 0, usedCount: 0, unusedCount: 0, unusedSize: 0 };
+const sourceImageMaxBytes = 8 * 1024 * 1024;
+const uploadImageMaxBytes = 1024 * 1024;
+const compressSkipBytes = 300 * 1024;
+const compressTargetBytes = 260 * 1024;
+const compressMaxDimension = 1800;
+
+const adminCopy: Record<AdminLanguage, Record<string, string>> = {
+  zh: {
+    language: '中文',
+    singleEvent: '单场演出',
+    tourEvent: '多站巡演',
+    eventType: '演出类型',
+    eventInfo: '演出信息',
+    tourStops: '巡演站点',
+    addStop: '增加站点',
+    stopName: '站点名称',
+    stopId: '上传目录 ID',
+    dateTime: '演出时间',
+    venue: '演出场地',
+    venueHint: '选择场地后自动使用场地库城市与地址',
+    priceText: '票价 / 时间说明',
+    guestBands: '嘉宾乐队',
+    tickets: '购票链接',
+    addTicket: '增加购票',
+    recapPhotos: '回顾照片',
+    addPhoto: '增加照片',
+    recapVideo: 'B站回顾视频',
+    mainLineup: '演出阵容',
+    mainLineupHelp: '主要演出乐队在这里配置；嘉宾在演出信息中配置，多站巡演可按站点配置。',
+    noMainLineup: '尚未选择主要阵容。',
+    addBand: '+ 添加乐队',
+    searchBand: '搜索乐队名称 / ID...',
+    addGuest: '+ 添加嘉宾',
+    searchGuest: '搜索嘉宾乐队...',
+    autoDate: '自动日期',
+    autoLocation: '自动地点',
+    autoAddress: '自动地址',
+    autoEmpty: '将由演出时间与场地自动生成',
+    singleHelp: '适合只有一站的专场、联合演出或活动。前台会按单场信息展示，不出现巡演站点样式。',
+    tourHelp: '适合多城市或多场次巡演。每一站可以独立配置场地、嘉宾、票务与回顾。',
+    slug: '链接标识',
+    eventTitle: '活动标题',
+    label: '厂牌（可选）',
+    status: '状态',
+    legacyTicketUrl: '旧购票链接',
+    optional: '可选',
+    setActive: '设为首页主推演出',
+    eventDescription: '活动介绍',
+    introduction: '介绍',
+    photoTitle: '照片标题',
+    caption: '照片说明',
+    photoImageUrl: '照片图片 URL',
+    videoTitle: '视频标题',
+    bilibiliUrl: 'B站链接',
+    qrCodes: '二维码',
+    addQr: '增加二维码',
+    qrTitlePlaceholder: '标题（例如：厂牌微信 / 乐队微信）',
+    qrImageUrl: '二维码图片 URL',
+    eventJson: '演出 JSON',
+    generate: '生成',
+    apply: '应用',
+    eventJsonPlaceholder: '在这里粘贴演出 JSON，然后点击应用。',
+    imageMax: '图片（自动压缩至约 200-300KB）',
+    uploadFile: '上传文件',
+    imageUrl: '图片 URL',
+    chooseExisting: '选择已有图片',
+    imageUrlPlaceholder: '输入图片 URL（例如 https://...）',
+    eventJsonApplied: '演出 JSON 已应用',
+    invalidJson: 'JSON 格式无效',
+    sourceImageTooLarge: '源图片不能超过 8MB',
+    compressedImageTooLarge: '图片压缩后仍超过 1MB，请换一张更小的图',
+    imageCompressed: '图片已压缩至',
+    dataManagement: '数据管理',
+    manageBands: '管理乐队',
+    manageVenues: '管理场地',
+    manageRehearsalRooms: '管理排练室',
+    manageSpots: '管理地点',
+    manageEvents: '管理演出',
+    manageAccounts: '管理账号',
+    imageAssets: '图片资源',
+    settings: '设置',
+    changePassword: '修改密码',
+    currentPassword: '当前密码',
+    newPassword: '新密码',
+    confirmNewPassword: '确认新密码',
+    updatePassword: '更新密码',
+    addNew: '新增',
+    edit: '编辑',
+    current: '当前',
+    bulkImport: '批量导入',
+    province: '省份',
+    city: '城市',
+    selectProvince: '选择省份',
+    selectCity: '选择城市',
+    band: '乐队',
+    venueEntity: '场地',
+    eventEntity: '演出',
+    rehearsalRoom: '排练室',
+    account: '账号',
+    spot: '地点',
+    bandId: '乐队 ID',
+    venueId: '场地 ID',
+    roomId: '排练室 ID',
+    spotId: '地点 ID',
+    accountType: '账号类型',
+    username: '登录名',
+    initialPassword: '初始密码',
+    newPasswordKeep: '新密码（留空不修改）',
+    displayName: '显示名称',
+    logo: '标志（建议方形，自动压缩）',
+    pasteLogoUrl: '或粘贴标志 URL',
+    linkedEntityId: '关联艺人或厂牌 ID',
+    contactPerson: '联系人',
+    contactInfo: '联系方式',
+    contactType: '联系方式类型',
+    notes: '备注',
+    notesPlaceholder: '申请来源、需管理的艺人、内部备注等',
+    name: '名称',
+    chineseName: '中文名',
+    subtitleName: '副标题 / English name',
+    primaryChineseName: '主标题 / 中文名',
+    genre: '风格',
+    neteaseUrl: '网易云链接',
+    xiaohongshuUrl: '小红书链接',
+    address: '地址',
+    capacity: '容量',
+    ticketUrl: '购票链接',
+    equipment: '设备',
+    priceInfo: '价格信息',
+    type: '类型',
+    businessHours: '营业时间',
+    socialUrl: '社交链接',
+    update: '更新',
+    add: '添加',
+    cancel: '取消',
+    search: '搜索...',
+    loading: '加载中...'
+  },
+  en: {
+    language: 'English',
+    singleEvent: 'Single Show',
+    tourEvent: 'Tour',
+    eventType: 'Event Type',
+    eventInfo: 'Show Details',
+    tourStops: 'Tour Stops',
+    addStop: 'Add Stop',
+    stopName: 'Stop Name',
+    stopId: 'Upload Folder ID',
+    dateTime: 'Date & Time',
+    venue: 'Venue',
+    venueHint: 'Venue city and address are pulled from the venue database.',
+    priceText: 'Price / Time Notes',
+    guestBands: 'Guest Bands',
+    tickets: 'Tickets',
+    addTicket: 'Add Ticket',
+    recapPhotos: 'Recap Photos',
+    addPhoto: 'Add Photo',
+    recapVideo: 'Bilibili Recap Video',
+    mainLineup: 'Lineup',
+    mainLineupHelp: 'Configure main performers here. Guests live in show details, and tours can set guests per stop.',
+    noMainLineup: 'No main lineup bands selected.',
+    addBand: '+ Add Band',
+    searchBand: 'Search band by name / ID...',
+    addGuest: '+ Add Guest',
+    searchGuest: 'Search guest band...',
+    autoDate: 'Auto Date',
+    autoLocation: 'Auto Location',
+    autoAddress: 'Auto Address',
+    autoEmpty: 'Generated from show time and venue',
+    singleHelp: 'For one-off shows, showcases, and single-city events. The public page will avoid tour-style stop layouts.',
+    tourHelp: 'For multi-city or multi-show tours. Each stop can have its own venue, guests, tickets, and recap.',
+    slug: 'Slug',
+    eventTitle: 'Event Title',
+    label: 'Label (optional)',
+    status: 'Status',
+    legacyTicketUrl: 'Legacy Ticket URL',
+    optional: 'Optional',
+    setActive: 'Set as Active Featured Event',
+    eventDescription: 'Event Description',
+    introduction: 'Introduction',
+    photoTitle: 'Photo Title',
+    caption: 'Caption',
+    photoImageUrl: 'Photo Image URL',
+    videoTitle: 'Video Title',
+    bilibiliUrl: 'Bilibili URL',
+    qrCodes: 'QR Codes',
+    addQr: 'Add QR',
+    qrTitlePlaceholder: 'Title (e.g. Label WeChat / Band WeChat)',
+    qrImageUrl: 'QR Image URL',
+    eventJson: 'Event JSON',
+    generate: 'Generate',
+    apply: 'Apply',
+    eventJsonPlaceholder: 'Paste event JSON here, then click Apply.',
+    imageMax: 'Image (auto-compressed to about 200-300KB)',
+    uploadFile: 'Upload File',
+    imageUrl: 'Image URL',
+    chooseExisting: 'Choose Existing',
+    imageUrlPlaceholder: 'Enter Image URL (e.g. https://...)',
+    eventJsonApplied: 'Event JSON applied',
+    invalidJson: 'Invalid JSON',
+    sourceImageTooLarge: 'Source image must be under 8MB',
+    compressedImageTooLarge: 'Image is still over 1MB after compression; please choose a smaller image',
+    imageCompressed: 'Image compressed to',
+    dataManagement: 'Data Management',
+    manageBands: 'Manage Bands',
+    manageVenues: 'Manage Venues',
+    manageRehearsalRooms: 'Manage Rehearsal Rooms',
+    manageSpots: 'Manage Spots',
+    manageEvents: 'Manage Events',
+    manageAccounts: 'Manage Accounts',
+    imageAssets: 'Image Assets',
+    settings: 'Settings',
+    changePassword: 'Change Password',
+    currentPassword: 'Current Password',
+    newPassword: 'New Password',
+    confirmNewPassword: 'Confirm New Password',
+    updatePassword: 'Update Password',
+    addNew: 'Add New',
+    edit: 'Edit',
+    current: 'Current',
+    bulkImport: 'Bulk Import',
+    province: 'Province',
+    city: 'City',
+    selectProvince: 'Select Province',
+    selectCity: 'Select City',
+    band: 'Band',
+    venueEntity: 'Venue',
+    eventEntity: 'Event',
+    rehearsalRoom: 'Rehearsal Room',
+    account: 'Account',
+    spot: 'Spot',
+    bandId: 'Band ID',
+    venueId: 'Venue ID',
+    roomId: 'Room ID',
+    spotId: 'Spot ID',
+    accountType: 'Account Type',
+    username: 'Username',
+    initialPassword: 'Initial Password',
+    newPasswordKeep: 'New Password (leave blank to keep current)',
+    displayName: 'Display Name',
+    logo: 'Logo (square recommended, auto-compressed)',
+    pasteLogoUrl: 'Or paste logo URL',
+    linkedEntityId: 'Linked Entity ID',
+    contactPerson: 'Contact Person',
+    contactInfo: 'Contact Info',
+    contactType: 'Contact Type',
+    notes: 'Notes',
+    notesPlaceholder: 'Application source, managed artists, internal notes, etc.',
+    name: 'Name',
+    chineseName: 'Chinese Name',
+    subtitleName: 'Subtitle / English name',
+    primaryChineseName: 'Primary / Chinese name',
+    genre: 'Genre',
+    neteaseUrl: 'NetEase URL',
+    xiaohongshuUrl: 'Xiaohongshu URL',
+    address: 'Address',
+    capacity: 'Capacity',
+    ticketUrl: 'Ticket URL',
+    equipment: 'Equipment',
+    priceInfo: 'Price Info',
+    type: 'Type',
+    businessHours: 'Business Hours',
+    socialUrl: 'Social URL',
+    update: 'Update',
+    add: 'Add',
+    cancel: 'Cancel',
+    search: 'Search...',
+    loading: 'Loading...'
+  }
+};
+
+const blobFromCanvas = (canvas: HTMLCanvasElement, type: string, quality: number) => {
+  return new Promise<Blob | null>(resolve => canvas.toBlob(resolve, type, quality));
+};
+
+const getCompressedFileName = (fileName: string) => {
+  const baseName = fileName.replace(/\.[^.]+$/, '') || 'image';
+  return `${baseName}.webp`;
+};
+
+const compressImageFile = async (file: File) => {
+  if (!file.type.startsWith('image/') || file.type === 'image/svg+xml' || file.type === 'image/gif' || file.size <= compressSkipBytes) {
+    return file;
+  }
+
+  const bitmap = await createImageBitmap(file).catch(() => null);
+  if (!bitmap) return file;
+
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  if (!ctx) {
+    bitmap.close();
+    return file;
+  }
+
+  const initialScale = Math.min(1, compressMaxDimension / Math.max(bitmap.width, bitmap.height));
+  let width = Math.max(1, Math.round(bitmap.width * initialScale));
+  let height = Math.max(1, Math.round(bitmap.height * initialScale));
+  let bestBlob: Blob | null = null;
+  const qualities = [0.86, 0.78, 0.7, 0.62, 0.54, 0.46];
+
+  for (let resizeAttempt = 0; resizeAttempt < 4; resizeAttempt += 1) {
+    canvas.width = width;
+    canvas.height = height;
+    ctx.clearRect(0, 0, width, height);
+    ctx.drawImage(bitmap, 0, 0, width, height);
+
+    for (const quality of qualities) {
+      const blob = await blobFromCanvas(canvas, 'image/webp', quality);
+      if (!blob) continue;
+      if (!bestBlob || blob.size < bestBlob.size) bestBlob = blob;
+      if (blob.size <= compressSkipBytes && blob.size >= 180 * 1024) {
+        bitmap.close();
+        return new File([blob], getCompressedFileName(file.name), { type: 'image/webp', lastModified: Date.now() });
+      }
+      if (blob.size <= compressTargetBytes) {
+        bitmap.close();
+        return new File([blob], getCompressedFileName(file.name), { type: 'image/webp', lastModified: Date.now() });
+      }
+    }
+
+    const shrinkRatio = bestBlob?.size ? Math.sqrt(compressTargetBytes / bestBlob.size) : 0.82;
+    const nextScale = Math.max(0.72, Math.min(0.86, shrinkRatio * 0.96));
+    width = Math.max(1, Math.round(width * nextScale));
+    height = Math.max(1, Math.round(height * nextScale));
+  }
+
+  bitmap.close();
+  if (!bestBlob || bestBlob.size >= file.size) return file;
+  return new File([bestBlob], getCompressedFileName(file.name), { type: 'image/webp', lastModified: Date.now() });
+};
 
 const formatBytes = (bytes: number) => {
   if (!bytes) return '0 B';
@@ -293,6 +629,9 @@ export default function AdminPage() {
   const [confirmDeleteAssetUrl, setConfirmDeleteAssetUrl] = useState<string | null>(null);
   const [lineupBandQuery, setLineupBandQuery] = useState('');
   const [guestBandQueries, setGuestBandQueries] = useState<Record<number, string>>({});
+  const [adminLanguage, setAdminLanguage] = useState<AdminLanguage>(() => (localStorage.getItem('adminLanguage') === 'en' ? 'en' : 'zh'));
+  const [eventMode, setEventModeState] = useState<EventMode>('single');
+  const t = (key: string) => adminCopy[adminLanguage][key] || key;
 
   const showMessage = (text: string, type: 'error' | 'success' = 'error') => {
     setMessage({ text, type });
@@ -345,7 +684,7 @@ export default function AdminPage() {
     status: 'on_sale',
     is_active: false,
     lineup: [] as { day: string, bandIds: string[] }[],
-    stops: [] as EventStopForm[],
+    stops: [createEmptyStop(0, 'single')] as EventStopForm[],
     qr_codes: [] as EventQrCodeForm[],
     // Common
     name: '',
@@ -370,6 +709,10 @@ export default function AdminPage() {
       })
       .catch(err => console.error('Failed to load locations', err));
   }, []);
+
+  useEffect(() => {
+    localStorage.setItem('adminLanguage', adminLanguage);
+  }, [adminLanguage]);
 
   useEffect(() => {
     if (token) {
@@ -521,13 +864,23 @@ export default function AdminPage() {
   };
 
   const uploadImageFile = async (file: File, options?: { eventCategory?: 'poster' | 'qr' | 'recap'; stopId?: string }) => {
-    if (file.size > 1024 * 1024) {
-      showMessage('File size exceeds 1MB limit', 'error');
+    if (file.size > sourceImageMaxBytes) {
+      showMessage(t('sourceImageTooLarge'), 'error');
       return null;
     }
 
+    const fileToUpload = await compressImageFile(file);
+    if (fileToUpload.size > uploadImageMaxBytes) {
+      showMessage(t('compressedImageTooLarge'), 'error');
+      return null;
+    }
+
+    if (fileToUpload !== file) {
+      showMessage(`${t('imageCompressed')} ${formatBytes(fileToUpload.size)}`, 'success');
+    }
+
     const uploadData = new FormData();
-    uploadData.append('image', file);
+    uploadData.append('image', fileToUpload);
 
     const endpoint = options?.eventCategory
       ? `/api/events/${encodeURIComponent(slugifySegment(formData.slug, 'untitled-event'))}/upload/${options.eventCategory}${options.stopId ? `/${encodeURIComponent(slugifySegment(options.stopId, 'general'))}` : ''}`
@@ -726,6 +1079,7 @@ export default function AdminPage() {
     try {
       const parsed = JSON.parse(eventJsonInput);
       const nextStops = normalizeStopsForForm(parsed.stops);
+      setEventModeState(nextStops.length > 1 ? 'tour' : 'single');
       setFormData(prev => ({
         ...prev,
         slug: parsed.slug || '',
@@ -744,13 +1098,13 @@ export default function AdminPage() {
           day: day.day || '全站阵容',
           bandIds: day.bandIds || []
         })) : [],
-        stops: nextStops,
+        stops: nextStops.length ? nextStops : [createEmptyStop(0, 'single')],
         qr_codes: normalizeQrCodesForForm(parsed.qr_codes || parsed.qrCodes)
       }));
       setImageInputType(parsed.image_url && !parsed.image_url.startsWith('/uploads/') ? 'url' : 'upload');
-      showMessage('Event JSON applied', 'success');
+      showMessage(t('eventJsonApplied'), 'success');
     } catch (err) {
-      showMessage('Invalid JSON');
+      showMessage(t('invalidJson'));
     }
   };
 
@@ -913,6 +1267,7 @@ export default function AdminPage() {
       if (activeTab === 'events') {
         const selectedLabel = accounts.find(account => String(account.id) === String(payload.label_account_id) && account.account_type === 'label');
         payload.organizer = selectedLabel ? selectedLabel.display_name : '';
+        payload.stops = payload.stops.length ? payload.stops : [createEmptyStop(0, 'single')];
         const missingVenueStop = payload.stops.find((stop: EventStopForm) => !stop.venue_id || !venues.some(venue => venue.venue_id === stop.venue_id));
         if (missingVenueStop) {
           showMessage(`Invalid venue for stop: ${missingVenueStop.label || 'Unnamed stop'}`);
@@ -1020,6 +1375,9 @@ export default function AdminPage() {
 
     const parsedStops = normalizeStopsForForm(item.stops);
     const parsedQrCodes = normalizeQrCodesForForm(item.qr_codes);
+    if (activeTab === 'events') {
+      setEventModeState(parsedStops.length > 1 ? 'tour' : 'single');
+    }
 
     const nextFormData = {
       province_id: item.province_id || '',
@@ -1060,7 +1418,7 @@ export default function AdminPage() {
       status: activeTab === 'accounts' ? item.status || 'active' : item.status || 'on_sale',
       is_active: !!item.is_active,
       lineup: parsedLineup,
-      stops: parsedStops,
+      stops: parsedStops.length ? parsedStops : [createEmptyStop(0, 'single')],
       qr_codes: parsedQrCodes,
       intro: item.intro || item.description || '',
       image_url: item.image_url || '',
@@ -1083,13 +1441,14 @@ export default function AdminPage() {
     setSearchQuery('');
     setLineupBandQuery('');
     setGuestBandQueries({});
+    setEventModeState('single');
     setFormData({
       province_id: '', province_zh: '', city_id: '', city_zh: '',
       band_id: '', venue_id: '', room_id: '', spot_id: '', name: '', name_zh: '', genre: '', type: '',
       label_account_id: '',
       account_type: 'artist', username: '', password: '', display_name: '', logo_url: '', contact_name: '', linked_entity_id: '', notes: '',
       netease_url: '', xiaohongshu_url: '', social_url: '', ticket_url: '',
-      slug: '', title: '', date_str: '', location: '', organizer: '', status: activeTab === 'accounts' ? 'active' : 'on_sale', is_active: false, lineup: [], stops: [], qr_codes: [],
+      slug: '', title: '', date_str: '', location: '', organizer: '', status: activeTab === 'accounts' ? 'active' : 'on_sale', is_active: false, lineup: [], stops: [createEmptyStop(0, 'single')], qr_codes: [],
       address: '', capacity: '', equipment: '', price_info: '', business_hours: '', intro: '', image_url: '', contact_info: ''
     });
     setEventJsonInput('');
@@ -1188,18 +1547,62 @@ export default function AdminPage() {
     const label = labelOptions.find(account => String(account.id) === String(labelAccountId));
     return label?.display_name || '';
   };
+  const entityName = (tab: AdminTab = activeTab) => {
+    const keys: Record<AdminTab, string> = {
+      bands: 'band',
+      venues: 'venueEntity',
+      events: 'eventEntity',
+      rehearsal_rooms: 'rehearsalRoom',
+      spots: 'spot',
+      accounts: 'account',
+      assets: 'imageAssets',
+      settings: 'settings'
+    };
+    return t(keys[tab]);
+  };
+  const eventStops = formData.stops.length ? formData.stops : [createEmptyStop(0, 'single')];
+  const setEventMode = (mode: EventMode) => {
+    setEventModeState(mode);
+    if (mode === 'single') {
+      const firstStop = formData.stops[0] || createEmptyStop(0, 'single');
+      setFormData({
+        ...formData,
+        stops: [{ ...firstStop, label: firstStop.label.match(/^第 \d+ 站$/) ? '' : firstStop.label }]
+      });
+      setGuestBandQueries({});
+      return;
+    }
+
+    const stops = formData.stops.length ? formData.stops : [createEmptyStop(0, 'tour')];
+    setFormData({
+      ...formData,
+      stops: stops.map((stop, index) => ({
+        ...stop,
+        label: stop.label || `第 ${index + 1} 站`
+      }))
+    });
+  };
 
   return (
     <div className="min-h-[100dvh] bg-[#0a0502] text-white p-5 md:p-8 font-sans">
       <div className="max-w-7xl mx-auto">
         <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-serif">Data Management</h1>
+          <h1 className="text-3xl font-serif">{t('dataManagement')}</h1>
           <div className="flex items-center gap-4">
             {message && (
               <div className={`px-4 py-2 rounded-lg text-sm font-medium ${message.type === 'success' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
                 {message.text}
               </div>
             )}
+            <button
+              type="button"
+              onClick={() => setAdminLanguage(adminLanguage === 'zh' ? 'en' : 'zh')}
+              className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-gray-300 hover:bg-white/10 hover:text-white transition-colors"
+              title="Switch language"
+            >
+              <Languages size={17} />
+              {adminLanguage === 'zh' ? '中文' : 'EN'}
+            </button>
             <button onClick={handleLogout} className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors">
               <LogOut size={20} /> Logout
             </button>
@@ -1212,49 +1615,49 @@ export default function AdminPage() {
             onClick={() => { setActiveTab('bands'); resetForm(); }}
             className={`flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-colors ${activeTab === 'bands' ? 'bg-[#ff4e00] text-white' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}
           >
-            <Music size={18} /> Manage Bands
+            <Music size={18} /> {t('manageBands')}
           </button>
           <button 
             onClick={() => { setActiveTab('venues'); resetForm(); }}
             className={`flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-colors ${activeTab === 'venues' ? 'bg-[#ff4e00] text-white' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}
           >
-            <MapPin size={18} /> Manage Venues
+            <MapPin size={18} /> {t('manageVenues')}
           </button>
           <button 
             onClick={() => { setActiveTab('rehearsal_rooms'); resetForm(); }}
             className={`flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-colors ${activeTab === 'rehearsal_rooms' ? 'bg-[#ff4e00] text-white' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}
           >
-            <Mic2 size={18} /> Manage Rehearsal Rooms
+            <Mic2 size={18} /> {t('manageRehearsalRooms')}
           </button>
           <button 
             onClick={() => { setActiveTab('spots'); resetForm(); }}
             className={`flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-colors ${activeTab === 'spots' ? 'bg-[#ff4e00] text-white' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}
           >
-            <Coffee size={18} /> Manage Spots
+            <Coffee size={18} /> {t('manageSpots')}
           </button>
           <button 
             onClick={() => { setActiveTab('events'); resetForm(); }}
             className={`flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-colors ${activeTab === 'events' ? 'bg-[#ff4e00] text-white' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}
           >
-            <Calendar size={18} /> Manage Events
+            <Calendar size={18} /> {t('manageEvents')}
           </button>
           <button
             onClick={() => { setActiveTab('accounts'); resetForm(); }}
             className={`flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-colors ${activeTab === 'accounts' ? 'bg-[#ff4e00] text-white' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}
           >
-            <Users size={18} /> Manage Accounts
+            <Users size={18} /> {t('manageAccounts')}
           </button>
           <button
             onClick={() => { setActiveTab('assets'); resetForm(); }}
             className={`flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-colors ${activeTab === 'assets' ? 'bg-[#ff4e00] text-white' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}
           >
-            <ImageIcon size={18} /> Image Assets
+            <ImageIcon size={18} /> {t('imageAssets')}
           </button>
           <button 
             onClick={() => { setActiveTab('settings'); resetForm(); }}
             className={`flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-colors ${activeTab === 'settings' ? 'bg-[#ff4e00] text-white' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}
           >
-            <Lock size={18} /> Settings
+            <Lock size={18} /> {t('settings')}
           </button>
         </div>
 
@@ -1262,13 +1665,13 @@ export default function AdminPage() {
           <div className="bg-[#1a1a1a] p-6 rounded-2xl border border-white/10 max-w-md">
             <h2 className="text-xl mb-6 font-medium flex items-center gap-2">
               <Lock size={20} className="text-[#ff4e00]" />
-              Change Password
+              {t('changePassword')}
             </h2>
             <form onSubmit={handleChangePassword} className="space-y-4">
               <input
                 type="password"
                 required
-                placeholder="Current Password"
+                placeholder={t('currentPassword')}
                 value={passwordForm.oldPassword}
                 onChange={e => setPasswordForm({...passwordForm, oldPassword: e.target.value})}
                 className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-full text-white focus:outline-none focus:border-[#ff4e00]"
@@ -1276,7 +1679,7 @@ export default function AdminPage() {
               <input
                 type="password"
                 required
-                placeholder="New Password"
+                placeholder={t('newPassword')}
                 value={passwordForm.newPassword}
                 onChange={e => setPasswordForm({...passwordForm, newPassword: e.target.value})}
                 className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-full text-white focus:outline-none focus:border-[#ff4e00]"
@@ -1284,13 +1687,13 @@ export default function AdminPage() {
               <input
                 type="password"
                 required
-                placeholder="Confirm New Password"
+                placeholder={t('confirmNewPassword')}
                 value={passwordForm.confirmPassword}
                 onChange={e => setPasswordForm({...passwordForm, confirmPassword: e.target.value})}
                 className="bg-black/50 border border-white/10 rounded px-3 py-2 text-sm w-full text-white focus:outline-none focus:border-[#ff4e00]"
               />
               <button type="submit" className="w-full bg-[#ff4e00] text-white rounded py-2 text-sm font-medium hover:bg-[#ff4e00]/90">
-                Update Password
+                {t('updatePassword')}
               </button>
             </form>
           </div>
@@ -1449,31 +1852,31 @@ export default function AdminPage() {
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-xl font-medium flex items-center gap-2">
                 {isEditing ? <Edit2 size={20} className="text-[#ff4e00]" /> : <Plus size={20} className="text-[#ff4e00]" />}
-                {isEditing ? `Edit ${activeTab === 'bands' ? 'Band' : activeTab === 'venues' ? 'Venue' : activeTab === 'events' ? 'Event' : activeTab === 'rehearsal_rooms' ? 'Rehearsal Room' : activeTab === 'accounts' ? 'Account' : 'Spot'}` : `Add New ${activeTab === 'bands' ? 'Band' : activeTab === 'venues' ? 'Venue' : activeTab === 'events' ? 'Event' : activeTab === 'rehearsal_rooms' ? 'Rehearsal Room' : activeTab === 'accounts' ? 'Account' : 'Spot'}`}
+                {isEditing ? `${t('edit')} ${entityName()}` : `${t('addNew')} ${entityName()}`}
               </h2>
               {!isEditing && activeTab !== 'accounts' && (
                 <button 
                   onClick={() => setIsBulkImportOpen(true)}
                   className="flex items-center gap-1.5 text-xs bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-lg transition-colors"
                 >
-                  <Upload size={14} /> Bulk Import
+                  <Upload size={14} /> {t('bulkImport')}
                 </button>
               )}
             </div>
             <form onSubmit={handleSubmit} className="space-y-5">
               {activeTab !== 'events' && activeTab !== 'accounts' && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Field label="Province / 省份">
+                  <Field label={t('province')}>
                     <select required value={formData.province_id} onChange={handleProvinceChange} className={inputClass}>
-                      <option value="" disabled>Select Province</option>
+                      <option value="" disabled>{t('selectProvince')}</option>
                       {provinces.map(p => (
                         <option key={p.en} value={p.en}>{p.zh} ({p.en})</option>
                       ))}
                     </select>
                   </Field>
-                  <Field label="City / 城市">
+                  <Field label={t('city')}>
                     <select required value={formData.city_id} onChange={handleCityChange} disabled={!formData.province_id} className={`${inputClass} disabled:opacity-50`}>
-                      <option value="" disabled>Select City</option>
+                      <option value="" disabled>{t('selectCity')}</option>
                       {cities.map(c => (
                         <option key={c.en} value={c.en}>{c.zh} ({c.en})</option>
                       ))}
@@ -1483,25 +1886,25 @@ export default function AdminPage() {
               )}
 
               {activeTab === 'bands' ? (
-                <Field label="Band ID / 乐队 ID"><input required placeholder="e.g. carsick-cars" value={formData.band_id} onChange={e => setFormData({...formData, band_id: e.target.value})} className={inputClass} /></Field>
+                <Field label={t('bandId')}><input required placeholder="e.g. carsick-cars" value={formData.band_id} onChange={e => setFormData({...formData, band_id: e.target.value})} className={inputClass} /></Field>
               ) : activeTab === 'venues' ? (
-                <Field label="Venue ID / 场地 ID"><input required placeholder="e.g. school-bar" value={formData.venue_id} onChange={e => setFormData({...formData, venue_id: e.target.value})} className={inputClass} /></Field>
+                <Field label={t('venueId')}><input required placeholder="e.g. school-bar" value={formData.venue_id} onChange={e => setFormData({...formData, venue_id: e.target.value})} className={inputClass} /></Field>
               ) : activeTab === 'rehearsal_rooms' ? (
-                <Field label="Room ID / 排练室 ID"><input required placeholder="e.g. super-rehearsal" value={formData.room_id} onChange={e => setFormData({...formData, room_id: e.target.value})} className={inputClass} /></Field>
+                <Field label={t('roomId')}><input required placeholder="e.g. super-rehearsal" value={formData.room_id} onChange={e => setFormData({...formData, room_id: e.target.value})} className={inputClass} /></Field>
               ) : activeTab === 'spots' ? (
-                <Field label="Spot ID / 地点 ID"><input required placeholder="e.g. fruityspace" value={formData.spot_id} onChange={e => setFormData({...formData, spot_id: e.target.value})} className={inputClass} /></Field>
+                <Field label={t('spotId')}><input required placeholder="e.g. fruityspace" value={formData.spot_id} onChange={e => setFormData({...formData, spot_id: e.target.value})} className={inputClass} /></Field>
               ) : null}
 
               {activeTab === 'events' ? (
                 <>
-                  <Field label="Slug / 链接标识">
+                  <Field label={t('slug')}>
                     <input required placeholder="e.g. tingkaozai-night-decides-acoustic-live" value={formData.slug} onChange={e => setFormData({...formData, slug: e.target.value})} className={inputClass} />
                   </Field>
-                  <Field label="Event Title / 活动标题">
-                    <input required placeholder="Event Title" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} className={inputClass} />
+                  <Field label={t('eventTitle')}>
+                    <input required placeholder={t('eventTitle')} value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} className={inputClass} />
                   </Field>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Field label="Label / 厂牌（可选）">
+                    <Field label={t('label')}>
                       <select
                         value={formData.label_account_id}
                         onChange={e => {
@@ -1520,7 +1923,7 @@ export default function AdminPage() {
                         ))}
                       </select>
                     </Field>
-                    <Field label="Status / 状态">
+                    <Field label={t('status')}>
                       <select value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})} className={inputClass}>
                         <option value="on_sale">售票中</option>
                         <option value="upcoming">即将开始</option>
@@ -1531,17 +1934,41 @@ export default function AdminPage() {
                       </select>
                     </Field>
                   </div>
-                  <Field label="Legacy Ticket URL / 旧购票链接">
-                    <input placeholder="Optional" value={formData.ticket_url} onChange={e => setFormData({...formData, ticket_url: e.target.value})} className={inputClass} />
+                  <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                      <span className={labelClass}>{t('eventType')}</span>
+                      <div className="flex gap-2 rounded-lg border border-white/10 bg-black/50 p-1">
+                        <button
+                          type="button"
+                          onClick={() => setEventMode('single')}
+                          className={`rounded-md px-3 py-1.5 text-xs transition-colors ${eventMode === 'single' ? 'bg-[#ff4e00] text-white' : 'text-gray-400 hover:text-white'}`}
+                        >
+                          {t('singleEvent')}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEventMode('tour')}
+                          className={`rounded-md px-3 py-1.5 text-xs transition-colors ${eventMode === 'tour' ? 'bg-[#ff4e00] text-white' : 'text-gray-400 hover:text-white'}`}
+                        >
+                          {t('tourEvent')}
+                        </button>
+                      </div>
+                    </div>
+                    <p className="text-xs leading-6 text-gray-500">
+                      {eventMode === 'single' ? t('singleHelp') : t('tourHelp')}
+                    </p>
+                  </div>
+                  <Field label={t('legacyTicketUrl')}>
+                    <input placeholder={t('optional')} value={formData.ticket_url} onChange={e => setFormData({...formData, ticket_url: e.target.value})} className={inputClass} />
                   </Field>
                   <div className="rounded-xl border border-white/10 bg-black/25 p-3 text-xs text-gray-400 space-y-1">
-                    <div><span className="text-gray-500">Auto Date:</span> {buildEventLegacyFields(formData, venues).date_str || 'Will be generated from Tour Stops'}</div>
-                    <div><span className="text-gray-500">Auto Location:</span> {buildEventLegacyFields(formData, venues).location || 'Will be generated from Tour Stops'}</div>
-                    <div><span className="text-gray-500">Auto Address:</span> {buildEventLegacyFields(formData, venues).address || 'Will be generated from Tour Stops'}</div>
+                    <div><span className="text-gray-500">{t('autoDate')}:</span> {buildEventLegacyFields(formData, venues).date_str || t('autoEmpty')}</div>
+                    <div><span className="text-gray-500">{t('autoLocation')}:</span> {buildEventLegacyFields(formData, venues).location || t('autoEmpty')}</div>
+                    <div><span className="text-gray-500">{t('autoAddress')}:</span> {buildEventLegacyFields(formData, venues).address || t('autoEmpty')}</div>
                   </div>
                   <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
                     <input type="checkbox" checked={formData.is_active} onChange={e => setFormData({...formData, is_active: e.target.checked})} className="rounded border-white/10 bg-black/50 text-[#ff4e00] focus:ring-[#ff4e00]" />
-                    Set as Active Featured Event
+                    {t('setActive')}
                   </label>
                 </>
               ) : activeTab === 'accounts' ? (
@@ -1550,7 +1977,7 @@ export default function AdminPage() {
                     艺人账号和厂牌账号暂不支持自主注册，需要联系我们后由管理员创建。
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Field label="Account Type / 账号类型">
+                    <Field label={t('accountType')}>
                       <select
                         required
                         value={formData.account_type}
@@ -1561,7 +1988,7 @@ export default function AdminPage() {
                         <option value="label">厂牌账号</option>
                       </select>
                     </Field>
-                    <Field label="Status / 状态">
+                    <Field label={t('status')}>
                       <select
                         value={formData.status}
                         onChange={e => setFormData({...formData, status: e.target.value})}
@@ -1574,19 +2001,19 @@ export default function AdminPage() {
                     </Field>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Field label="Username / 登录名">
+                    <Field label={t('username')}>
                       <input required placeholder="e.g. maybe-mars" value={formData.username} onChange={e => setFormData({...formData, username: e.target.value})} className={inputClass} />
                     </Field>
-                    <Field label={isEditing ? "New Password / 新密码（留空不修改）" : "Initial Password / 初始密码"}>
-                      <input type="password" required={!isEditing} placeholder={isEditing ? "Leave blank to keep current password" : "Set initial password"} value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} className={inputClass} />
+                    <Field label={isEditing ? t('newPasswordKeep') : t('initialPassword')}>
+                      <input type="password" required={!isEditing} placeholder={isEditing ? t('newPasswordKeep') : t('initialPassword')} value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} className={inputClass} />
                     </Field>
                   </div>
-                  <Field label="Display Name / 显示名称">
+                  <Field label={t('displayName')}>
                     <input required placeholder="e.g. Maybe Mars / 兵马司" value={formData.display_name} onChange={e => setFormData({...formData, display_name: e.target.value})} className={inputClass} />
                   </Field>
                   <div className="space-y-2 rounded-xl border border-white/10 bg-black/20 p-4">
                     <div className="flex items-center justify-between">
-                      <span className={labelClass}>Logo / 标志（建议方形，1MB 内）</span>
+                      <span className={labelClass}>{t('logo')}</span>
                       {formData.logo_url && (
                         <button type="button" onClick={handleRemoveLogo} className="text-xs text-red-400 hover:text-red-300">
                           Remove
@@ -1599,45 +2026,45 @@ export default function AdminPage() {
                         onClick={() => openImageAssetPicker(url => setFormData(prev => ({ ...prev, logo_url: url })))}
                         className="bg-white/10 hover:bg-white/15 text-white rounded-lg px-4 py-2 text-sm transition-colors"
                       >
-                        Choose Existing
+                        {t('chooseExisting')}
                       </button>
                       <input type="file" accept="image/*" onChange={handleLogoUpload} className={`${inputClass} file:mr-4 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:bg-white/10 file:text-white hover:file:bg-white/20`} />
                     </div>
-                    <input placeholder="Or paste logo URL" value={formData.logo_url} onChange={e => setFormData({...formData, logo_url: e.target.value})} className={inputClass} />
+                    <input placeholder={t('pasteLogoUrl')} value={formData.logo_url} onChange={e => setFormData({...formData, logo_url: e.target.value})} className={inputClass} />
                     {formData.logo_url && (
                       <img src={formData.logo_url} alt="Logo preview" className="h-20 w-20 rounded-xl border border-white/10 bg-white object-contain p-2" />
                     )}
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Field label="Linked Entity ID / 关联艺人或厂牌 ID">
+                    <Field label={t('linkedEntityId')}>
                       <input placeholder={formData.account_type === 'label' ? "label slug, optional" : "band_id, optional"} value={formData.linked_entity_id} onChange={e => setFormData({...formData, linked_entity_id: e.target.value})} className={inputClass} />
                     </Field>
-                    <Field label="Contact Person / 联系人">
-                      <input placeholder="Optional" value={formData.contact_name} onChange={e => setFormData({...formData, contact_name: e.target.value})} className={inputClass} />
+                    <Field label={t('contactPerson')}>
+                      <input placeholder={t('optional')} value={formData.contact_name} onChange={e => setFormData({...formData, contact_name: e.target.value})} className={inputClass} />
                     </Field>
                   </div>
-                  <Field label="Contact Info / 联系方式">
+                  <Field label={t('contactInfo')}>
                     <input placeholder="WeChat / Email / Phone" value={formData.contact_info} onChange={e => setFormData({...formData, contact_info: e.target.value})} className={inputClass} />
                   </Field>
-                  <Field label="Notes / 备注">
-                    <textarea placeholder="申请来源、需管理的艺人、内部备注等" value={formData.notes} onChange={e => setFormData({...formData, notes: e.target.value})} className={`${inputClass} min-h-28 resize-y`} />
+                  <Field label={t('notes')}>
+                    <textarea placeholder={t('notesPlaceholder')} value={formData.notes} onChange={e => setFormData({...formData, notes: e.target.value})} className={`${inputClass} min-h-28 resize-y`} />
                   </Field>
                 </>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Field label="Name / 名称">
-                    <input required placeholder="副标题 / English name" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className={inputClass} />
+                  <Field label={t('name')}>
+                    <input required placeholder={t('subtitleName')} value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className={inputClass} />
                   </Field>
-                  <Field label="Chinese Name / 中文名">
-                    <input required placeholder="主标题 / 中文名" value={formData.name_zh} onChange={e => setFormData({...formData, name_zh: e.target.value})} className={inputClass} />
+                  <Field label={t('chineseName')}>
+                    <input required placeholder={t('primaryChineseName')} value={formData.name_zh} onChange={e => setFormData({...formData, name_zh: e.target.value})} className={inputClass} />
                   </Field>
                 </div>
               )}
 
               {activeTab === 'bands' ? (
                 <>
-                  <Field label="Genre / 风格"><input required placeholder="e.g. Indie Rock" value={formData.genre} onChange={e => setFormData({...formData, genre: e.target.value})} className={inputClass} /></Field>
-                  <Field label="Label / 厂牌（可选）">
+                  <Field label={t('genre')}><input required placeholder="e.g. Indie Rock" value={formData.genre} onChange={e => setFormData({...formData, genre: e.target.value})} className={inputClass} /></Field>
+                  <Field label={t('label')}>
                     <select
                       value={formData.label_account_id}
                       onChange={e => setFormData({...formData, label_account_id: e.target.value})}
@@ -1650,46 +2077,46 @@ export default function AdminPage() {
                     </select>
                   </Field>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Field label="NetEase URL / 网易云链接"><input placeholder="NetEase Cloud Music URL" value={formData.netease_url} onChange={e => setFormData({...formData, netease_url: e.target.value})} className={inputClass} /></Field>
-                    <Field label="Xiaohongshu URL / 小红书链接"><input placeholder="Xiaohongshu URL" value={formData.xiaohongshu_url} onChange={e => setFormData({...formData, xiaohongshu_url: e.target.value})} className={inputClass} /></Field>
+                    <Field label={t('neteaseUrl')}><input placeholder={t('neteaseUrl')} value={formData.netease_url} onChange={e => setFormData({...formData, netease_url: e.target.value})} className={inputClass} /></Field>
+                    <Field label={t('xiaohongshuUrl')}><input placeholder={t('xiaohongshuUrl')} value={formData.xiaohongshu_url} onChange={e => setFormData({...formData, xiaohongshu_url: e.target.value})} className={inputClass} /></Field>
                   </div>
                 </>
               ) : activeTab === 'venues' ? (
                 <>
-                  <Field label="Address / 地址"><input required placeholder="Address" value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} className={inputClass} /></Field>
+                  <Field label={t('address')}><input required placeholder={t('address')} value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} className={inputClass} /></Field>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Field label="Capacity / 容量"><input required type="number" placeholder="e.g. 500" value={formData.capacity} onChange={e => setFormData({...formData, capacity: e.target.value})} className={inputClass} /></Field>
-                    <Field label="Ticket URL / 购票链接"><input placeholder="e.g. ShowStart" value={formData.ticket_url} onChange={e => setFormData({...formData, ticket_url: e.target.value})} className={inputClass} /></Field>
+                    <Field label={t('capacity')}><input required type="number" placeholder="e.g. 500" value={formData.capacity} onChange={e => setFormData({...formData, capacity: e.target.value})} className={inputClass} /></Field>
+                    <Field label={t('ticketUrl')}><input placeholder="e.g. ShowStart" value={formData.ticket_url} onChange={e => setFormData({...formData, ticket_url: e.target.value})} className={inputClass} /></Field>
                   </div>
                 </>
               ) : activeTab === 'rehearsal_rooms' ? (
                 <>
-                  <Field label="Address / 地址"><input required placeholder="Address" value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} className={inputClass} /></Field>
-                  <Field label="Equipment / 设备"><textarea required placeholder="e.g. Marshall JCM900..." value={formData.equipment} onChange={e => setFormData({...formData, equipment: e.target.value})} className={`${inputClass} min-h-28 resize-y`} /></Field>
-                  <Field label="Price Info / 价格信息"><input required placeholder="e.g. 80元/小时" value={formData.price_info} onChange={e => setFormData({...formData, price_info: e.target.value})} className={inputClass} /></Field>
+                  <Field label={t('address')}><input required placeholder={t('address')} value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} className={inputClass} /></Field>
+                  <Field label={t('equipment')}><textarea required placeholder="e.g. Marshall JCM900..." value={formData.equipment} onChange={e => setFormData({...formData, equipment: e.target.value})} className={`${inputClass} min-h-28 resize-y`} /></Field>
+                  <Field label={t('priceInfo')}><input required placeholder="e.g. 80元/小时" value={formData.price_info} onChange={e => setFormData({...formData, price_info: e.target.value})} className={inputClass} /></Field>
                 </>
               ) : activeTab === 'spots' ? (
                 <>
-                  <Field label="Type / 类型"><input required placeholder="e.g. 唱片店, 摇滚酒吧" value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})} className={inputClass} /></Field>
-                  <Field label="Address / 地址"><input required placeholder="Address" value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} className={inputClass} /></Field>
+                  <Field label={t('type')}><input required placeholder="e.g. 唱片店, 摇滚酒吧" value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})} className={inputClass} /></Field>
+                  <Field label={t('address')}><input required placeholder={t('address')} value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} className={inputClass} /></Field>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Field label="Business Hours / 营业时间"><input required placeholder="Business Hours" value={formData.business_hours} onChange={e => setFormData({...formData, business_hours: e.target.value})} className={inputClass} /></Field>
-                    <Field label="Social URL / 社交链接"><input placeholder="e.g. Xiaohongshu" value={formData.social_url} onChange={e => setFormData({...formData, social_url: e.target.value})} className={inputClass} /></Field>
+                    <Field label={t('businessHours')}><input required placeholder={t('businessHours')} value={formData.business_hours} onChange={e => setFormData({...formData, business_hours: e.target.value})} className={inputClass} /></Field>
+                    <Field label={t('socialUrl')}><input placeholder="e.g. Xiaohongshu" value={formData.social_url} onChange={e => setFormData({...formData, social_url: e.target.value})} className={inputClass} /></Field>
                   </div>
                 </>
               ) : null}
 
               {activeTab !== 'accounts' && (
-                <Field label={activeTab === 'events' ? "Event Description / 活动介绍" : "Introduction / 介绍"}>
-                  <textarea required placeholder={activeTab === 'events' ? "Event Description" : "Introduction"} value={formData.intro} onChange={e => setFormData({...formData, intro: e.target.value})} className={`${inputClass} min-h-32 resize-y`} />
+                <Field label={activeTab === 'events' ? t('eventDescription') : t('introduction')}>
+                  <textarea required placeholder={activeTab === 'events' ? t('eventDescription') : t('introduction')} value={formData.intro} onChange={e => setFormData({...formData, intro: e.target.value})} className={`${inputClass} min-h-32 resize-y`} />
                 </Field>
               )}
               
               {activeTab === 'events' && (
                 <div className="space-y-4 border border-white/10 p-4 rounded-xl bg-black/20">
                   <div>
-                    <h3 className="text-sm font-medium text-white">Lineup Configuration</h3>
-                    <p className="mt-1 text-xs text-gray-500">Main performing band(s). Stop-specific guests are configured inside Tour Stops.</p>
+                    <h3 className="text-sm font-medium text-white">{t('mainLineup')}</h3>
+                    <p className="mt-1 text-xs text-gray-500">{t('mainLineupHelp')}</p>
                   </div>
 
                   <div className="space-y-3 border border-white/5 p-3 rounded-lg bg-black/40">
@@ -1709,7 +2136,7 @@ export default function AdminPage() {
                           </div>
                         );
                       }) : (
-                        <span className="text-xs text-gray-500">No main lineup bands selected.</span>
+                        <span className="text-xs text-gray-500">{t('noMainLineup')}</span>
                       )}
                     </div>
 
@@ -1717,7 +2144,7 @@ export default function AdminPage() {
                       <input
                         value={lineupBandQuery}
                         onChange={e => setLineupBandQuery(e.target.value)}
-                        placeholder="Search band by name / ID..."
+                        placeholder={t('searchBand')}
                         className={compactInputClass}
                       />
                       <select
@@ -1729,7 +2156,7 @@ export default function AdminPage() {
                         }}
                         className={compactInputClass}
                       >
-                        <option value="">+ Add Band</option>
+                        <option value="">{t('addBand')}</option>
                         {filteredLineupBands.map(b => (
                           <option key={b.band_id} value={b.band_id}>{b.name_zh || b.name} ({b.band_id})</option>
                         ))}
@@ -1760,21 +2187,25 @@ export default function AdminPage() {
               {activeTab === 'events' && (
                 <div className="space-y-4 border border-white/10 p-4 rounded-xl bg-black/20">
                   <div className="flex justify-between items-center">
-                    <h3 className="text-sm font-medium text-white">Tour Stops</h3>
-                    <button type="button" onClick={() => setFormData({...formData, stops: [...formData.stops, createEmptyStop(formData.stops.length)]})} className="text-xs text-[#ff4e00] hover:text-[#ff6a2b] flex items-center gap-1"><Plus size={14}/> Add Stop</button>
+                    <h3 className="text-sm font-medium text-white">{eventMode === 'single' ? t('eventInfo') : t('tourStops')}</h3>
+                    {eventMode === 'tour' && (
+                      <button type="button" onClick={() => setFormData({...formData, stops: [...formData.stops, createEmptyStop(formData.stops.length, 'tour')]})} className="text-xs text-[#ff4e00] hover:text-[#ff6a2b] flex items-center gap-1"><Plus size={14}/> {t('addStop')}</button>
+                    )}
                   </div>
 
-                  {formData.stops.map((stop, stopIndex) => (
+                  {eventStops.map((stop, stopIndex) => (
                     <div key={stopIndex} className="space-y-3 border border-white/5 p-3 rounded-lg bg-black/40">
-                      <div className="flex justify-between items-center gap-2">
-                        <input value={stop.label} onChange={e => updateStop(stopIndex, { label: e.target.value })} className="bg-transparent border-b border-white/10 px-1 py-1 text-sm text-[#ff4e00] font-mono focus:outline-none focus:border-[#ff4e00] flex-1" placeholder="e.g. 宁波站" />
-                        <button type="button" onClick={() => {
-                          setFormData({...formData, stops: formData.stops.filter((_, i) => i !== stopIndex)});
-                        }} className="text-gray-500 hover:text-red-400"><X size={14}/></button>
-                      </div>
+                      {eventMode === 'tour' && (
+                        <div className="flex justify-between items-center gap-2">
+                          <input value={stop.label} onChange={e => updateStop(stopIndex, { label: e.target.value })} className="bg-transparent border-b border-white/10 px-1 py-1 text-sm text-[#ff4e00] font-mono focus:outline-none focus:border-[#ff4e00] flex-1" placeholder={`${t('stopName')}，e.g. 宁波站`} />
+                          <button type="button" onClick={() => {
+                            setFormData({...formData, stops: formData.stops.filter((_, i) => i !== stopIndex)});
+                          }} className="text-gray-500 hover:text-red-400"><X size={14}/></button>
+                        </div>
+                      )}
 
                       <input
-                        placeholder="Stop ID for uploads (e.g. ningbo)"
+                        placeholder={`${t('stopId')} (e.g. ningbo)`}
                         value={stop.id}
                         onChange={e => updateStop(stopIndex, { id: e.target.value })}
                         className={compactInputClass}
@@ -1808,15 +2239,15 @@ export default function AdminPage() {
                         <div className="bg-black/30 border border-white/10 rounded px-3 py-2 text-xs text-gray-400 truncate">
                           {(() => {
                             const venue = venues.find(v => v.venue_id === stop.venue_id);
-                            return venue ? `${venue.name_zh || venue.name} · ${venue.city_zh || ''}` : 'Select Venue ID to use venue database info';
+                            return venue ? `${venue.name_zh || venue.name} · ${venue.city_zh || ''}` : t('venueHint');
                           })()}
                         </div>
                       </div>
 
-                      <input placeholder="Price Text" value={stop.price_text} onChange={e => updateStop(stopIndex, { price_text: e.target.value })} className={compactInputClass} />
+                      <input placeholder={t('priceText')} value={stop.price_text} onChange={e => updateStop(stopIndex, { price_text: e.target.value })} className={compactInputClass} />
 
                       <div className="space-y-2">
-                        <span className="text-xs text-gray-400">Guest Bands</span>
+                        <span className="text-xs text-gray-400">{t('guestBands')}</span>
                         <div className="flex flex-wrap gap-2">
                           {stop.guestBandIds.map((bandId, bandIndex) => {
                             const band = bands.find(b => b.band_id === bandId);
@@ -1851,7 +2282,7 @@ export default function AdminPage() {
                                 <input
                                   value={guestBandQueries[stopIndex] || ''}
                                   onChange={e => setGuestBandQueries(prev => ({ ...prev, [stopIndex]: e.target.value }))}
-                                  placeholder="Search guest band..."
+                                  placeholder={t('searchGuest')}
                                   className={compactInputClass}
                                 />
                                 <select
@@ -1870,7 +2301,7 @@ export default function AdminPage() {
                                   }}
                                   className={compactInputClass}
                                 >
-                                  <option value="">+ Add Guest</option>
+                                  <option value="">{t('addGuest')}</option>
                                   {guestOptions.map(b => (
                                     <option key={b.band_id} value={b.band_id}>{b.name_zh || b.name} ({b.band_id})</option>
                                   ))}
@@ -1908,7 +2339,7 @@ export default function AdminPage() {
 
                       <div className="space-y-2">
                         <div className="flex justify-between items-center">
-                          <span className="text-xs text-gray-400">Tickets</span>
+                          <span className="text-xs text-gray-400">{t('tickets')}</span>
                           <button type="button" onClick={() => {
                             const nextStops = [...formData.stops];
                             nextStops[stopIndex] = {
@@ -1916,7 +2347,7 @@ export default function AdminPage() {
                               tickets: [...nextStops[stopIndex].tickets, { label: '购票', url: '' }]
                             };
                             setFormData({...formData, stops: nextStops});
-                          }} className="text-xs text-[#ff4e00] hover:text-[#ff6a2b] flex items-center gap-1"><Plus size={12}/> Add Ticket</button>
+                          }} className="text-xs text-[#ff4e00] hover:text-[#ff6a2b] flex items-center gap-1"><Plus size={12}/> {t('addTicket')}</button>
                         </div>
                         {stop.tickets.map((ticket, ticketIndex) => (
                           <div key={ticketIndex} className="grid grid-cols-1 md:grid-cols-[0.35fr_1fr_auto] gap-2 items-center">
@@ -1936,7 +2367,7 @@ export default function AdminPage() {
 
                       <div className="space-y-3 border-t border-white/10 pt-3">
                         <div className="flex justify-between items-center">
-                          <span className="text-xs text-gray-400">Recap Photos</span>
+                          <span className="text-xs text-gray-400">{t('recapPhotos')}</span>
                           <button type="button" onClick={() => {
                             const nextStops = [...formData.stops];
                             nextStops[stopIndex] = {
@@ -1944,25 +2375,25 @@ export default function AdminPage() {
                               recap_photos: [...nextStops[stopIndex].recap_photos, { title: '', caption: '', image_url: '' }]
                             };
                             setFormData({...formData, stops: nextStops});
-                          }} className="text-xs text-[#ff4e00] hover:text-[#ff6a2b] flex items-center gap-1"><Plus size={12}/> Add Photo</button>
+                          }} className="text-xs text-[#ff4e00] hover:text-[#ff6a2b] flex items-center gap-1"><Plus size={12}/> {t('addPhoto')}</button>
                         </div>
 
                         {stop.recap_photos.map((photo, photoIndex) => (
                           <div key={photoIndex} className="space-y-2 rounded-lg border border-white/5 bg-black/30 p-3">
                             <div className="grid grid-cols-[1fr_auto] gap-2 items-center">
-                              <input placeholder="Photo Title" value={photo.title} onChange={e => updateRecapPhoto(stopIndex, photoIndex, { title: e.target.value })} className={compactInputClass} />
+                              <input placeholder={t('photoTitle')} value={photo.title} onChange={e => updateRecapPhoto(stopIndex, photoIndex, { title: e.target.value })} className={compactInputClass} />
                               <button type="button" onClick={() => removeRecapPhoto(stopIndex, photoIndex)} className="text-gray-500 hover:text-red-400"><X size={14}/></button>
                             </div>
-                            <input placeholder="Caption" value={photo.caption} onChange={e => updateRecapPhoto(stopIndex, photoIndex, { caption: e.target.value })} className={compactInputClass} />
+                            <input placeholder={t('caption')} value={photo.caption} onChange={e => updateRecapPhoto(stopIndex, photoIndex, { caption: e.target.value })} className={compactInputClass} />
                             <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-2">
-                              <input placeholder="Photo Image URL" value={photo.image_url} onChange={e => updateRecapPhoto(stopIndex, photoIndex, { image_url: e.target.value })} className={compactInputClass} />
+                              <input placeholder={t('photoImageUrl')} value={photo.image_url} onChange={e => updateRecapPhoto(stopIndex, photoIndex, { image_url: e.target.value })} className={compactInputClass} />
                               <div className="flex flex-col sm:flex-row gap-2">
                                 <button
                                   type="button"
                                   onClick={() => openImageAssetPicker(url => updateRecapPhoto(stopIndex, photoIndex, { image_url: url }))}
                                   className="bg-white/10 hover:bg-white/15 text-white rounded-lg px-3 py-2 text-xs transition-colors whitespace-nowrap"
                                 >
-                                  Choose Existing
+                                  {t('chooseExisting')}
                                 </button>
                                 <input type="file" accept="image/*" onChange={e => handleRecapPhotoUpload(stopIndex, photoIndex, e)} className={`${compactInputClass} md:w-44 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-white/10 file:text-white hover:file:bg-white/20`} />
                               </div>
@@ -1974,10 +2405,10 @@ export default function AdminPage() {
                         ))}
 
                         <div className="space-y-2">
-                          <span className="text-xs text-gray-400">Bilibili Recap Video</span>
+                          <span className="text-xs text-gray-400">{t('recapVideo')}</span>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                            <input placeholder="Video Title" value={stop.recap_video.title} onChange={e => updateRecapVideo(stopIndex, { title: e.target.value })} className={compactInputClass} />
-                            <input placeholder="Bilibili URL" value={stop.recap_video.url} onChange={e => updateRecapVideo(stopIndex, { url: e.target.value })} className={compactInputClass} />
+                            <input placeholder={t('videoTitle')} value={stop.recap_video.title} onChange={e => updateRecapVideo(stopIndex, { title: e.target.value })} className={compactInputClass} />
+                            <input placeholder={t('bilibiliUrl')} value={stop.recap_video.url} onChange={e => updateRecapVideo(stopIndex, { url: e.target.value })} className={compactInputClass} />
                           </div>
                         </div>
                       </div>
@@ -1989,15 +2420,15 @@ export default function AdminPage() {
               {activeTab === 'events' && (
                 <div className="space-y-4 border border-white/10 p-4 rounded-xl bg-black/20">
                   <div className="flex justify-between items-center">
-                    <h3 className="text-sm font-medium text-white">QR Codes</h3>
-                    <button type="button" onClick={() => setFormData({...formData, qr_codes: [...formData.qr_codes, { title: '', image_url: '' }]})} className="text-xs text-[#ff4e00] hover:text-[#ff6a2b] flex items-center gap-1"><Plus size={14}/> Add QR</button>
+                    <h3 className="text-sm font-medium text-white">{t('qrCodes')}</h3>
+                    <button type="button" onClick={() => setFormData({...formData, qr_codes: [...formData.qr_codes, { title: '', image_url: '' }]})} className="text-xs text-[#ff4e00] hover:text-[#ff6a2b] flex items-center gap-1"><Plus size={14}/> {t('addQr')}</button>
                   </div>
 
                   {formData.qr_codes.map((qrCode, qrIndex) => (
                     <div key={qrIndex} className="space-y-3 border border-white/5 p-3 rounded-lg bg-black/40">
                       <div className="flex justify-between items-center gap-2">
                         <input
-                          placeholder="Title (e.g. 厂牌微信 / 乐队微信)"
+                          placeholder={t('qrTitlePlaceholder')}
                           value={qrCode.title}
                           onChange={e => updateQrCode(qrIndex, { title: e.target.value })}
                           className="bg-transparent border-b border-white/10 px-1 py-1 text-sm text-[#ff4e00] font-mono focus:outline-none focus:border-[#ff4e00] flex-1"
@@ -2007,7 +2438,7 @@ export default function AdminPage() {
 
                       <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-2">
                         <input
-                          placeholder="QR Image URL"
+                          placeholder={t('qrImageUrl')}
                           value={qrCode.image_url}
                           onChange={e => updateQrCode(qrIndex, { image_url: e.target.value })}
                           className={compactInputClass}
@@ -2018,7 +2449,7 @@ export default function AdminPage() {
                             onClick={() => openImageAssetPicker(url => updateQrCode(qrIndex, { image_url: url }))}
                             className="bg-white/10 hover:bg-white/15 text-white rounded-lg px-3 py-2 text-xs transition-colors whitespace-nowrap"
                           >
-                            Choose Existing
+                            {t('chooseExisting')}
                           </button>
                           <input
                             type="file"
@@ -2044,14 +2475,14 @@ export default function AdminPage() {
               {activeTab === 'events' && (
                 <div className="space-y-3 border border-white/10 p-4 rounded-xl bg-black/20">
                   <div className="flex justify-between items-center gap-3">
-                    <h3 className="text-sm font-medium text-white flex items-center gap-2"><Code2 size={15}/> Event JSON</h3>
+                    <h3 className="text-sm font-medium text-white flex items-center gap-2"><Code2 size={15}/> {t('eventJson')}</h3>
                     <div className="flex gap-2">
-                      <button type="button" onClick={refreshEventJson} className="text-xs bg-white/10 hover:bg-white/15 text-gray-200 rounded px-3 py-1 transition-colors">Generate</button>
-                      <button type="button" onClick={applyEventJson} className="text-xs bg-[#ff4e00] hover:bg-[#ff6a2b] text-white rounded px-3 py-1 transition-colors">Apply</button>
+                      <button type="button" onClick={refreshEventJson} className="text-xs bg-white/10 hover:bg-white/15 text-gray-200 rounded px-3 py-1 transition-colors">{t('generate')}</button>
+                      <button type="button" onClick={applyEventJson} className="text-xs bg-[#ff4e00] hover:bg-[#ff6a2b] text-white rounded px-3 py-1 transition-colors">{t('apply')}</button>
                     </div>
                   </div>
                   <textarea
-                    placeholder="Paste event JSON here, then click Apply."
+                    placeholder={t('eventJsonPlaceholder')}
                     value={eventJsonInput}
                     onChange={e => setEventJsonInput(e.target.value)}
                     className={`${compactInputClass} h-44 resize-y font-mono`}
@@ -2062,21 +2493,21 @@ export default function AdminPage() {
               {activeTab !== 'accounts' && (
               <div className="space-y-2 rounded-xl border border-white/10 bg-black/20 p-4">
                 <div className="flex items-center justify-between">
-                  <span className={labelClass}>Image (Max 1MB)</span>
+                  <span className={labelClass}>{t('imageMax')}</span>
                   <div className="flex gap-2 bg-black/50 rounded-lg p-1 border border-white/10">
                     <button
                       type="button"
                       onClick={() => setImageInputType('upload')}
                       className={`px-3 py-1 text-xs rounded-md transition-colors ${imageInputType === 'upload' ? 'bg-[#ff4e00] text-white' : 'text-gray-400 hover:text-white'}`}
                     >
-                      Upload File
+                      {t('uploadFile')}
                     </button>
                     <button
                       type="button"
                       onClick={() => setImageInputType('url')}
                       className={`px-3 py-1 text-xs rounded-md transition-colors ${imageInputType === 'url' ? 'bg-[#ff4e00] text-white' : 'text-gray-400 hover:text-white'}`}
                     >
-                      Image URL
+                      {t('imageUrl')}
                     </button>
                   </div>
                 </div>
@@ -2088,12 +2519,12 @@ export default function AdminPage() {
                         onClick={() => openImageAssetPicker(url => setFormData(prev => ({ ...prev, image_url: url })))}
                         className="bg-white/10 hover:bg-white/15 text-white rounded-lg px-4 py-2 text-sm transition-colors"
                       >
-                        Choose Existing
+                        {t('chooseExisting')}
                       </button>
                       <input type="file" accept="image/*" onChange={handleImageUpload} className={`${inputClass} file:mr-4 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:bg-white/10 file:text-white hover:file:bg-white/20`} />
                     </div>
                   ) : (
-                    <input placeholder="Enter Image URL (e.g. https://...)" value={formData.image_url} onChange={e => setFormData({...formData, image_url: e.target.value})} className={inputClass} />
+                    <input placeholder={t('imageUrlPlaceholder')} value={formData.image_url} onChange={e => setFormData({...formData, image_url: e.target.value})} className={inputClass} />
                   )}
                 </div>
                 {formData.image_url && (
@@ -2114,7 +2545,7 @@ export default function AdminPage() {
 
               {activeTab !== 'events' && activeTab !== 'accounts' && (
                 <div className="grid grid-cols-1 md:grid-cols-[0.35fr_1fr] gap-4">
-                  <Field label="Contact Type / 联系方式类型">
+                  <Field label={t('contactType')}>
                     <select
                       value={contactType}
                       onChange={e => setContactType(e.target.value as 'wechat' | 'email')}
@@ -2124,9 +2555,9 @@ export default function AdminPage() {
                       <option value="email">Email</option>
                     </select>
                   </Field>
-                  <Field label="Contact Info / 联系方式">
+                  <Field label={t('contactInfo')}>
                     <input
-                      placeholder="Optional"
+                      placeholder={t('optional')}
                       value={contactValue}
                       onChange={e => setContactValue(e.target.value)}
                       className={inputClass}
@@ -2137,11 +2568,11 @@ export default function AdminPage() {
               
               <div className="flex gap-3 pt-4">
                 <button type="submit" className="flex-1 bg-[#ff4e00] text-white rounded py-2 text-sm font-medium hover:bg-[#ff4e00]/90">
-                  {isEditing ? 'Update' : 'Add'}
+                  {isEditing ? t('update') : t('add')}
                 </button>
                 {isEditing && (
                   <button type="button" onClick={resetForm} className="flex-1 bg-white/10 text-white rounded py-2 text-sm font-medium hover:bg-white/20">
-                    Cancel
+                    {t('cancel')}
                   </button>
                 )}
               </div>
@@ -2151,12 +2582,12 @@ export default function AdminPage() {
           {/* List */}
           <div className="bg-[#1a1a1a] p-5 md:p-6 rounded-2xl border border-white/10 flex flex-col h-full">
             <div className="flex flex-col gap-4 mb-6">
-              <h2 className="text-lg font-medium">Current {activeTab === 'bands' ? 'Bands' : activeTab === 'venues' ? 'Venues' : activeTab === 'events' ? 'Events' : activeTab === 'rehearsal_rooms' ? 'Rehearsal Rooms' : activeTab === 'accounts' ? 'Accounts' : 'Spots'} ({filteredList.length}/{currentList.length})</h2>
+              <h2 className="text-lg font-medium">{t('current')} {entityName()} ({filteredList.length}/{currentList.length})</h2>
               <div className="relative w-full">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
                 <input
                   type="text"
-                  placeholder="Search..."
+                  placeholder={t('search')}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="bg-black/50 border border-white/10 rounded-lg pl-9 pr-4 py-2 text-sm text-white focus:outline-none focus:border-[#ff4e00] w-full"
@@ -2164,7 +2595,7 @@ export default function AdminPage() {
               </div>
             </div>
             {loading ? (
-              <div className="text-center py-8 text-gray-500">Loading...</div>
+              <div className="text-center py-8 text-gray-500">{t('loading')}</div>
             ) : (
               <div className="space-y-3 max-h-[720px] overflow-y-auto pr-2 custom-scrollbar flex-1">
                 {filteredList.map(item => (

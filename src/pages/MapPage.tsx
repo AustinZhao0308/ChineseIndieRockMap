@@ -10,7 +10,7 @@ import FeedbackMenu from "../components/FeedbackMenu";
 import { Band, Venue, RehearsalRoom, Spot } from "../data";
 import { Music2 } from "lucide-react";
 import { useProvinceData } from "../hooks/useProvinceData";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 export default function MapPage() {
   const navigate = useNavigate();
@@ -126,6 +126,9 @@ export default function MapPage() {
             <p className="md:hidden text-[11px] text-gray-400 font-mono tracking-widest uppercase mb-1">
               已收录 <span className="text-[#ff4e00] font-semibold">{totalBands}</span> 支乐队
             </p>
+            <Link to="/events" className="md:hidden inline-flex mt-1 rounded-full border border-white/12 bg-black/35 px-3 py-1.5 text-[11px] text-white/70 backdrop-blur-md hover:bg-white/10 transition-colors">
+              演出档案
+            </Link>
             <div className="flex items-center gap-2">
               <div className="h-[1px] w-4 bg-gray-600/50"></div>
               <p className="text-[10px] text-gray-500 font-mono tracking-widest uppercase">
@@ -135,10 +138,14 @@ export default function MapPage() {
           </div>
         </div>
         
-        <div className="hidden md:block pointer-events-auto bg-black/40 backdrop-blur-md border border-white/10 rounded-full px-6 py-3">
+        <div className="hidden md:flex pointer-events-auto items-center gap-4 bg-black/40 backdrop-blur-md border border-white/10 rounded-full px-5 py-3">
           <p className="text-xs text-gray-300">
             已收录 <span className="text-[#ff4e00] font-semibold">{totalBands}</span> 支乐队 · 点击高亮的省份探索当地独立乐队与场地 <span className="text-[#ff4e00] ml-2">●</span>
           </p>
+          <span className="h-4 w-px bg-white/10" />
+          <Link to="/events" className="text-xs text-white/72 hover:text-white transition-colors">
+            演出档案
+          </Link>
         </div>
       </header>
 

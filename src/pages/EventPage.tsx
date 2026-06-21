@@ -153,6 +153,12 @@ export default function EventPage() {
   const isAdmin = typeof window !== "undefined" && !!localStorage.getItem("adminToken");
   const posterUrl = resolvePosterUrl(event?.image_url);
   const stops = event?.stops?.length ? event.stops : [];
+  const isTour = stops.length > 1;
+  const primaryStop = stops[0];
+  const primaryVenueName = primaryStop?.venue?.name_zh || primaryStop?.venue?.name || primaryStop?.venue_id || event?.location;
+  const heroMeta = isTour
+    ? `${stops.length}站巡演`
+    : [primaryStop?.venue?.city_zh, primaryVenueName].filter(Boolean).join(" · ");
   const recapStops = useMemo(() => {
     if (event?.status !== "ended") return [];
     return stops.filter(hasStopRecap);
@@ -167,7 +173,6 @@ export default function EventPage() {
   const recapMediaGridClass = hasActiveRecapPhoto && hasActiveRecapVideo
     ? "grid gap-5 lg:grid-cols-2 lg:items-start"
     : "grid gap-5 max-w-5xl";
-  const isTour = stops.length > 1;
   const lineupBands = useMemo(() => {
     const bandMap = new Map<string, { band: Band; notes: Set<string>; isGuest: boolean }>();
 
@@ -183,7 +188,7 @@ export default function EventPage() {
     event?.stops?.forEach(stop => {
       stop.guestBands?.forEach(band => {
         const entry = bandMap.get(band.id) || { band, notes: new Set<string>(), isGuest: true };
-        entry.notes.add(stop.label);
+        if (isTour && stop.label) entry.notes.add(stop.label);
         if (!bandMap.has(band.id)) entry.isGuest = true;
         bandMap.set(band.id, entry);
       });
@@ -193,7 +198,7 @@ export default function EventPage() {
       ...entry,
       notes: Array.from(entry.notes)
     }));
-  }, [event]);
+  }, [event, isTour]);
 
   useEffect(() => {
     if (!recapStops.length) {
@@ -380,7 +385,7 @@ export default function EventPage() {
                 {event.title}
               </h1>
               <p className="mt-6 max-w-xl text-base md:text-lg leading-8 text-white/68">
-                {event.organizer ? `${event.organizer} 呈现` : "Catbeer Presents"} · {isTour ? `${stops.length}站巡演` : (stops[0]?.venue?.name_zh || event.location)}
+                {event.organizer ? `${event.organizer} 呈现` : "Catbeer Presents"} · {heroMeta || event.location}
               </p>
 
               {isTour && <div className="mt-8 hidden gap-3 md:grid md:grid-cols-2">
@@ -413,9 +418,10 @@ export default function EventPage() {
               {ticketMessage && <p className="text-sm text-white/70">{ticketMessage}</p>}
             </div>
 
-            <div className="mt-8 grid gap-5 md:grid-cols-2">
-              {stops.map((stop, index) => (
-                <article id={`stop-${index}`} key={`${stop.label}-${index}`} className="rounded-3xl border border-white/12 bg-white/[0.07] p-5 md:p-6 backdrop-blur-2xl">
+            {isTour ? (
+              <div className="mt-8 grid gap-5 md:grid-cols-2">
+                {stops.map((stop, index) => (
+                  <article id={`stop-${index}`} key={`${stop.label}-${index}`} className="rounded-3xl border border-white/12 bg-white/[0.07] p-5 md:p-6 backdrop-blur-2xl">
                   <div className="flex items-start justify-between gap-4">
                     <div>
                       <p className="text-sm text-white/55">{stop.venue?.city_zh}</p>
@@ -467,9 +473,72 @@ export default function EventPage() {
                       ))}
                     </div>
                   )}
-                </article>
-              ))}
-            </div>
+                  </article>
+                ))}
+              </div>
+            ) : primaryStop && (
+              <article id="show-details" className="mt-8 rounded-3xl border border-white/12 bg-white/[0.07] p-5 backdrop-blur-2xl md:p-7">
+                <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_auto] md:items-start">
+                  <div>
+                    <p className="text-sm text-white/55">{primaryStop.venue?.city_zh || event.location}</p>
+                    <h3 className="mt-1 text-2xl md:text-3xl font-serif">{primaryVenueName || "演出地点待补充"}</h3>
+                    <p className="mt-3 text-sm leading-7 text-white/58">{primaryStop.venue?.address || event.address || "请先在场地库补充地址"}</p>
+                  </div>
+                  {formatStopTime(primaryStop.start_at) && (
+                    <div className="rounded-full bg-white/10 px-4 py-2 text-sm text-white/76">
+                      {formatStopTime(primaryStop.start_at)}
+                    </div>
+                  )}
+                </div>
+
+                <div className="mt-7 grid gap-4 text-sm text-white/68 md:grid-cols-2">
+                  {formatStopTime(primaryStop.start_at) && (
+                    <div className="flex gap-3">
+                      <CalendarDays size={18} className="mt-0.5 text-white/55 shrink-0" />
+                      <p>{formatStopTime(primaryStop.start_at)}</p>
+                    </div>
+                  )}
+                  <div className="flex gap-3">
+                    <MapPin size={18} className="mt-0.5 text-white/55 shrink-0" />
+                    <button
+                      type="button"
+                      disabled={!primaryStop.venue}
+                      onClick={() => primaryStop.venue && setSelectedVenue(primaryStop.venue)}
+                      className="text-left text-white font-medium hover:text-[rgb(var(--glow-c))] disabled:hover:text-white"
+                    >
+                      {primaryVenueName || "演出地点待补充"}
+                    </button>
+                  </div>
+                  {primaryStop.price_text && (
+                    <div className="flex gap-3">
+                      <Ticket size={18} className="mt-0.5 text-white/55 shrink-0" />
+                      <p>{primaryStop.price_text}</p>
+                    </div>
+                  )}
+                  {!!primaryStop.guestBands?.length && (
+                    <div className="flex gap-3">
+                      <Users size={18} className="mt-0.5 text-white/55 shrink-0" />
+                      <p>嘉宾 {primaryStop.guestBands.map(band => band.name_zh || band.name).join(' / ')}</p>
+                    </div>
+                  )}
+                </div>
+
+                {!!primaryStop.tickets?.length && (
+                  <div className="mt-7 flex flex-wrap gap-3">
+                    {primaryStop.tickets.map((ticket, ticketIndex) => (
+                      <div key={`${ticket.label}-${ticketIndex}`} className="flex overflow-hidden rounded-full border border-white/12 bg-white text-black">
+                        <button type="button" onClick={() => handleTicket(ticket)} className="px-5 py-2 text-sm font-semibold hover:bg-white/85 transition-colors">
+                          {ticketLabel(ticket)}
+                        </button>
+                        <button type="button" onClick={() => copyTicket(ticket)} className="border-l border-black/10 px-3 hover:bg-black/5 transition-colors" aria-label="复制购票链接">
+                          {ticket.url.startsWith("weixin://") ? <Copy size={16} /> : <ExternalLink size={16} />}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </article>
+            )}
           </div>
         </section>
 
@@ -486,7 +555,7 @@ export default function EventPage() {
                   </p>
                   </div>
 
-                  <div className="flex gap-2 overflow-x-auto pb-1 lg:justify-end lg:overflow-visible lg:pb-0">
+                  {isTour && <div className="flex gap-2 overflow-x-auto pb-1 lg:justify-end lg:overflow-visible lg:pb-0">
                     {recapStops.map((stop, index) => {
                       const key = stopKey(stop, stops.indexOf(stop));
                       const isActive = key === activeRecapStopKey;
@@ -508,13 +577,13 @@ export default function EventPage() {
                         </button>
                       );
                     })}
-                  </div>
+                  </div>}
                 </div>
 
                 <div className="mt-9">
                   <div className="mb-5">
                     <p className="text-sm text-white/50">{activeRecapStop.venue?.name_zh || activeRecapStop.venue?.name}</p>
-                    <h3 className="mt-1 text-2xl md:text-4xl font-serif">{activeRecapStop.label}回顾</h3>
+                    {isTour && <h3 className="mt-1 text-2xl md:text-4xl font-serif">{activeRecapStop.label}回顾</h3>}
                   </div>
 
                   <div className={recapMediaGridClass}>
@@ -639,11 +708,13 @@ export default function EventPage() {
                     <div>
                       <p className="text-lg font-medium text-white">{band.name_zh || band.name}</p>
                       <p className="mt-1 text-sm text-white/55">{band.genre}</p>
-                      {notes.length > 0 ? (
+                      {isGuest && !isTour ? (
+                        <p className="mt-2 text-xs text-white/45">嘉宾</p>
+                      ) : notes.length > 0 ? (
                         <p className="mt-2 text-xs text-white/45">{isGuest ? '嘉宾 · ' : ''}{notes.join(' / ')}</p>
-                      ) : (
+                      ) : isTour ? (
                         <p className="mt-2 text-xs text-white/45">全站阵容</p>
-                      )}
+                      ) : null}
                     </div>
                   </div>
                 </button>

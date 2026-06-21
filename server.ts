@@ -620,6 +620,20 @@ app.get('/api/labels/:username/archive', (req, res) => {
   }
 });
 
+app.get('/api/events/archive', (req, res) => {
+  try {
+    const events = (db.prepare(`
+      SELECT *
+      FROM featured_events
+      ORDER BY id DESC
+    `).all() as any[]).map(populateEvent);
+
+    res.json({ events });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.get('/api/accounts', authenticateToken, (req, res) => {
   const accounts = db
     .prepare('SELECT * FROM accounts ORDER BY updated_at DESC, id DESC')

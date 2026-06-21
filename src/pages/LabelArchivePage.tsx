@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, CalendarDays, MapPin, Ticket } from "lucide-react";
 import tingkaozaiPoster from "../pic/停靠在.JPG";
 
@@ -59,10 +59,26 @@ const getEventYear = (event: ArchiveEvent) => {
 };
 
 const getEventMeta = (event: ArchiveEvent) => {
+  if ((event.stops?.length || 0) > 1) {
+    const cities = Array.from(new Set(event.stops?.map(stop => stop.venue?.city_zh).filter(Boolean) || []));
+    const cityText = cities.length > 2 ? `${cities.slice(0, 2).join(" / ")} 等 ${cities.length} 城` : cities.join(" / ");
+    return [getEventDateLabel(event), cityText, `${event.stops?.length || 0} 站巡演`].filter(Boolean).join(" · ");
+  }
+
   const firstStop = event.stops?.[0];
   const venue = firstStop?.venue?.name_zh || firstStop?.venue?.name || event.location;
   const city = firstStop?.venue?.city_zh;
-  return [event.date_str, city, venue].filter(Boolean).join(" · ");
+  return [getEventDateLabel(event), city, venue].filter(Boolean).join(" · ");
+};
+
+const getEventDateLabel = (event: ArchiveEvent) => {
+  if ((event.stops?.length || 0) <= 1) return event.date_str || "";
+  const dates = event.stops
+    ?.map(stop => stop.start_at ? new Date(stop.start_at) : null)
+    .filter((date): date is Date => !!date && !Number.isNaN(date.getTime())) || [];
+  if (dates.length < 2) return event.date_str || `${event.stops?.length || 0} 站巡演`;
+  const formatter = new Intl.DateTimeFormat("zh-CN", { month: "2-digit", day: "2-digit" });
+  return `${formatter.format(dates[0])} - ${formatter.format(dates[dates.length - 1])}`;
 };
 
 const getRecapPhotos = (event: ArchiveEvent) => {
@@ -94,6 +110,8 @@ const posterOffsets = [
 
 export default function LabelArchivePage() {
   const { username } = useParams();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [label, setLabel] = useState<LabelInfo | null>(null);
   const [events, setEvents] = useState<ArchiveEvent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -133,6 +151,14 @@ export default function LabelArchivePage() {
     });
   }, [events]);
 
+  const handleBack = () => {
+    if (location.key && location.key !== "default") {
+      navigate(-1);
+      return;
+    }
+    navigate("/");
+  };
+
   if (loading) {
     return (
       <div className="min-h-[100dvh] bg-[#0a0502] flex items-center justify-center text-[#ff4e00] font-mono">
@@ -146,10 +172,10 @@ export default function LabelArchivePage() {
       <div className="min-h-[100dvh] bg-[#0a0502] flex flex-col items-center justify-center px-6 text-center">
         <p className="text-xl text-white font-serif">档案暂未开放</p>
         <p className="mt-3 text-sm text-white/50">{error || "Label not found"}</p>
-        <Link to="/" className="mt-8 inline-flex items-center gap-2 rounded-full border border-white/15 px-5 py-2 text-sm text-white/75 hover:bg-white/10 transition-colors">
+        <button type="button" onClick={handleBack} className="mt-8 inline-flex items-center gap-2 rounded-full border border-white/15 px-5 py-2 text-sm text-white/75 hover:bg-white/10 transition-colors">
           <ArrowLeft size={16} />
-          返回地图
-        </Link>
+          返回
+        </button>
       </div>
     );
   }
@@ -170,10 +196,10 @@ export default function LabelArchivePage() {
 
       <header className="relative z-10 px-5 pt-5 md:px-8 md:pt-7">
         <div className="mx-auto max-w-[1500px]">
-          <Link to="/" className="inline-flex items-center gap-2 text-sm text-white/55 hover:text-white transition-colors">
+          <button type="button" onClick={handleBack} className="inline-flex items-center gap-2 text-sm text-white/55 hover:text-white transition-colors">
             <ArrowLeft size={16} />
-            独立摇滚地图
-          </Link>
+            返回
+          </button>
           <div className="mt-4 flex flex-col gap-4 border-b border-white/10 pb-4 md:mt-5 md:flex-row md:items-end md:justify-between">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-3">
@@ -273,10 +299,10 @@ export default function LabelArchivePage() {
                                 <Ticket size={12} />
                                 {statusLabel(event.status)}
                               </span>
-                              {event.date_str && (
+                              {getEventDateLabel(event) && (
                                 <span className="inline-flex items-center gap-1">
                                   <CalendarDays size={12} />
-                                  {event.date_str}
+                                  {getEventDateLabel(event)}
                                 </span>
                               )}
                             </div>
