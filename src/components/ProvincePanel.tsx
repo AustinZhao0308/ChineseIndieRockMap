@@ -79,14 +79,14 @@ const ProvincePanel: React.FC<ProvincePanelProps> = ({ province, onClose, onBand
     <AnimatePresence>
       {province && (
         <motion.div
-          initial={isMobile ? { y: "100%", opacity: 0, height: "55vh" } : { x: "100%", opacity: 0, height: "100%" }}
-          animate={isMobile ? { y: 0, opacity: 1, height: isExpanded ? "85vh" : "55vh" } : { x: 0, opacity: 1, height: "100%" }}
-          exit={isMobile ? { y: "100%", opacity: 0, height: isExpanded ? "85vh" : "55vh" } : { x: "100%", opacity: 0, height: "100%" }}
+          initial={isMobile ? { y: "100%", opacity: 0, height: "55vh" } : { x: "100%", opacity: 0 }}
+          animate={isMobile ? { y: 0, opacity: 1, height: isExpanded ? "85vh" : "55vh" } : { x: 0, opacity: 1 }}
+          exit={isMobile ? { y: "100%", opacity: 0, height: isExpanded ? "85vh" : "55vh" } : { x: "100%", opacity: 0 }}
           transition={{ type: "spring", stiffness: 300, damping: 30 }}
           onScroll={handleScroll}
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
-          className="absolute bottom-0 md:top-0 right-0 w-full md:w-[400px] bg-[#151619]/90 backdrop-blur-xl border-t md:border-t-0 md:border-l border-white/10 shadow-[0_-10px_40px_rgba(0,0,0,0.5)] md:shadow-2xl z-40 overflow-y-auto scrollbar-hide rounded-t-3xl md:rounded-none"
+          className="absolute bottom-0 right-0 z-40 w-full overflow-y-auto rounded-t-3xl border-t border-white/10 bg-[#151619]/90 shadow-[0_-10px_40px_rgba(0,0,0,0.5)] backdrop-blur-xl scrollbar-hide md:top-[3.65rem] md:w-[400px] md:rounded-none md:border-l md:border-t-0 md:shadow-2xl"
         >
           <div className="p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
             {/* Mobile drag indicator */}
