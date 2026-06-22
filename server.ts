@@ -336,8 +336,38 @@ const publicUserFromToken = (user: any) => ({
   username: user?.username,
   displayName: user?.displayName,
   accountId: user?.accountId,
-  accountType: user?.accountType
+  accountType: user?.accountType,
+  logoUrl: user?.logoUrl
 });
+
+const getCurrentPublicUser = (user: any) => {
+  if (user?.role === 'admin') {
+    return publicUserFromToken(user);
+  }
+
+  if (user?.accountId) {
+    const account = db.prepare(`
+      SELECT id, account_type, username, display_name, logo_url, status
+      FROM accounts
+      WHERE id = ?
+      LIMIT 1
+    `).get(user.accountId) as any;
+
+    if (account) {
+      return {
+        role: account.account_type === 'label' ? 'label' : 'artist',
+        accountId: account.id,
+        accountType: account.account_type,
+        username: account.username,
+        displayName: account.display_name,
+        logoUrl: account.logo_url,
+        status: account.status
+      };
+    }
+  }
+
+  return publicUserFromToken(user);
+};
 
 const isAdminRequest = (req: express.Request) => (req as any).user?.role === 'admin';
 const isLabelRequest = (req: express.Request) => (req as any).user?.role === 'label';
@@ -692,7 +722,8 @@ app.post('/api/login', async (req, res) => {
       accountId: account.id,
       accountType: account.account_type,
       username: account.username,
-      displayName: account.display_name
+      displayName: account.display_name,
+      logoUrl: account.logo_url
     };
     const token = jwt.sign(user, JWT_SECRET, { expiresIn: '24h' });
     return res.json({ token, user });
@@ -713,7 +744,7 @@ app.post('/api/login', async (req, res) => {
 });
 
 app.get('/api/me', authenticateToken, (req, res) => {
-  res.json({ user: publicUserFromToken((req as any).user) });
+  res.json({ user: getCurrentPublicUser((req as any).user) });
 });
 
 app.get('/api/labels/:username/archive', (req, res) => {

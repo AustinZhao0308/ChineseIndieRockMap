@@ -6,6 +6,7 @@ type NavUser = {
   role?: string;
   username?: string;
   displayName?: string;
+  logoUrl?: string;
 };
 
 const baseNavItems = [
@@ -26,6 +27,23 @@ const getStoredUser = (): NavUser | null => {
   }
 };
 
+const fetchCurrentUser = async () => {
+  const token = localStorage.getItem("adminToken");
+  if (!token) return null;
+
+  const res = await fetch("/api/me", {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+
+  if (!res.ok) {
+    localStorage.removeItem("adminToken");
+    return null;
+  }
+
+  const data = await res.json();
+  return data.user as NavUser;
+};
+
 export default function SiteNav() {
   const { pathname } = useLocation();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -36,15 +54,28 @@ export default function SiteNav() {
 
   useEffect(() => {
     setIsMenuOpen(false);
-    setUser(getStoredUser());
   }, [pathname]);
 
   useEffect(() => {
-    const syncUser = () => setUser(getStoredUser());
+    let cancelled = false;
+    const syncUser = () => {
+      const storedUser = getStoredUser();
+      setUser(storedUser);
+      if (!storedUser) return;
+      fetchCurrentUser()
+        .then(nextUser => {
+          if (!cancelled) setUser(nextUser);
+        })
+        .catch(() => {
+          if (!cancelled) setUser(null);
+        });
+    };
+    syncUser();
     window.addEventListener("storage", syncUser);
     window.addEventListener("authchange", syncUser);
     window.addEventListener("focus", syncUser);
     return () => {
+      cancelled = true;
       window.removeEventListener("storage", syncUser);
       window.removeEventListener("authchange", syncUser);
       window.removeEventListener("focus", syncUser);
@@ -58,7 +89,19 @@ export default function SiteNav() {
   };
 
   const displayName = user?.displayName || user?.username || "";
-  const avatarText = displayName.trim().slice(0, 1).toUpperCase() || "C";
+  const avatarText = Array.from(displayName.trim())[0]?.toUpperCase() || "C";
+  const avatar = (sizeClass: string) => user?.logoUrl ? (
+    <img
+      src={user.logoUrl}
+      alt={`${displayName} logo`}
+      className={`${sizeClass} rounded-full border border-white/10 bg-white object-contain p-0.5`}
+      referrerPolicy="no-referrer"
+    />
+  ) : (
+    <span className={`${sizeClass} grid place-items-center rounded-full border border-white/10 bg-white/[0.08] text-xs font-semibold text-white`}>
+      {avatarText}
+    </span>
+  );
 
   return (
     <nav className="fixed left-0 right-0 top-0 z-50 pointer-events-none">
@@ -102,9 +145,7 @@ export default function SiteNav() {
           {user && (
             <div className="ml-1 flex items-center gap-3 border-l border-white/[0.08] pl-5">
               <Link to="/admin" className="flex items-center gap-2 text-white/76 transition-colors hover:text-white">
-                <span className="grid h-7 w-7 place-items-center rounded-full border border-white/10 bg-white/[0.08] text-xs font-semibold text-white">
-                  {avatarText}
-                </span>
+                {avatar("h-7 w-7")}
                 <span className="max-w-28 truncate text-sm font-medium">{displayName}</span>
               </Link>
               <button type="button" onClick={handleLogout} className="text-xs text-white/38 transition-colors hover:text-white/72">
@@ -133,9 +174,7 @@ export default function SiteNav() {
         <div className="space-y-1 py-4">
           {user && (
             <div className="mb-2 flex items-center gap-3 border-b border-white/[0.055] pb-4 text-white">
-              <span className="grid h-8 w-8 place-items-center rounded-full border border-white/10 bg-white/[0.08] text-xs font-semibold">
-                {avatarText}
-              </span>
+              {avatar("h-8 w-8")}
               <span className="min-w-0 truncate text-sm">{displayName}</span>
             </div>
           )}

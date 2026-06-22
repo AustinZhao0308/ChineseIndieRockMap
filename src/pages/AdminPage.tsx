@@ -248,6 +248,7 @@ type CurrentUser = {
   displayName: string;
   accountId?: number;
   accountType?: string;
+  logoUrl?: string;
 };
 const labelEditorTabs: AdminTab[] = ['bands', 'events'];
 
