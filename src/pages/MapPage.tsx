@@ -8,9 +8,8 @@ import SpotModal from "../components/SpotModal";
 import AdBanner from "../components/AdBanner";
 import FeedbackMenu from "../components/FeedbackMenu";
 import { Band, Venue, RehearsalRoom, Spot } from "../data";
-import { Music2 } from "lucide-react";
 import { useProvinceData } from "../hooks/useProvinceData";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
 export default function MapPage() {
   const navigate = useNavigate();
@@ -108,46 +107,16 @@ export default function MapPage() {
 
   return (
     <div className="w-full h-[100dvh] bg-[#0a0502] overflow-hidden font-sans relative">
-      {/* Header */}
-      <header className="absolute top-0 left-0 w-full p-6 z-10 pointer-events-none flex justify-between items-start">
-        <div className="pointer-events-auto">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 bg-[#ff4e00] rounded-full flex items-center justify-center text-white shadow-[0_0_20px_rgba(255,78,0,0.3)]">
-              <Music2 size={20} />
-            </div>
-            <h1 className="text-3xl font-serif text-white tracking-tight">
-              独立摇滚地图
-            </h1>
-          </div>
-          <div className="ml-14">
-            <p className="text-sm text-gray-400 font-mono tracking-widest uppercase mb-1">
-              Indie Rock Map
-            </p>
-            <p className="md:hidden text-[11px] text-gray-400 font-mono tracking-widest uppercase mb-1">
-              已收录 <span className="text-[#ff4e00] font-semibold">{totalBands}</span> 支乐队
-            </p>
-            <Link to="/events" className="md:hidden inline-flex mt-1 rounded-full border border-white/12 bg-black/35 px-3 py-1.5 text-[11px] text-white/70 backdrop-blur-md hover:bg-white/10 transition-colors">
-              演出档案
-            </Link>
-            <div className="flex items-center gap-2">
-              <div className="h-[1px] w-4 bg-gray-600/50"></div>
-              <p className="text-[10px] text-gray-500 font-mono tracking-widest uppercase">
-                by <span className="text-[#ff4e00] font-semibold">Catbeer Records</span>
-              </p>
-            </div>
-          </div>
+      <div className="absolute left-5 right-5 top-[calc(4.05rem+env(safe-area-inset-top))] z-10 pointer-events-none sm:left-6 sm:right-6 md:left-10 md:right-auto md:top-[4.9rem] lg:left-12 xl:left-14">
+        <div className="inline-flex max-w-full items-center gap-2 rounded-full border border-white/[0.08] bg-black/28 px-3 py-2 text-[11px] text-white/58 backdrop-blur-xl md:px-4 md:text-xs">
+          <span>
+            已收录 <span className="font-semibold text-[#ff6a2b]">{totalBands}</span> 支乐队
+          </span>
+          <span className="hidden text-white/28 md:inline">·</span>
+          <span className="hidden md:inline">点击高亮省份探索当地音乐现场</span>
+          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#ff4e00] shadow-[0_0_14px_rgba(255,78,0,0.72)]" />
         </div>
-        
-        <div className="hidden md:flex pointer-events-auto items-center gap-4 bg-black/40 backdrop-blur-md border border-white/10 rounded-full px-5 py-3">
-          <p className="text-xs text-gray-300">
-            已收录 <span className="text-[#ff4e00] font-semibold">{totalBands}</span> 支乐队 · 点击高亮的省份探索当地独立乐队与场地 <span className="text-[#ff4e00] ml-2">●</span>
-          </p>
-          <span className="h-4 w-px bg-white/10" />
-          <Link to="/events" className="text-xs text-white/72 hover:text-white transition-colors">
-            演出档案
-          </Link>
-        </div>
-      </header>
+      </div>
 
       {/* Main Map */}
       <ChinaMap 

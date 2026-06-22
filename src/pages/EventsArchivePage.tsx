@@ -202,13 +202,9 @@ export default function EventsArchivePage() {
       <div className="absolute inset-0 pointer-events-none opacity-[0.22] bg-[linear-gradient(90deg,rgba(255,255,255,0.045)_1px,transparent_1px),linear-gradient(0deg,rgba(255,255,255,0.035)_1px,transparent_1px)] bg-[size:56px_56px]" />
       <div className="absolute inset-0 pointer-events-none opacity-[0.14] bg-[radial-gradient(circle_at_20px_18px,rgba(255,255,255,0.22)_1px,transparent_1.6px)] bg-[size:23px_23px]" />
 
-      <header className="relative z-10 px-5 pt-5 md:px-8 md:pt-7">
+      <header className="relative z-10 px-5 pt-[calc(4.25rem+env(safe-area-inset-top))] sm:px-6 md:px-10 md:pt-20 lg:px-12 xl:px-14">
         <div className="mx-auto max-w-[1500px]">
-          <button type="button" onClick={handleBack} className="inline-flex items-center gap-2 text-sm text-white/55 hover:text-white transition-colors">
-            <ArrowLeft size={16} />
-            返回
-          </button>
-          <div className="mt-4 flex flex-col gap-4 border-b border-white/10 pb-5 md:flex-row md:items-end md:justify-between">
+          <div className="flex flex-col gap-4 border-b border-white/10 pb-5 md:flex-row md:items-end md:justify-between">
             <div>
               <div className="flex flex-wrap items-center gap-3">
                 <span className="rounded-full border border-[#ff4e00]/35 bg-[#ff4e00]/12 px-3 py-1 text-xs text-[#ffb18a]">Events</span>
@@ -223,7 +219,7 @@ export default function EventsArchivePage() {
         </div>
       </header>
 
-      <main className="relative z-10 px-4 pb-16 pt-6 md:px-8 md:pt-7">
+      <main className="relative z-10 px-5 pb-16 pt-6 sm:px-6 md:px-10 md:pt-7 lg:px-12 xl:px-14">
         <div className="mx-auto max-w-[1500px]">
           <section className="rounded-sm border border-white/[0.08] bg-black/20 p-3 shadow-[inset_0_0_80px_rgba(0,0,0,0.25)] md:p-4">
             <div className="grid gap-3 md:grid-cols-[minmax(220px,1.4fr)_repeat(3,minmax(150px,0.7fr))]">

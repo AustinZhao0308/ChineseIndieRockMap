@@ -49,6 +49,7 @@ type EventQrCode = {
 
 type EventDetail = {
   id: number;
+  label_account_id?: number;
   slug?: string;
   title: string;
   date_str: string;
@@ -75,6 +76,19 @@ const resolvePosterUrl = (url?: string) => {
   if (!url) return tingkaozaiPoster;
   if (url.includes("停靠在.JPG")) return tingkaozaiPoster;
   return url;
+};
+
+const getStoredUser = () => {
+  if (typeof window === "undefined") return null;
+  const token = localStorage.getItem("adminToken");
+  if (!token) return null;
+  try {
+    const payload = token.split(".")[1] || "";
+    const normalizedPayload = payload.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(payload.length / 4) * 4, "=");
+    return JSON.parse(atob(normalizedPayload));
+  } catch (err) {
+    return null;
+  }
 };
 
 const formatStopTime = (value?: string) => {
@@ -150,7 +164,8 @@ export default function EventPage() {
   const [activeRecapKey, setActiveRecapKey] = useState("");
   const [recapPhotoIndexes, setRecapPhotoIndexes] = useState<Record<string, number>>({});
 
-  const isAdmin = typeof window !== "undefined" && !!localStorage.getItem("adminToken");
+  const storedUser = getStoredUser();
+  const canEdit = storedUser?.role === "admin" || (storedUser?.role === "label" && Number(storedUser.accountId) === Number(event?.label_account_id));
   const posterUrl = resolvePosterUrl(event?.image_url);
   const stops = event?.stops?.length ? event.stops : [];
   const isTour = stops.length > 1;
@@ -348,12 +363,12 @@ export default function EventPage() {
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_20%,rgba(var(--glow-a),0.34),transparent_34%),radial-gradient(circle_at_82%_10%,rgba(var(--glow-b),0.25),transparent_30%),radial-gradient(circle_at_65%_92%,rgba(var(--glow-c),0.24),transparent_38%),linear-gradient(180deg,rgba(8,7,5,0.18),#080705_78%)]" />
       </div>
 
-      <header className="fixed top-0 left-0 right-0 z-30 px-4 py-4 md:px-8 md:py-6 flex items-center justify-between pointer-events-none">
+      <header className="fixed left-0 right-0 top-[calc(3.25rem+env(safe-area-inset-top))] z-40 px-5 py-3 sm:px-6 md:top-[3.65rem] md:px-10 md:py-4 lg:px-12 xl:px-14 flex items-center justify-between pointer-events-none">
         <button type="button" onClick={handleBack} className="pointer-events-auto inline-flex items-center gap-2 rounded-full border border-white/15 bg-black/30 px-4 py-2 text-sm text-white/85 backdrop-blur-xl hover:bg-white/10 transition-colors">
           <ArrowLeft size={16} />
           返回
         </button>
-        {isAdmin && (
+        {canEdit && (
           <Link to={`/admin?tab=events&edit=${encodeURIComponent(event.slug || String(event.id))}`} className="pointer-events-auto inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm text-white/85 backdrop-blur-xl hover:bg-white/15 transition-colors">
             <PenLine size={16} />
             编辑
@@ -362,7 +377,7 @@ export default function EventPage() {
       </header>
 
       <main className="relative z-10 flex flex-col">
-        <section className="order-0 min-h-[100svh] px-4 pt-24 pb-8 md:min-h-screen md:px-10 md:pt-28 md:pb-16 flex items-center">
+        <section className="order-0 min-h-[100svh] px-4 pt-32 pb-8 md:min-h-screen md:px-10 md:pt-36 md:pb-16 flex items-center">
           <div className="mx-auto w-full max-w-7xl grid gap-8 md:grid-cols-[minmax(320px,0.86fr)_minmax(420px,1.14fr)] md:items-center">
             <div className="relative mx-auto w-full max-w-[420px] md:max-w-[520px]">
               <div className="absolute -inset-5 rounded-[2rem] bg-[linear-gradient(135deg,rgba(var(--glow-a),0.42),rgba(var(--glow-b),0.18))] blur-2xl opacity-80" />

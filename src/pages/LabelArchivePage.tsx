@@ -194,13 +194,9 @@ export default function LabelArchivePage() {
       <div className="absolute left-[8%] top-[18%] hidden h-8 w-32 -rotate-6 bg-[#d6c6a0]/10 blur-[0.2px] md:block" />
       <div className="absolute right-[13%] top-[28%] hidden h-7 w-24 rotate-3 bg-[#d6c6a0]/10 blur-[0.2px] md:block" />
 
-      <header className="relative z-10 px-5 pt-5 md:px-8 md:pt-7">
+      <header className="relative z-10 px-5 pt-[calc(4.25rem+env(safe-area-inset-top))] sm:px-6 md:px-10 md:pt-20 lg:px-12 xl:px-14">
         <div className="mx-auto max-w-[1500px]">
-          <button type="button" onClick={handleBack} className="inline-flex items-center gap-2 text-sm text-white/55 hover:text-white transition-colors">
-            <ArrowLeft size={16} />
-            返回
-          </button>
-          <div className="mt-4 flex flex-col gap-4 border-b border-white/10 pb-4 md:mt-5 md:flex-row md:items-end md:justify-between">
+          <div className="flex flex-col gap-4 border-b border-white/10 pb-4 md:flex-row md:items-end md:justify-between">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-3">
                 <span className="rounded-full border border-[#ff4e00]/35 bg-[#ff4e00]/12 px-3 py-1 text-xs text-[#ffb18a]">已入驻</span>
@@ -227,7 +223,7 @@ export default function LabelArchivePage() {
         </div>
       </header>
 
-      <main className="relative z-10 px-4 pb-16 pt-6 md:px-8 md:pt-7">
+      <main className="relative z-10 px-5 pb-16 pt-6 sm:px-6 md:px-10 md:pt-7 lg:px-12 xl:px-14">
         <div className="mx-auto max-w-[1500px]">
           {events.length === 0 ? (
             <section className="min-h-[45vh] rounded-[0.5rem] border border-white/10 bg-black/20 p-8 shadow-[inset_0_0_80px_rgba(0,0,0,0.45)] md:p-12">

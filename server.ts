@@ -12,6 +12,8 @@ dotenv.config();
 
 const app = express();
 const PORT = 3000;
+const ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'admin';
+const ADMIN_DISPLAY_NAME = process.env.ADMIN_DISPLAY_NAME || 'Catbeer Admin';
 const ADMIN_PASSWORD_HASH = process.env.ADMIN_PASSWORD_HASH || '$2b$10$xVBmUPJph0jgqqkqnLIt8e.4EhwN4NYUj1wqEazquAsPWtEazLvDO'; // Default hash for 'bercat2026'
 const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_jwt_key_for_indie_rock_map';
 
@@ -201,6 +203,16 @@ db.exec(`
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   );
+
+  CREATE TABLE IF NOT EXISTS admin_users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT NOT NULL UNIQUE,
+    display_name TEXT NOT NULL,
+    password_hash TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'active',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  );
 `);
 
 // Add columns to existing tables if they don't exist (migration)
@@ -228,6 +240,11 @@ try { db.exec("ALTER TABLE accounts ADD COLUMN status TEXT NOT NULL DEFAULT 'act
 try { db.exec('ALTER TABLE accounts ADD COLUMN notes TEXT;'); } catch (e) {}
 try { db.exec('ALTER TABLE accounts ADD COLUMN created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP;'); } catch (e) {}
 try { db.exec('ALTER TABLE accounts ADD COLUMN updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP;'); } catch (e) {}
+
+db.prepare(`
+  INSERT OR IGNORE INTO admin_users (username, display_name, password_hash, status, updated_at)
+  VALUES (?, ?, ?, 'active', CURRENT_TIMESTAMP)
+`).run(ADMIN_USERNAME, ADMIN_DISPLAY_NAME, ADMIN_PASSWORD_HASH);
 
 // Seed initial data if empty
 const countBands = db.prepare('SELECT COUNT(*) as count FROM bands').get() as { count: number };
@@ -314,6 +331,24 @@ const authenticateToken = (req: express.Request, res: express.Response, next: ex
   });
 };
 
+const publicUserFromToken = (user: any) => ({
+  role: user?.role,
+  username: user?.username,
+  displayName: user?.displayName,
+  accountId: user?.accountId,
+  accountType: user?.accountType
+});
+
+const isAdminRequest = (req: express.Request) => (req as any).user?.role === 'admin';
+const isLabelRequest = (req: express.Request) => (req as any).user?.role === 'label';
+
+const requireAdmin = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  if (!isAdminRequest(req)) {
+    return res.status(403).json({ error: 'Admin permission required.' });
+  }
+  next();
+};
+
 const normalizeDisplayCity = (cityZh: string) => {
   return cityZh ? cityZh.replace(/(省|市|维吾尔自治区|壮族自治区|回族自治区|自治区|特别行政区|自治州|地区|盟)$/, '') : '';
 };
@@ -345,6 +380,35 @@ const normalizeOptionalLabelAccountId = (value: any) => {
     throw new Error('Unknown label account.');
   }
   return id;
+};
+
+const normalizeScopedLabelAccountId = (req: express.Request, value: any) => {
+  if (isAdminRequest(req)) return normalizeOptionalLabelAccountId(value);
+  if (isLabelRequest(req)) {
+    const accountId = Number((req as any).user.accountId);
+    const requestedId = value === undefined || value === null || value === '' ? accountId : Number(value);
+    if (requestedId !== accountId) {
+      throw new Error('Label accounts can only manage their own label data.');
+    }
+    return accountId;
+  }
+  throw new Error('Label or admin permission required.');
+};
+
+const ensureLabelResourceAccess = (req: express.Request, table: 'bands' | 'featured_events', id: any) => {
+  if (isAdminRequest(req)) return;
+  if (!isLabelRequest(req)) {
+    throw new Error('Label or admin permission required.');
+  }
+
+  const accountId = Number((req as any).user.accountId);
+  const row = db.prepare(`SELECT label_account_id FROM ${table} WHERE id = ?`).get(id) as any;
+  if (!row) {
+    throw new Error('Resource not found.');
+  }
+  if (Number(row.label_account_id) !== accountId) {
+    throw new Error('You can only edit content owned by your label.');
+  }
 };
 
 const toBandCard = (b: any) => {
@@ -574,8 +638,20 @@ const validateEventReferences = (lineup: any, stops: any) => {
 };
 
 const toPublicAccount = (account: any) => {
-  const { password_hash, ...safeAccount } = account;
-  return safeAccount;
+  return {
+    id: account.id,
+    account_type: account.account_type,
+    username: account.username,
+    display_name: account.display_name,
+    logo_url: account.logo_url,
+    contact_name: account.contact_name,
+    contact_info: account.contact_info,
+    linked_entity_id: account.linked_entity_id,
+    status: account.status,
+    notes: account.notes,
+    created_at: account.created_at,
+    updated_at: account.updated_at
+  };
 };
 
 const normalizeAccountType = (value: any) => {
@@ -584,14 +660,60 @@ const normalizeAccountType = (value: any) => {
 
 // API Routes
 app.post('/api/login', async (req, res) => {
-  const { password } = req.body;
-  const isValid = await bcrypt.compare(password, ADMIN_PASSWORD_HASH);
-  if (isValid) {
-    const token = jwt.sign({ role: 'admin' }, JWT_SECRET, { expiresIn: '24h' });
-    res.json({ token });
-  } else {
-    res.status(401).json({ error: 'Invalid password' });
+  const { username, password } = req.body;
+  const normalizedUsername = String(username || '').trim();
+
+  if (!password?.trim()) {
+    return res.status(400).json({ error: 'Username and password are required.' });
   }
+
+  const adminUser = normalizedUsername
+    ? db.prepare('SELECT * FROM admin_users WHERE username = ? AND status = ?').get(normalizedUsername, 'active') as any
+    : null;
+
+  if (adminUser && await bcrypt.compare(password, adminUser.password_hash)) {
+    const user = {
+      role: 'admin',
+      username: adminUser.username,
+      displayName: adminUser.display_name
+    };
+    const token = jwt.sign(user, JWT_SECRET, { expiresIn: '24h' });
+    return res.json({ token, user });
+  }
+
+  const account = normalizedUsername
+    ? db.prepare('SELECT * FROM accounts WHERE username = ? AND status = ?').get(normalizedUsername, 'active') as any
+    : null;
+
+  if (account && await bcrypt.compare(password, account.password_hash)) {
+    const role = account.account_type === 'label' ? 'label' : 'artist';
+    const user = {
+      role,
+      accountId: account.id,
+      accountType: account.account_type,
+      username: account.username,
+      displayName: account.display_name
+    };
+    const token = jwt.sign(user, JWT_SECRET, { expiresIn: '24h' });
+    return res.json({ token, user });
+  }
+
+  // Backward compatibility for the previous password-only admin login.
+  if (!normalizedUsername && await bcrypt.compare(password, ADMIN_PASSWORD_HASH)) {
+    const user = {
+      role: 'admin',
+      username: ADMIN_USERNAME,
+      displayName: ADMIN_DISPLAY_NAME
+    };
+    const token = jwt.sign(user, JWT_SECRET, { expiresIn: '24h' });
+    return res.json({ token, user });
+  }
+
+  res.status(401).json({ error: 'Invalid username or password.' });
+});
+
+app.get('/api/me', authenticateToken, (req, res) => {
+  res.json({ user: publicUserFromToken((req as any).user) });
 });
 
 app.get('/api/labels/:username/archive', (req, res) => {
@@ -634,15 +756,19 @@ app.get('/api/events/archive', (req, res) => {
   }
 });
 
-app.get('/api/accounts', authenticateToken, (req, res) => {
+app.get('/api/accounts', authenticateToken, requireAdmin, (req, res) => {
   const accounts = db
-    .prepare('SELECT * FROM accounts ORDER BY updated_at DESC, id DESC')
+    .prepare(`
+      SELECT id, account_type, username, display_name, logo_url, contact_name, contact_info, linked_entity_id, status, notes, created_at, updated_at
+      FROM accounts
+      ORDER BY updated_at DESC, id DESC
+    `)
     .all()
     .map(toPublicAccount);
   res.json(accounts);
 });
 
-app.post('/api/accounts', authenticateToken, async (req, res) => {
+app.post('/api/accounts', authenticateToken, requireAdmin, async (req, res) => {
   const {
     account_type,
     username,
@@ -683,7 +809,7 @@ app.post('/api/accounts', authenticateToken, async (req, res) => {
   }
 });
 
-app.put('/api/accounts/:id', authenticateToken, async (req, res) => {
+app.put('/api/accounts/:id', authenticateToken, requireAdmin, async (req, res) => {
   const {
     account_type,
     username,
@@ -745,9 +871,34 @@ app.put('/api/accounts/:id', authenticateToken, async (req, res) => {
   }
 });
 
-app.delete('/api/accounts/:id', authenticateToken, (req, res) => {
+app.delete('/api/accounts/:id', authenticateToken, requireAdmin, (req, res) => {
   try {
     db.prepare('DELETE FROM accounts WHERE id = ?').run(req.params.id);
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.post('/api/admin/password', authenticateToken, async (req, res) => {
+  const { oldPassword, newPassword } = req.body;
+  if (!oldPassword?.trim() || !newPassword?.trim()) {
+    return res.status(400).json({ error: 'Current and new passwords are required.' });
+  }
+
+  try {
+    const user = (req as any).user;
+    const table = user.role === 'admin' ? 'admin_users' : 'accounts';
+    const row = user.role === 'admin'
+      ? db.prepare('SELECT id, password_hash FROM admin_users WHERE username = ?').get(user.username) as any
+      : db.prepare('SELECT id, password_hash FROM accounts WHERE id = ?').get(user.accountId) as any;
+
+    if (!row || !await bcrypt.compare(oldPassword, row.password_hash)) {
+      return res.status(400).json({ error: 'Current password is incorrect.' });
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    db.prepare(`UPDATE ${table} SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`).run(passwordHash, row.id);
     res.json({ success: true });
   } catch (error: any) {
     res.status(400).json({ error: error.message });
@@ -825,7 +976,7 @@ const handleEventUpload = (req: express.Request, res: express.Response) => {
 app.post('/api/events/:slug/upload/:category', authenticateToken, handleEventUpload);
 app.post('/api/events/:slug/upload/:category/:stopId', authenticateToken, handleEventUpload);
 
-app.get('/api/admin/assets', authenticateToken, (req, res) => {
+app.get('/api/admin/assets', authenticateToken, requireAdmin, (req, res) => {
   try {
     const references = collectImageReferences();
     const assets = collectUploadFiles(uploadsDir)
@@ -859,7 +1010,7 @@ app.get('/api/admin/assets', authenticateToken, (req, res) => {
   }
 });
 
-app.delete('/api/admin/assets', authenticateToken, (req, res) => {
+app.delete('/api/admin/assets', authenticateToken, requireAdmin, (req, res) => {
   const { url } = req.body;
   const normalizedUrl = normalizeUploadUrl(url);
 
@@ -921,7 +1072,7 @@ app.get('/api/bands', (req, res) => {
 app.post('/api/bands', authenticateToken, (req, res) => {
   const { province_id, province_zh, city_id, city_zh, band_id, name, name_zh, genre, intro, image_url, contact_info, netease_url, xiaohongshu_url, label_account_id } = req.body;
   try {
-    const normalizedLabelAccountId = normalizeOptionalLabelAccountId(label_account_id);
+    const normalizedLabelAccountId = normalizeScopedLabelAccountId(req, label_account_id);
     const info = db.prepare(`
       INSERT INTO bands (province_id, province_zh, city_id, city_zh, band_id, name, name_zh, genre, intro, image_url, contact_info, netease_url, xiaohongshu_url, label_account_id)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -935,7 +1086,8 @@ app.post('/api/bands', authenticateToken, (req, res) => {
 app.put('/api/bands/:id', authenticateToken, (req, res) => {
   const { province_id, province_zh, city_id, city_zh, band_id, name, name_zh, genre, intro, image_url, contact_info, netease_url, xiaohongshu_url, label_account_id } = req.body;
   try {
-    const normalizedLabelAccountId = normalizeOptionalLabelAccountId(label_account_id);
+    ensureLabelResourceAccess(req, 'bands', req.params.id);
+    const normalizedLabelAccountId = normalizeScopedLabelAccountId(req, label_account_id);
     db.prepare(`
       UPDATE bands SET 
         province_id = ?, province_zh = ?, city_id = ?, city_zh = ?, band_id = ?, name = ?, name_zh = ?, genre = ?, intro = ?, image_url = ?, contact_info = ?, netease_url = ?, xiaohongshu_url = ?, label_account_id = ?
@@ -949,6 +1101,7 @@ app.put('/api/bands/:id', authenticateToken, (req, res) => {
 
 app.delete('/api/bands/:id', authenticateToken, (req, res) => {
   try {
+    ensureLabelResourceAccess(req, 'bands', req.params.id);
     const band = db.prepare('SELECT image_url FROM bands WHERE id = ?').get(req.params.id) as any;
     if (band && band.image_url) {
       deleteLocalImage(band.image_url);
@@ -966,7 +1119,7 @@ app.get('/api/venues', (req, res) => {
   res.json(venues);
 });
 
-app.post('/api/venues', authenticateToken, (req, res) => {
+app.post('/api/venues', authenticateToken, requireAdmin, (req, res) => {
   const { province_id, province_zh, city_id, city_zh, venue_id, name, name_zh, address, capacity, intro, image_url, contact_info, ticket_url } = req.body;
   try {
     const info = db.prepare(`
@@ -979,7 +1132,7 @@ app.post('/api/venues', authenticateToken, (req, res) => {
   }
 });
 
-app.put('/api/venues/:id', authenticateToken, (req, res) => {
+app.put('/api/venues/:id', authenticateToken, requireAdmin, (req, res) => {
   const { province_id, province_zh, city_id, city_zh, venue_id, name, name_zh, address, capacity, intro, image_url, contact_info, ticket_url } = req.body;
   try {
     db.prepare(`
@@ -993,7 +1146,7 @@ app.put('/api/venues/:id', authenticateToken, (req, res) => {
   }
 });
 
-app.delete('/api/venues/:id', authenticateToken, (req, res) => {
+app.delete('/api/venues/:id', authenticateToken, requireAdmin, (req, res) => {
   try {
     const venue = db.prepare('SELECT image_url FROM venues WHERE id = ?').get(req.params.id) as any;
     if (venue && venue.image_url) {
@@ -1029,10 +1182,10 @@ app.get('/api/featured_events/:slugOrId', (req, res) => {
 app.post('/api/featured_events', authenticateToken, (req, res) => {
   const { slug, title, date_str, location, address, description, image_url, ticket_url, is_active, lineup, organizer, status, stops, qr_codes, label_account_id } = req.body;
   try {
-    const normalizedLabelAccountId = normalizeOptionalLabelAccountId(label_account_id);
+    const normalizedLabelAccountId = normalizeScopedLabelAccountId(req, label_account_id);
     const label = getLabelAccount(normalizedLabelAccountId);
     validateEventReferences(lineup, stops);
-    if (is_active) {
+    if (is_active && isAdminRequest(req)) {
       db.prepare('UPDATE featured_events SET is_active = 0').run();
     }
     const lineupStr = lineup ? JSON.stringify(lineup) : null;
@@ -1041,7 +1194,7 @@ app.post('/api/featured_events', authenticateToken, (req, res) => {
     const info = db.prepare(`
       INSERT INTO featured_events (slug, title, date_str, location, address, description, image_url, ticket_url, is_active, lineup, organizer, status, stops, qr_codes, label_account_id)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(slug || null, title, date_str, location, address, description, image_url, ticket_url, is_active ? 1 : 0, lineupStr, label?.display_name || organizer || '', status || 'on_sale', stopsStr, qrCodesStr, normalizedLabelAccountId);
+    `).run(slug || null, title, date_str, location, address, description, image_url, ticket_url, is_active && isAdminRequest(req) ? 1 : 0, lineupStr, label?.display_name || organizer || '', status || 'on_sale', stopsStr, qrCodesStr, normalizedLabelAccountId);
     res.json({ id: info.lastInsertRowid });
   } catch (error: any) {
     res.status(400).json({ error: error.message });
@@ -1051,10 +1204,11 @@ app.post('/api/featured_events', authenticateToken, (req, res) => {
 app.put('/api/featured_events/:id', authenticateToken, (req, res) => {
   const { slug, title, date_str, location, address, description, image_url, ticket_url, is_active, lineup, organizer, status, stops, qr_codes, label_account_id } = req.body;
   try {
-    const normalizedLabelAccountId = normalizeOptionalLabelAccountId(label_account_id);
+    ensureLabelResourceAccess(req, 'featured_events', req.params.id);
+    const normalizedLabelAccountId = normalizeScopedLabelAccountId(req, label_account_id);
     const label = getLabelAccount(normalizedLabelAccountId);
     validateEventReferences(lineup, stops);
-    if (is_active) {
+    if (is_active && isAdminRequest(req)) {
       db.prepare('UPDATE featured_events SET is_active = 0').run();
     }
     const lineupStr = lineup ? JSON.stringify(lineup) : null;
@@ -1064,7 +1218,7 @@ app.put('/api/featured_events/:id', authenticateToken, (req, res) => {
       UPDATE featured_events SET 
         slug = ?, title = ?, date_str = ?, location = ?, address = ?, description = ?, image_url = ?, ticket_url = ?, is_active = ?, lineup = ?, organizer = ?, status = ?, stops = ?, qr_codes = ?, label_account_id = ?
       WHERE id = ?
-    `).run(slug || null, title, date_str, location, address, description, image_url, ticket_url, is_active ? 1 : 0, lineupStr, label?.display_name || organizer || '', status || 'on_sale', stopsStr, qrCodesStr, normalizedLabelAccountId, req.params.id);
+    `).run(slug || null, title, date_str, location, address, description, image_url, ticket_url, is_active && isAdminRequest(req) ? 1 : 0, lineupStr, label?.display_name || organizer || '', status || 'on_sale', stopsStr, qrCodesStr, normalizedLabelAccountId, req.params.id);
     res.json({ success: true });
   } catch (error: any) {
     res.status(400).json({ error: error.message });
@@ -1073,6 +1227,7 @@ app.put('/api/featured_events/:id', authenticateToken, (req, res) => {
 
 app.delete('/api/featured_events/:id', authenticateToken, (req, res) => {
   try {
+    ensureLabelResourceAccess(req, 'featured_events', req.params.id);
     const event = db.prepare('SELECT image_url, qr_codes, stops FROM featured_events WHERE id = ?').get(req.params.id) as any;
     if (event && event.image_url) {
       deleteLocalImage(event.image_url);
@@ -1100,7 +1255,7 @@ app.get('/api/rehearsal_rooms', (req, res) => {
   res.json(rooms);
 });
 
-app.post('/api/rehearsal_rooms', authenticateToken, (req, res) => {
+app.post('/api/rehearsal_rooms', authenticateToken, requireAdmin, (req, res) => {
   const { province_id, province_zh, city_id, city_zh, room_id, name, name_zh, address, equipment, price_info, intro, image_url, contact_info } = req.body;
   try {
     const info = db.prepare(`
@@ -1113,7 +1268,7 @@ app.post('/api/rehearsal_rooms', authenticateToken, (req, res) => {
   }
 });
 
-app.put('/api/rehearsal_rooms/:id', authenticateToken, (req, res) => {
+app.put('/api/rehearsal_rooms/:id', authenticateToken, requireAdmin, (req, res) => {
   const { province_id, province_zh, city_id, city_zh, room_id, name, name_zh, address, equipment, price_info, intro, image_url, contact_info } = req.body;
   try {
     db.prepare(`
@@ -1127,7 +1282,7 @@ app.put('/api/rehearsal_rooms/:id', authenticateToken, (req, res) => {
   }
 });
 
-app.delete('/api/rehearsal_rooms/:id', authenticateToken, (req, res) => {
+app.delete('/api/rehearsal_rooms/:id', authenticateToken, requireAdmin, (req, res) => {
   try {
     const room = db.prepare('SELECT image_url FROM rehearsal_rooms WHERE id = ?').get(req.params.id) as any;
     if (room && room.image_url) {
@@ -1146,7 +1301,7 @@ app.get('/api/spots', (req, res) => {
   res.json(spots);
 });
 
-app.post('/api/spots', authenticateToken, (req, res) => {
+app.post('/api/spots', authenticateToken, requireAdmin, (req, res) => {
   const { province_id, province_zh, city_id, city_zh, spot_id, name, name_zh, type, address, business_hours, intro, image_url, contact_info, social_url } = req.body;
   try {
     const info = db.prepare(`
@@ -1159,7 +1314,7 @@ app.post('/api/spots', authenticateToken, (req, res) => {
   }
 });
 
-app.put('/api/spots/:id', authenticateToken, (req, res) => {
+app.put('/api/spots/:id', authenticateToken, requireAdmin, (req, res) => {
   const { province_id, province_zh, city_id, city_zh, spot_id, name, name_zh, type, address, business_hours, intro, image_url, contact_info, social_url } = req.body;
   try {
     db.prepare(`
@@ -1173,7 +1328,7 @@ app.put('/api/spots/:id', authenticateToken, (req, res) => {
   }
 });
 
-app.delete('/api/spots/:id', authenticateToken, (req, res) => {
+app.delete('/api/spots/:id', authenticateToken, requireAdmin, (req, res) => {
   try {
     const spot = db.prepare('SELECT image_url FROM spots WHERE id = ?').get(req.params.id) as any;
     if (spot && spot.image_url) {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { Code2, Lock, LogOut, Plus, Trash2, Edit2, Music, MapPin, X, Calendar, Star, Mic2, Coffee, Search, Upload, Image as ImageIcon, HardDrive, Link as LinkIcon, Users, Languages } from 'lucide-react';
+import { Navigate, useLocation, useSearchParams } from 'react-router-dom';
+import { Code2, KeyRound, Plus, Trash2, Edit2, Music, MapPin, X, Calendar, Star, Mic2, Coffee, Search, Upload, Image as ImageIcon, HardDrive, Link as LinkIcon, Users, Languages } from 'lucide-react';
 import BulkImportModal from '../components/BulkImportModal';
 import ImageAssetPicker from '../components/ImageAssetPicker';
 
@@ -242,16 +242,25 @@ const cleanQrCodesForSave = (qrCodes: EventQrCodeForm[]) => {
 
 const adminTabs = ['bands', 'venues', 'events', 'rehearsal_rooms', 'spots', 'accounts', 'assets', 'settings'] as const;
 type AdminTab = typeof adminTabs[number];
+type CurrentUser = {
+  role: 'admin' | 'label' | 'artist';
+  username: string;
+  displayName: string;
+  accountId?: number;
+  accountType?: string;
+};
+const labelEditorTabs: AdminTab[] = ['bands', 'events'];
 
 const inputClass = "bg-black/50 border border-white/10 rounded-lg px-3 py-2.5 text-sm w-full text-white placeholder:text-gray-600 focus:outline-none focus:border-[#ff4e00]";
 const compactInputClass = "bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-xs w-full text-white placeholder:text-gray-600 focus:outline-none focus:border-[#ff4e00]";
 const labelClass = "block text-xs font-medium uppercase tracking-wide text-gray-400";
 const emptyAssetSummary: ImageAssetSummary = { totalCount: 0, totalSize: 0, usedCount: 0, unusedCount: 0, unusedSize: 0 };
 const sourceImageMaxBytes = 8 * 1024 * 1024;
-const uploadImageMaxBytes = 1024 * 1024;
-const compressSkipBytes = 300 * 1024;
+const uploadImageMaxBytes = 300 * 1024;
+const compressSkipBytes = uploadImageMaxBytes;
 const compressTargetBytes = 260 * 1024;
 const compressMaxDimension = 1800;
+const unsupportedImageTypes = new Set(['image/svg+xml', 'image/gif']);
 
 const adminCopy: Record<AdminLanguage, Record<string, string>> = {
   zh: {
@@ -309,7 +318,7 @@ const adminCopy: Record<AdminLanguage, Record<string, string>> = {
     generate: '生成',
     apply: '应用',
     eventJsonPlaceholder: '在这里粘贴演出 JSON，然后点击应用。',
-    imageMax: '图片（自动压缩至约 200-300KB）',
+    imageMax: '图片（自动压缩，上传上限 300KB）',
     uploadFile: '上传文件',
     imageUrl: '图片 URL',
     chooseExisting: '选择已有图片',
@@ -317,8 +326,9 @@ const adminCopy: Record<AdminLanguage, Record<string, string>> = {
     eventJsonApplied: '演出 JSON 已应用',
     invalidJson: 'JSON 格式无效',
     sourceImageTooLarge: '源图片不能超过 8MB',
-    compressedImageTooLarge: '图片压缩后仍超过 1MB，请换一张更小的图',
+    compressedImageTooLarge: '图片压缩后仍超过 300KB，请换一张更小的图',
     imageCompressed: '图片已压缩至',
+    unsupportedImageType: '暂不支持 SVG 或 GIF，请上传 JPG、PNG 或 WebP',
     dataManagement: '数据管理',
     manageBands: '管理乐队',
     manageVenues: '管理场地',
@@ -353,8 +363,8 @@ const adminCopy: Record<AdminLanguage, Record<string, string>> = {
     spotId: '地点 ID',
     accountType: '账号类型',
     username: '登录名',
-    initialPassword: '初始密码',
-    newPasswordKeep: '新密码（留空不修改）',
+    initialPassword: '设置初始密码',
+    newPasswordKeep: '重置密码（留空不修改）',
     displayName: '显示名称',
     logo: '标志（建议方形，自动压缩）',
     pasteLogoUrl: '或粘贴标志 URL',
@@ -440,7 +450,7 @@ const adminCopy: Record<AdminLanguage, Record<string, string>> = {
     generate: 'Generate',
     apply: 'Apply',
     eventJsonPlaceholder: 'Paste event JSON here, then click Apply.',
-    imageMax: 'Image (auto-compressed to about 200-300KB)',
+    imageMax: 'Image (auto-compressed, 300KB upload limit)',
     uploadFile: 'Upload File',
     imageUrl: 'Image URL',
     chooseExisting: 'Choose Existing',
@@ -448,8 +458,9 @@ const adminCopy: Record<AdminLanguage, Record<string, string>> = {
     eventJsonApplied: 'Event JSON applied',
     invalidJson: 'Invalid JSON',
     sourceImageTooLarge: 'Source image must be under 8MB',
-    compressedImageTooLarge: 'Image is still over 1MB after compression; please choose a smaller image',
+    compressedImageTooLarge: 'Image is still over 300KB after compression; please choose a smaller image',
     imageCompressed: 'Image compressed to',
+    unsupportedImageType: 'SVG and GIF uploads are not supported. Please upload JPG, PNG, or WebP',
     dataManagement: 'Data Management',
     manageBands: 'Manage Bands',
     manageVenues: 'Manage Venues',
@@ -484,8 +495,8 @@ const adminCopy: Record<AdminLanguage, Record<string, string>> = {
     spotId: 'Spot ID',
     accountType: 'Account Type',
     username: 'Username',
-    initialPassword: 'Initial Password',
-    newPasswordKeep: 'New Password (leave blank to keep current)',
+    initialPassword: 'Set Initial Password',
+    newPasswordKeep: 'Reset Password (leave blank to keep current)',
     displayName: 'Display Name',
     logo: 'Logo (square recommended, auto-compressed)',
     pasteLogoUrl: 'Or paste logo URL',
@@ -528,7 +539,7 @@ const getCompressedFileName = (fileName: string) => {
 };
 
 const compressImageFile = async (file: File) => {
-  if (!file.type.startsWith('image/') || file.type === 'image/svg+xml' || file.type === 'image/gif' || file.size <= compressSkipBytes) {
+  if (!file.type.startsWith('image/') || file.size <= compressSkipBytes) {
     return file;
   }
 
@@ -596,14 +607,14 @@ function Field({ label, children, className = '' }: { label: string; children: R
 }
 
 export default function AdminPage() {
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const requestedTab = searchParams.get('tab');
   const requestedEdit = searchParams.get('edit');
   const initialTab: AdminTab = adminTabs.includes(requestedTab as AdminTab) ? requestedTab as AdminTab : 'bands';
   const autoEditKeyRef = useRef('');
   const [token, setToken] = useState(localStorage.getItem('adminToken'));
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [bands, setBands] = useState<any[]>([]);
   const [venues, setVenues] = useState<any[]>([]);
   const [events, setEvents] = useState<any[]>([]);
@@ -632,6 +643,9 @@ export default function AdminPage() {
   const [adminLanguage, setAdminLanguage] = useState<AdminLanguage>(() => (localStorage.getItem('adminLanguage') === 'en' ? 'en' : 'zh'));
   const [eventMode, setEventModeState] = useState<EventMode>('single');
   const t = (key: string) => adminCopy[adminLanguage][key] || key;
+  const isAdmin = currentUser?.role === 'admin';
+  const isLabelEditor = currentUser?.role === 'label';
+  const editableTabs = isAdmin ? [...adminTabs] : labelEditorTabs;
 
   const showMessage = (text: string, type: 'error' | 'success' = 'error') => {
     setMessage({ text, type });
@@ -715,10 +729,58 @@ export default function AdminPage() {
   }, [adminLanguage]);
 
   useEffect(() => {
-    if (token) {
+    const syncToken = () => {
+      const nextToken = localStorage.getItem('adminToken');
+      setToken(nextToken);
+      if (!nextToken) setCurrentUser(null);
+    };
+    window.addEventListener('storage', syncToken);
+    window.addEventListener('authchange', syncToken);
+    return () => {
+      window.removeEventListener('storage', syncToken);
+      window.removeEventListener('authchange', syncToken);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!token) {
+      setCurrentUser(null);
+      return;
+    }
+
+    fetch('/api/me', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
+      .then(res => {
+        if (!res.ok) throw new Error('Invalid session');
+        return res.json();
+      })
+      .then(data => {
+        setCurrentUser(data.user);
+        if (data.user?.role !== 'admin' && !labelEditorTabs.includes(activeTab)) {
+          setActiveTab('bands');
+        }
+      })
+      .catch(() => handleLogout());
+  }, [token]);
+
+  useEffect(() => {
+    if (token && currentUser) {
+      if (!editableTabs.includes(activeTab)) {
+        setActiveTab(editableTabs[0]);
+        return;
+      }
       fetchData();
     }
-  }, [token, activeTab]);
+  }, [token, currentUser, activeTab]);
+
+  useEffect(() => {
+    if (!isLabelEditor || !currentUser?.accountId || isEditing) return;
+    setFormData(prev => prev.label_account_id ? prev : {
+      ...prev,
+      label_account_id: String(currentUser.accountId)
+    });
+  }, [isLabelEditor, currentUser?.accountId, isEditing]);
 
   const fetchAdminAccounts = async () => {
     const res = await fetch('/api/accounts', {
@@ -741,6 +803,7 @@ export default function AdminPage() {
     setLoading(true);
     try {
       if (activeTab === 'assets') {
+        if (!isAdmin) return;
         const res = await fetch('/api/admin/assets', {
           headers: { 'Authorization': `Bearer ${token}` }
         });
@@ -767,10 +830,15 @@ export default function AdminPage() {
           fetch('/api/featured_events').then(res => res.json()),
           fetch('/api/bands').then(res => res.json()),
           fetch('/api/venues').then(res => res.json()),
-          fetchAdminAccounts()
+          isAdmin ? fetchAdminAccounts() : Promise.resolve(currentUser?.accountId ? [{
+            id: currentUser.accountId,
+            account_type: 'label',
+            username: currentUser.username,
+            display_name: currentUser.displayName
+          }] : [])
         ]);
-        setEvents(eventsData);
-        setBands(bandsData);
+        setEvents(isLabelEditor ? eventsData.filter((event: any) => Number(event.label_account_id) === Number(currentUser?.accountId)) : eventsData);
+        setBands(isLabelEditor ? bandsData.filter((band: any) => Number(band.label_account_id) === Number(currentUser?.accountId)) : bandsData);
         setVenues(venuesData);
         setAccounts(accountsData);
         return;
@@ -779,9 +847,14 @@ export default function AdminPage() {
       if (activeTab === 'bands') {
         const [bandsData, accountsData] = await Promise.all([
           fetch('/api/bands').then(res => res.json()),
-          fetchAdminAccounts()
+          isAdmin ? fetchAdminAccounts() : Promise.resolve(currentUser?.accountId ? [{
+            id: currentUser.accountId,
+            account_type: 'label',
+            username: currentUser.username,
+            display_name: currentUser.displayName
+          }] : [])
         ]);
-        setBands(bandsData);
+        setBands(isLabelEditor ? bandsData.filter((band: any) => Number(band.label_account_id) === Number(currentUser?.accountId)) : bandsData);
         setAccounts(accountsData);
         return;
       }
@@ -807,30 +880,10 @@ export default function AdminPage() {
     }
   };
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    try {
-      const res = await fetch('/api/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password })
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setToken(data.token);
-        localStorage.setItem('adminToken', data.token);
-      } else {
-        setError(data.error || 'Login failed');
-      }
-    } catch (err) {
-      setError('Network error');
-    }
-  };
-
   const handleLogout = () => {
     setToken(null);
     localStorage.removeItem('adminToken');
+    window.dispatchEvent(new Event('authchange'));
   };
 
   const handleChangePassword = async (e: React.FormEvent) => {
@@ -864,6 +917,11 @@ export default function AdminPage() {
   };
 
   const uploadImageFile = async (file: File, options?: { eventCategory?: 'poster' | 'qr' | 'recap'; stopId?: string }) => {
+    if (unsupportedImageTypes.has(file.type)) {
+      showMessage(t('unsupportedImageType'), 'error');
+      return null;
+    }
+
     if (file.size > sourceImageMaxBytes) {
       showMessage(t('sourceImageTooLarge'), 'error');
       return null;
@@ -1255,11 +1313,14 @@ export default function AdminPage() {
           showMessage('Initial password is required for new accounts');
           return;
         }
+        if (isEditing && !payload.password.trim()) {
+          delete payload.password;
+        }
         payload.display_name = payload.display_name || payload.name_zh || payload.name;
         payload.account_type = payload.account_type === 'label' ? 'label' : 'artist';
       } else {
         payload.contact_info = contactValue ? `${contactType}:${contactValue}` : '';
-        payload.label_account_id = payload.label_account_id || null;
+        payload.label_account_id = isLabelEditor && currentUser?.accountId ? currentUser.accountId : payload.label_account_id || null;
       }
       if (activeTab === 'venues') {
         payload.capacity = parseInt(payload.capacity as string) || 0 as any;
@@ -1445,7 +1506,7 @@ export default function AdminPage() {
     setFormData({
       province_id: '', province_zh: '', city_id: '', city_zh: '',
       band_id: '', venue_id: '', room_id: '', spot_id: '', name: '', name_zh: '', genre: '', type: '',
-      label_account_id: '',
+      label_account_id: isLabelEditor && currentUser?.accountId ? String(currentUser.accountId) : '',
       account_type: 'artist', username: '', password: '', display_name: '', logo_url: '', contact_name: '', linked_entity_id: '', notes: '',
       netease_url: '', xiaohongshu_url: '', social_url: '', ticket_url: '',
       slug: '', title: '', date_str: '', location: '', organizer: '', status: activeTab === 'accounts' ? 'active' : 'on_sale', is_active: false, lineup: [], stops: [createEmptyStop(0, 'single')], qr_codes: [],
@@ -1469,27 +1530,13 @@ export default function AdminPage() {
   }, [token, activeTab, requestedEdit, events]);
 
   if (!token) {
+    return <Navigate to={`/login?next=${encodeURIComponent(`${location.pathname}${location.search}`)}`} replace />;
+  }
+
+  if (!currentUser) {
     return (
-      <div className="min-h-[100dvh] bg-[#0a0502] flex items-center justify-center p-4">
-        <form onSubmit={handleLogin} className="bg-[#1a1a1a] p-8 rounded-2xl max-w-md w-full border border-white/10">
-          <div className="flex justify-center mb-6">
-            <div className="w-12 h-12 bg-[#ff4e00] rounded-full flex items-center justify-center text-white">
-              <Lock size={24} />
-            </div>
-          </div>
-          <h2 className="text-2xl text-white text-center mb-6 font-serif">Admin Access</h2>
-          {error && <p className="text-red-500 text-sm text-center mb-4">{error}</p>}
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Enter admin password"
-            className="w-full bg-black/50 border border-white/10 rounded-lg px-4 py-3 text-white mb-6 focus:outline-none focus:border-[#ff4e00]"
-          />
-          <button type="submit" className="w-full bg-[#ff4e00] text-white rounded-lg py-3 font-medium hover:bg-[#ff4e00]/90 transition-colors">
-            Enter
-          </button>
-        </form>
+      <div className="min-h-[100dvh] bg-[#0a0502] flex items-center justify-center text-[#ff4e00] font-mono">
+        Loading Account...
       </div>
     );
   }
@@ -1527,6 +1574,9 @@ export default function AdminPage() {
   const labelOptions = accounts
     .filter(account => account.account_type === 'label')
     .sort((a, b) => (a.display_name || '').localeCompare(b.display_name || '', 'zh-Hans-CN'));
+  const visibleLabelOptions = isLabelEditor && currentUser?.accountId
+    ? labelOptions.filter(account => Number(account.id) === Number(currentUser.accountId))
+    : labelOptions;
   const mainLineupBandIds = Array.from(new Set(formData.lineup.flatMap(day => day.bandIds || [])));
   const filteredLineupBands = bands.filter(band => {
     if (mainLineupBandIds.includes(band.band_id)) return false;
@@ -1584,7 +1634,7 @@ export default function AdminPage() {
   };
 
   return (
-    <div className="min-h-[100dvh] bg-[#0a0502] text-white p-5 md:p-8 font-sans">
+    <div className="min-h-[100dvh] bg-[#0a0502] text-white px-5 pb-5 pt-[calc(4.4rem+env(safe-area-inset-top))] sm:px-6 md:px-10 md:pb-8 md:pt-24 lg:px-12 xl:px-14 font-sans">
       <div className="max-w-7xl mx-auto">
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-serif">{t('dataManagement')}</h1>
@@ -1603,9 +1653,6 @@ export default function AdminPage() {
               <Languages size={17} />
               {adminLanguage === 'zh' ? '中文' : 'EN'}
             </button>
-            <button onClick={handleLogout} className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors">
-              <LogOut size={20} /> Logout
-            </button>
           </div>
         </div>
 
@@ -1617,54 +1664,62 @@ export default function AdminPage() {
           >
             <Music size={18} /> {t('manageBands')}
           </button>
-          <button 
-            onClick={() => { setActiveTab('venues'); resetForm(); }}
-            className={`flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-colors ${activeTab === 'venues' ? 'bg-[#ff4e00] text-white' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}
-          >
-            <MapPin size={18} /> {t('manageVenues')}
-          </button>
-          <button 
-            onClick={() => { setActiveTab('rehearsal_rooms'); resetForm(); }}
-            className={`flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-colors ${activeTab === 'rehearsal_rooms' ? 'bg-[#ff4e00] text-white' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}
-          >
-            <Mic2 size={18} /> {t('manageRehearsalRooms')}
-          </button>
-          <button 
-            onClick={() => { setActiveTab('spots'); resetForm(); }}
-            className={`flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-colors ${activeTab === 'spots' ? 'bg-[#ff4e00] text-white' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}
-          >
-            <Coffee size={18} /> {t('manageSpots')}
-          </button>
+          {isAdmin && (
+            <>
+              <button 
+                onClick={() => { setActiveTab('venues'); resetForm(); }}
+                className={`flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-colors ${activeTab === 'venues' ? 'bg-[#ff4e00] text-white' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}
+              >
+                <MapPin size={18} /> {t('manageVenues')}
+              </button>
+              <button 
+                onClick={() => { setActiveTab('rehearsal_rooms'); resetForm(); }}
+                className={`flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-colors ${activeTab === 'rehearsal_rooms' ? 'bg-[#ff4e00] text-white' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}
+              >
+                <Mic2 size={18} /> {t('manageRehearsalRooms')}
+              </button>
+              <button 
+                onClick={() => { setActiveTab('spots'); resetForm(); }}
+                className={`flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-colors ${activeTab === 'spots' ? 'bg-[#ff4e00] text-white' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}
+              >
+                <Coffee size={18} /> {t('manageSpots')}
+              </button>
+            </>
+          )}
           <button 
             onClick={() => { setActiveTab('events'); resetForm(); }}
             className={`flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-colors ${activeTab === 'events' ? 'bg-[#ff4e00] text-white' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}
           >
             <Calendar size={18} /> {t('manageEvents')}
           </button>
-          <button
-            onClick={() => { setActiveTab('accounts'); resetForm(); }}
-            className={`flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-colors ${activeTab === 'accounts' ? 'bg-[#ff4e00] text-white' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}
-          >
-            <Users size={18} /> {t('manageAccounts')}
-          </button>
-          <button
-            onClick={() => { setActiveTab('assets'); resetForm(); }}
-            className={`flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-colors ${activeTab === 'assets' ? 'bg-[#ff4e00] text-white' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}
-          >
-            <ImageIcon size={18} /> {t('imageAssets')}
-          </button>
-          <button 
-            onClick={() => { setActiveTab('settings'); resetForm(); }}
-            className={`flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-colors ${activeTab === 'settings' ? 'bg-[#ff4e00] text-white' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}
-          >
-            <Lock size={18} /> {t('settings')}
-          </button>
+          {isAdmin && (
+            <>
+              <button
+                onClick={() => { setActiveTab('accounts'); resetForm(); }}
+                className={`flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-colors ${activeTab === 'accounts' ? 'bg-[#ff4e00] text-white' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}
+              >
+                <Users size={18} /> {t('manageAccounts')}
+              </button>
+              <button
+                onClick={() => { setActiveTab('assets'); resetForm(); }}
+                className={`flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-colors ${activeTab === 'assets' ? 'bg-[#ff4e00] text-white' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}
+              >
+                <ImageIcon size={18} /> {t('imageAssets')}
+              </button>
+              <button 
+                onClick={() => { setActiveTab('settings'); resetForm(); }}
+                className={`flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-colors ${activeTab === 'settings' ? 'bg-[#ff4e00] text-white' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}
+              >
+                <KeyRound size={18} /> {t('settings')}
+              </button>
+            </>
+          )}
         </div>
 
         {activeTab === 'settings' ? (
           <div className="bg-[#1a1a1a] p-6 rounded-2xl border border-white/10 max-w-md">
             <h2 className="text-xl mb-6 font-medium flex items-center gap-2">
-              <Lock size={20} className="text-[#ff4e00]" />
+              <KeyRound size={20} className="text-[#ff4e00]" />
               {t('changePassword')}
             </h2>
             <form onSubmit={handleChangePassword} className="space-y-4">
@@ -1904,25 +1959,31 @@ export default function AdminPage() {
                     <input required placeholder={t('eventTitle')} value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} className={inputClass} />
                   </Field>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Field label={t('label')}>
-                      <select
-                        value={formData.label_account_id}
-                        onChange={e => {
-                          const selectedLabel = labelOptions.find(label => String(label.id) === e.target.value);
-                          setFormData({
-                            ...formData,
-                            label_account_id: e.target.value,
-                            organizer: selectedLabel?.display_name || ''
-                          });
-                        }}
-                        className={inputClass}
-                      >
-                        <option value="">不绑定厂牌</option>
-                        {labelOptions.map(label => (
-                          <option key={label.id} value={label.id}>{label.display_name}</option>
-                        ))}
-                      </select>
-                    </Field>
+                    {isAdmin ? (
+                      <Field label={t('label')}>
+                        <select
+                          value={formData.label_account_id}
+                          onChange={e => {
+                            const selectedLabel = visibleLabelOptions.find(label => String(label.id) === e.target.value);
+                            setFormData({
+                              ...formData,
+                              label_account_id: e.target.value,
+                              organizer: selectedLabel?.display_name || ''
+                            });
+                          }}
+                          className={inputClass}
+                        >
+                          <option value="">不绑定厂牌</option>
+                          {visibleLabelOptions.map(label => (
+                            <option key={label.id} value={label.id}>{label.display_name}</option>
+                          ))}
+                        </select>
+                      </Field>
+                    ) : (
+                      <div className="rounded-lg border border-white/10 bg-black/35 px-3 py-2 text-sm text-white/72">
+                        厂牌：{currentUser?.displayName}
+                      </div>
+                    )}
                     <Field label={t('status')}>
                       <select value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})} className={inputClass}>
                         <option value="on_sale">售票中</option>
@@ -1966,10 +2027,12 @@ export default function AdminPage() {
                     <div><span className="text-gray-500">{t('autoLocation')}:</span> {buildEventLegacyFields(formData, venues).location || t('autoEmpty')}</div>
                     <div><span className="text-gray-500">{t('autoAddress')}:</span> {buildEventLegacyFields(formData, venues).address || t('autoEmpty')}</div>
                   </div>
-                  <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                    <input type="checkbox" checked={formData.is_active} onChange={e => setFormData({...formData, is_active: e.target.checked})} className="rounded border-white/10 bg-black/50 text-[#ff4e00] focus:ring-[#ff4e00]" />
-                    {t('setActive')}
-                  </label>
+                  {isAdmin && (
+                    <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                      <input type="checkbox" checked={formData.is_active} onChange={e => setFormData({...formData, is_active: e.target.checked})} className="rounded border-white/10 bg-black/50 text-[#ff4e00] focus:ring-[#ff4e00]" />
+                      {t('setActive')}
+                    </label>
+                  )}
                 </>
               ) : activeTab === 'accounts' ? (
                 <>
@@ -2005,7 +2068,7 @@ export default function AdminPage() {
                       <input required placeholder="e.g. maybe-mars" value={formData.username} onChange={e => setFormData({...formData, username: e.target.value})} className={inputClass} />
                     </Field>
                     <Field label={isEditing ? t('newPasswordKeep') : t('initialPassword')}>
-                      <input type="password" required={!isEditing} placeholder={isEditing ? t('newPasswordKeep') : t('initialPassword')} value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} className={inputClass} />
+                      <input type="password" required={!isEditing} placeholder={isEditing ? t('newPasswordKeep') : t('initialPassword')} value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} autoComplete="new-password" className={inputClass} />
                     </Field>
                   </div>
                   <Field label={t('displayName')}>
@@ -2064,18 +2127,24 @@ export default function AdminPage() {
               {activeTab === 'bands' ? (
                 <>
                   <Field label={t('genre')}><input required placeholder="e.g. Indie Rock" value={formData.genre} onChange={e => setFormData({...formData, genre: e.target.value})} className={inputClass} /></Field>
-                  <Field label={t('label')}>
-                    <select
-                      value={formData.label_account_id}
-                      onChange={e => setFormData({...formData, label_account_id: e.target.value})}
-                      className={inputClass}
-                    >
-                      <option value="">不绑定厂牌</option>
-                      {labelOptions.map(label => (
-                        <option key={label.id} value={label.id}>{label.display_name}</option>
-                      ))}
-                    </select>
-                  </Field>
+                  {isAdmin ? (
+                    <Field label={t('label')}>
+                      <select
+                        value={formData.label_account_id}
+                        onChange={e => setFormData({...formData, label_account_id: e.target.value})}
+                        className={inputClass}
+                      >
+                        <option value="">不绑定厂牌</option>
+                        {visibleLabelOptions.map(label => (
+                          <option key={label.id} value={label.id}>{label.display_name}</option>
+                        ))}
+                      </select>
+                    </Field>
+                  ) : (
+                    <div className="rounded-lg border border-white/10 bg-black/35 px-3 py-2 text-sm text-white/72">
+                      厂牌：{currentUser?.displayName}
+                    </div>
+                  )}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <Field label={t('neteaseUrl')}><input placeholder={t('neteaseUrl')} value={formData.netease_url} onChange={e => setFormData({...formData, netease_url: e.target.value})} className={inputClass} /></Field>
                     <Field label={t('xiaohongshuUrl')}><input placeholder={t('xiaohongshuUrl')} value={formData.xiaohongshu_url} onChange={e => setFormData({...formData, xiaohongshu_url: e.target.value})} className={inputClass} /></Field>
