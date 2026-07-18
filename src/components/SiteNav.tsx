@@ -131,17 +131,31 @@ export default function SiteNav() {
   return (
     <nav className="fixed left-0 right-0 top-0 z-50 pointer-events-none">
       <div className="absolute inset-x-0 top-0 h-[calc(5.3rem+env(safe-area-inset-top))] bg-[linear-gradient(180deg,rgba(10,5,2,0.94)_0%,rgba(10,5,2,0.6)_50%,rgba(10,5,2,0)_100%)]" />
-      <div className="pointer-events-auto relative flex h-[calc(3.2rem+env(safe-area-inset-top))] items-end justify-between border-b border-white/[0.045] px-6 pb-2.5 backdrop-blur-[18px] sm:px-7 md:h-[4.25rem] md:items-center md:px-12 md:pb-0 lg:px-14 xl:px-16">
+      <div className="pointer-events-auto relative flex h-[calc(3.2rem+env(safe-area-inset-top))] items-end justify-between border-b border-white/[0.045] px-6 pb-2.5 backdrop-blur-[18px] sm:px-7 md:h-[3.65rem] md:items-center md:px-12 md:pb-0 lg:px-14 xl:px-16">
         <Link
           to="/"
-          className="group flex min-w-0 items-center text-white transition-opacity hover:opacity-85"
+          className="group flex min-w-0 max-w-[calc(100vw-4.5rem)] items-center text-white transition-opacity hover:opacity-85"
           aria-label="回到地图主页"
         >
-          <img
-            src="/brand/indie-rock-map-white.png"
-            alt="Indie Rock Map by Catbeer Records"
-            className="h-11 w-auto max-w-[14rem] object-contain object-left md:h-14 md:max-w-[21rem]"
-          />
+          <span className="flex min-w-0 items-center gap-2.5 md:gap-3">
+            <img
+              src="/brand/indie-rock-map-mark-orange.png"
+              alt=""
+              className="h-9 w-auto shrink-0 object-contain md:h-12"
+            />
+            <span className="flex min-w-0 items-center gap-2 md:gap-3">
+              <img
+                src="/brand/indie-rock-map-title-white.png"
+                alt="Indie Rock Map"
+                className="h-5 w-auto shrink-0 object-contain md:h-7"
+              />
+              <img
+                src="/brand/catbeer-records-orange.png"
+                alt="By Catbeer Records"
+                className="h-2.5 w-auto shrink-0 object-contain md:h-3.5"
+              />
+            </span>
+          </span>
         </Link>
 
         <div className="hidden items-center gap-7 md:flex">
