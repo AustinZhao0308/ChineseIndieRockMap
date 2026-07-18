@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Menu, Music2, X } from "lucide-react";
+import { Menu, X } from "lucide-react";
 
 type NavUser = {
   session: "map" | "app";
@@ -134,20 +134,14 @@ export default function SiteNav() {
       <div className="pointer-events-auto relative flex h-[calc(3.2rem+env(safe-area-inset-top))] items-end justify-between border-b border-white/[0.045] px-5 pb-2.5 backdrop-blur-[18px] sm:px-6 md:h-[3.65rem] md:items-center md:px-10 md:pb-0 lg:px-12 xl:px-14">
         <Link
           to="/"
-          className="group flex min-w-0 items-center gap-3 text-white transition-colors"
+          className="group flex min-w-0 items-center text-white transition-opacity hover:opacity-85"
           aria-label="回到地图主页"
         >
-          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#ff4e00] text-white shadow-[0_0_20px_rgba(255,78,0,0.32)] transition-transform group-hover:scale-105 md:h-10 md:w-10">
-            <Music2 size={18} className="md:h-5 md:w-5" />
-          </span>
-          <span className="min-w-0 md:flex md:items-baseline md:gap-3">
-            <span className="block truncate font-serif text-[18px] leading-none tracking-normal text-white md:text-[24px]">
-              独立摇滚地图
-            </span>
-            <span className="mt-1 hidden font-mono text-[9px] uppercase leading-none text-white/36 sm:block md:mt-0 md:text-[12px] md:tracking-[0.12em]">
-              Indie Rock Map
-            </span>
-          </span>
+          <img
+            src="/brand/indie-rock-map-white.png"
+            alt="Indie Rock Map by Catbeer Records"
+            className="h-8 w-auto max-w-[11rem] object-contain object-left md:h-10 md:max-w-[15rem]"
+          />
         </Link>
 
         <div className="hidden items-center gap-7 md:flex">
