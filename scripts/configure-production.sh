@@ -18,14 +18,31 @@ existing_user_jwt="$(env_value USER_JWT_SECRET)"
 existing_admin="$(env_value ADMIN_USERNAME)"
 existing_db="$(env_value DATABASE_PATH)"
 default_jwt='super_secret_jwt_key_for_indie_rock_map'
+rotate_map_jwt=false
 
-if [ "${#existing_jwt}" -lt 32 ] || [ "$existing_jwt" = "$default_jwt" ]; then
-  echo 'Current JWT_SECRET is missing or is the development default. No files were changed.' >&2
-  echo 'Stop here to preserve existing label sessions while the JWT migration is planned.' >&2
+if [ "${1:-}" = '--rotate-map-jwt' ]; then
+  rotate_map_jwt=true
+elif [ -n "${1:-}" ]; then
+  echo 'Usage: bash scripts/configure-production.sh [--rotate-map-jwt]' >&2
   exit 1
 fi
 
-map_jwt="$existing_jwt"
+if [ "${#existing_jwt}" -lt 32 ] || [ "$existing_jwt" = "$default_jwt" ]; then
+  if [ "$rotate_map_jwt" = false ]; then
+    echo 'Current JWT_SECRET is missing or is the development default. No files were changed.' >&2
+    echo 'Re-run with --rotate-map-jwt to create a secure secret and require existing sessions to sign in again.' >&2
+    exit 1
+  fi
+
+  read -r -p 'This signs out current map administrators and label users. Type ROTATE to continue: ' confirmation
+  if [ "$confirmation" != 'ROTATE' ]; then
+    echo 'JWT rotation was cancelled. No files were changed.' >&2
+    exit 1
+  fi
+  map_jwt="$(openssl rand -hex 32)"
+else
+  map_jwt="$existing_jwt"
+fi
 admin_username="${existing_admin:-admin}"
 
 printf 'Administrator username [%s]: ' "$admin_username"
