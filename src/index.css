@@ -5,6 +5,18 @@
   .content-input {
     @apply mt-2 w-full rounded-lg border border-white/10 bg-black/45 px-3 py-2.5 text-sm text-white outline-none placeholder:text-white/25 focus:border-[#ff4e00]/70;
   }
+
+  .editor-label {
+    @apply block text-[11px] font-mono uppercase tracking-[0.11em] text-white/38;
+  }
+
+  .editor-input {
+    @apply mt-2 h-9 w-full border border-white/10 bg-black/30 px-3 text-sm text-white outline-none placeholder:text-white/24 focus:border-[#ff4e00]/70;
+  }
+
+  .editor-utility {
+    @apply inline-flex h-8 items-center justify-center gap-1.5 border border-white/10 text-xs text-white/58 transition-colors hover:bg-white/[0.06] hover:text-white;
+  }
 }
 
 html, body {

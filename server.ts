@@ -1052,6 +1052,8 @@ const toPublicPost = (post: any, includeEvent = true) => {
     city: post.city_zh,
     tags,
     publishedAt: post.published_at,
+    createdAt: post.created_at,
+    updatedAt: post.updated_at,
     viewerHasSaved: Boolean(post.viewer_has_saved)
   };
 
@@ -1398,6 +1400,12 @@ app.get('/api/account/cheers', requireAppUser, (req, res) => {
 app.get('/api/admin/posts', authenticateToken, requireAdmin, (_req, res) => {
   const posts = db.prepare('SELECT * FROM posts ORDER BY updated_at DESC, id DESC').all() as any[];
   res.json({ posts: posts.map(post => ({ ...toPublicPost(post, false), status: post.status, sortOrder: post.sort_order, featuredEventId: post.featured_event_id })) });
+});
+
+app.get('/api/admin/posts/:id', authenticateToken, requireAdmin, (req, res) => {
+  const post = db.prepare('SELECT * FROM posts WHERE id = ?').get(req.params.id) as any;
+  if (!post) return res.status(404).json({ error: 'Post not found.' });
+  res.json({ post: { ...toPublicPost(post, false), status: post.status, sortOrder: post.sort_order, featuredEventId: post.featured_event_id } });
 });
 
 app.post('/api/admin/posts', authenticateToken, requireAdmin, (req, res) => {
