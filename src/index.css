@@ -1,6 +1,12 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Serif+SC:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 @import "tailwindcss";
 
+@layer components {
+  .content-input {
+    @apply mt-2 w-full rounded-lg border border-white/10 bg-black/45 px-3 py-2.5 text-sm text-white outline-none placeholder:text-white/25 focus:border-[#ff4e00]/70;
+  }
+}
+
 html, body {
   background-color: #0a0502;
   color: #ffffff;

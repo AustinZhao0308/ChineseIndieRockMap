@@ -49,8 +49,18 @@ export default function SiteNav() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [user, setUser] = useState<NavUser | null>(() => getStoredUser());
   const navItems = user
-    ? [...baseNavItems, { to: "/admin", label: "管理", match: (path: string) => path.startsWith("/admin") }]
-    : [...baseNavItems, { to: "/login", label: "登录 / 注册", match: (path: string) => path.startsWith("/login") }];
+    ? [
+      ...baseNavItems,
+      { to: "/admin", label: "数据管理", match: (path: string) => path === "/admin" },
+      ...(user.role === "admin"
+        ? [{ to: "/admin/posts", label: "内容流", match: (path: string) => path.startsWith("/admin/posts") }]
+        : [])
+    ]
+    : [
+      ...baseNavItems,
+      { to: "/user-login", label: "乐迷登录", match: (path: string) => path.startsWith("/user-login") },
+      { to: "/login", label: "合作方登录", match: (path: string) => path.startsWith("/login") }
+    ];
 
   useEffect(() => {
     setIsMenuOpen(false);

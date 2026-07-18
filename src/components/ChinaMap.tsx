@@ -10,6 +10,7 @@ interface ChinaMapProps {
   onProvinceClick: (provinceId: string) => void;
   selectedProvinceId: string | null;
   provinceData: Record<string, Province>;
+  theme?: 'light' | 'dark';
 }
 
 const normalizeProvinceName = (name: string) => {
@@ -36,10 +37,23 @@ const interpolateColor = (color1: string, color2: string, factor: number) => {
   return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
 };
 
-const ChinaMap: React.FC<ChinaMapProps> = ({ onProvinceClick, selectedProvinceId, provinceData }) => {
+const ChinaMap: React.FC<ChinaMapProps> = ({ onProvinceClick, selectedProvinceId, provinceData, theme = 'dark' }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const [transform, setTransform] = useState<ZoomTransform>(zoomIdentity);
   const [hoveredProvince, setHoveredProvince] = useState<string | null>(null);
+  const colors = theme === 'light'
+    ? {
+        background: '#f6f3ed', empty: '#ded8cd', emptyHover: '#cdc5b8',
+        dataStart: '#f0d5aa', dataEnd: '#b8502f', active: '#d84b23',
+        stroke: '#c6bcae', hoverStroke: '#8f7b6a', label: '#4a3c33', inactiveLabel: '#8d8378',
+        atmosphere: 'radial-gradient(circle at 50% 50%, transparent 42%, rgba(133, 106, 79, 0.16) 100%)'
+      }
+    : {
+        background: '#0a0502', empty: '#1a1a1a', emptyHover: '#222222',
+        dataStart: '#2c100b', dataEnd: '#732600', active: '#ff4e00',
+        stroke: '#333333', hoverStroke: '#555555', label: '#ffffff', inactiveLabel: '#888888',
+        atmosphere: 'radial-gradient(circle at 50% 50%, transparent 40%, rgba(10, 5, 2, 0.8) 100%)'
+      };
 
   // Set up projection
   const projection = useMemo(() => {
@@ -120,7 +134,7 @@ const ChinaMap: React.FC<ChinaMapProps> = ({ onProvinceClick, selectedProvinceId
   }, [selectedProvinceId]);
 
   return (
-    <div className="w-full h-full bg-[#0a0502] flex items-center justify-center relative overflow-hidden">
+    <div className="w-full h-full flex items-center justify-center relative overflow-hidden" style={{ background: colors.background }}>
       <svg
         ref={svgRef}
         viewBox="0 0 800 600"
@@ -140,13 +154,13 @@ const ChinaMap: React.FC<ChinaMapProps> = ({ onProvinceClick, selectedProvinceId
             const isHovered = hoveredProvince === provinceName;
 
             // Determine styles
-            let fill = "#1a1a1a";
-            if (isSelected) fill = "#ff4e00";
-            else if (isHovered && hasData) fill = "#ff4e00";
-            else if (isHovered && !hasData) fill = "#222222";
+            let fill = colors.empty;
+            if (isSelected) fill = colors.active;
+            else if (isHovered && hasData) fill = colors.active;
+            else if (isHovered && !hasData) fill = colors.emptyHover;
             else if (hasData) {
               const factor = maxCount > minCount ? (count - minCount) / (maxCount - minCount) : 0;
-              fill = interpolateColor("#2c100b", "#732600", factor);
+              fill = interpolateColor(colors.dataStart, colors.dataEnd, factor);
             }
 
             return (
@@ -154,7 +168,7 @@ const ChinaMap: React.FC<ChinaMapProps> = ({ onProvinceClick, selectedProvinceId
                 key={geo.properties.id || index}
                 d={pathGenerator(geo) || ""}
                 fill={fill}
-                stroke={isHovered ? "#555555" : "#333333"}
+                stroke={isHovered ? colors.hoverStroke : colors.stroke}
                 strokeWidth={(isHovered ? 1 : 0.5) / transform.k}
                 style={{
                   cursor: hasData ? "pointer" : "default",
@@ -192,13 +206,13 @@ const ChinaMap: React.FC<ChinaMapProps> = ({ onProvinceClick, selectedProvinceId
               const isHovered = hoveredProvince === region.name;
 
               // Determine styles
-              let fill = "#1a1a1a";
-              if (isSelected) fill = "#ff4e00";
-              else if (isHovered && hasData) fill = "#ff4e00";
-              else if (isHovered && !hasData) fill = "#222222";
+              let fill = colors.empty;
+              if (isSelected) fill = colors.active;
+              else if (isHovered && hasData) fill = colors.active;
+              else if (isHovered && !hasData) fill = colors.emptyHover;
               else if (hasData) {
                 const factor = maxCount > minCount ? (count - minCount) / (maxCount - minCount) : 0;
-                fill = interpolateColor("#2c100b", "#732600", factor);
+                fill = interpolateColor(colors.dataStart, colors.dataEnd, factor);
               }
 
               const [x, y] = projection(region.coords) || [0, 0];
@@ -239,7 +253,7 @@ const ChinaMap: React.FC<ChinaMapProps> = ({ onProvinceClick, selectedProvinceId
                     y1={y} 
                     x2={labelX} 
                     y2={labelY} 
-                    stroke={isHovered ? "#888" : "#444"} 
+                    stroke={isHovered ? colors.hoverStroke : colors.stroke}
                     strokeWidth={1 * scale}
                   />
                   
@@ -251,7 +265,7 @@ const ChinaMap: React.FC<ChinaMapProps> = ({ onProvinceClick, selectedProvinceId
                     height={rectH} 
                     rx={3 * scale}
                     fill={fill}
-                    stroke={isHovered ? "#555555" : "#333333"}
+                    stroke={isHovered ? colors.hoverStroke : colors.stroke}
                     strokeWidth={(isHovered ? 1.5 : 0.5) * scale}
                     style={{ transition: "fill 250ms, stroke 250ms" }}
                   />
@@ -262,7 +276,7 @@ const ChinaMap: React.FC<ChinaMapProps> = ({ onProvinceClick, selectedProvinceId
                     y={labelY + 1 * scale}
                     textAnchor="middle"
                     alignmentBaseline="middle"
-                    fill={hasData ? "#ffffff" : "#888888"}
+                    fill={hasData ? colors.label : colors.inactiveLabel}
                     fontSize={fontSize}
                     style={{ pointerEvents: "none", transition: "fill 250ms" }}
                   >
@@ -277,7 +291,7 @@ const ChinaMap: React.FC<ChinaMapProps> = ({ onProvinceClick, selectedProvinceId
       
       {/* Atmosphere effects */}
       <div className="absolute inset-0 pointer-events-none" style={{
-        background: 'radial-gradient(circle at 50% 50%, transparent 40%, rgba(10, 5, 2, 0.8) 100%)'
+        background: colors.atmosphere
       }} />
     </div>
   );

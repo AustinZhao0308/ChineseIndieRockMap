@@ -53,3 +53,36 @@ npm run build
 ```
 
 The built files will be output to the `dist` directory.
+
+## Production deployment
+
+The server runs the Express API and serves `dist` when started with `npm start`. Keep its runtime configuration in a server-only `.env` file; do not commit it.
+
+```bash
+NODE_ENV=production
+ADMIN_USERNAME=catbeer_admin
+ADMIN_DISPLAY_NAME=Catbeer Admin
+ADMIN_PASSWORD_HASH=<a unique bcrypt hash>
+JWT_SECRET=<keep the current map secret, or generate a 32-plus-character secret>
+USER_JWT_SECRET=<a different 32-plus-character secret>
+APPLE_CLIENT_ID=com.catbeer.Catbeer-iOS
+DATABASE_PATH=/var/lib/chinese-indie-rock-map/bands.db
+```
+
+Generate a bcrypt hash for the fallback administrator password with:
+
+```bash
+node -e "const bcrypt = require('bcryptjs'); bcrypt.hash(process.argv[1], 12).then(console.log)" 'choose-a-strong-password'
+```
+
+`JWT_SECRET` signs existing map admin and partner sessions, so preserve its current production value during an upgrade unless you intentionally want to invalidate those sessions. `USER_JWT_SECRET` is separate for Catbeer app users. Apple sign-in requires the same bundle identifier in Apple Developer and `APPLE_CLIENT_ID`.
+
+On the Aliyun host, back up the SQLite database, update the server-only `.env`, then run the deployment script:
+
+```bash
+mkdir -p backups
+cp /var/lib/chinese-indie-rock-map/bands.db backups/bands-$(date +%F-%H%M%S).db
+./deploy.sh
+```
+
+`deploy.sh` builds first, validates the production configuration without printing secrets, and only then reloads the existing `map` PM2 process. The Catbeer tables and API routes are additive; existing map pages and data are not migrated or replaced.

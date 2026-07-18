@@ -4,10 +4,11 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "tsx server.ts",
-    "start": "tsx server.ts",
+    "dev": "NODE_ENV=development tsx server.ts",
+    "start": "NODE_ENV=production tsx server.ts",
     "build": "vite build",
     "preview": "vite preview",
+    "check:production": "node scripts/check-production-config.mjs",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit"
   },

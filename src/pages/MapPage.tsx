@@ -9,11 +9,16 @@ import AdBanner from "../components/AdBanner";
 import FeedbackMenu from "../components/FeedbackMenu";
 import { Band, Venue, RehearsalRoom, Spot } from "../data";
 import { useProvinceData } from "../hooks/useProvinceData";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 
 export default function MapPage() {
   const navigate = useNavigate();
-  const { data: provinceData, loading, error } = useProvinceData();
+  const location = useLocation();
+  const query = new URLSearchParams(location.search);
+  const isEmbedded = query.get("embed") === "ios";
+  const mapTheme = query.get("theme") === "light" ? "light" : "dark";
+  const isLight = mapTheme === "light";
+  const { data: provinceData, loading, error, updateBand } = useProvinceData();
   const [selectedProvinceId, setSelectedProvinceId] = useState<string | null>(null);
   const [selectedBand, setSelectedBand] = useState<Band | null>(null);
   const [selectedVenue, setSelectedVenue] = useState<Venue | null>(null);
@@ -106,13 +111,13 @@ export default function MapPage() {
   }
 
   return (
-    <div className="w-full h-[100dvh] bg-[#0a0502] overflow-hidden font-sans relative">
-      <div className="absolute left-5 right-5 top-[calc(4.05rem+env(safe-area-inset-top))] z-10 pointer-events-none sm:left-6 sm:right-6 md:left-10 md:right-auto md:top-[4.9rem] lg:left-12 xl:left-14">
-        <div className="inline-flex max-w-full items-center gap-2 rounded-full border border-white/[0.08] bg-black/28 px-3 py-2 text-[11px] text-white/58 backdrop-blur-xl md:px-4 md:text-xs">
+    <div className="w-full h-[100dvh] overflow-hidden font-sans relative" style={{ background: isLight ? "#f6f3ed" : "#0a0502" }}>
+      <div className={`absolute left-5 right-5 z-10 pointer-events-none sm:left-6 sm:right-6 md:left-10 md:right-auto lg:left-12 xl:left-14 ${isEmbedded ? 'top-[calc(1rem+env(safe-area-inset-top))] md:top-5' : 'top-[calc(4.05rem+env(safe-area-inset-top))] md:top-[4.9rem]'}`}>
+        <div className={`inline-flex max-w-full items-center gap-2 rounded-full border px-3 py-2 text-[11px] backdrop-blur-xl md:px-4 md:text-xs ${isLight ? 'border-black/10 bg-white/72 text-black/58' : 'border-white/[0.08] bg-black/28 text-white/58'}`}>
           <span>
             已收录 <span className="font-semibold text-[#ff6a2b]">{totalBands}</span> 支乐队
           </span>
-          <span className="hidden text-white/28 md:inline">·</span>
+          <span className={`hidden md:inline ${isLight ? 'text-black/28' : 'text-white/28'}`}>·</span>
           <span className="hidden md:inline">点击高亮省份探索当地音乐现场</span>
           <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#ff4e00] shadow-[0_0_14px_rgba(255,78,0,0.72)]" />
         </div>
@@ -123,6 +128,7 @@ export default function MapPage() {
         onProvinceClick={handleProvinceClick} 
         selectedProvinceId={selectedProvinceId} 
         provinceData={provinceData}
+        theme={mapTheme}
       />
 
       {/* Side Panel */}
@@ -139,6 +145,10 @@ export default function MapPage() {
       <BandModal 
         band={selectedBand} 
         onClose={handleCloseModal} 
+        onBandUpdated={(bandId, updates) => {
+          updateBand(bandId, updates);
+          setSelectedBand(current => current?.id === bandId ? { ...current, ...updates } : current);
+        }}
       />
 
       {/* Venue Modal */}

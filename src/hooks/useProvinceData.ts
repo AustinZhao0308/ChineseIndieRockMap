@@ -11,9 +11,25 @@ export function useProvinceData() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const updateBand = (bandId: string, updates: Partial<{ cheerCount: number; viewerHasCheered: boolean }>) => {
+    setData(current => {
+      const next = JSON.parse(JSON.stringify(current)) as Record<string, Province>;
+      Object.values(next).forEach(province => {
+        province.cities.forEach(city => {
+          city.bands = city.bands.map(band => band.id === bandId ? { ...band, ...updates } : band);
+        });
+      });
+      return next;
+    });
+  };
+
   useEffect(() => {
     Promise.all([
-      fetch('/api/bands').then(res => {
+      fetch('/api/bands', {
+        headers: localStorage.getItem('catbeerUserToken')
+          ? { Authorization: `Bearer ${localStorage.getItem('catbeerUserToken')}` }
+          : undefined
+      }).then(res => {
         if (!res.ok) throw new Error(`Bands API failed: ${res.status}`);
         return res.json();
       }),
@@ -83,7 +99,9 @@ export function useProvinceData() {
             xiaohongshuUrl: b.xiaohongshu_url,
             labelAccountId: b.label_account_id || b.labelAccountId,
             label: b.label || null,
-            dbId: b.id
+            dbId: b.id,
+            cheerCount: Number(b.cheerCount || 0),
+            viewerHasCheered: Boolean(b.viewerHasCheered)
           });
         });
 
@@ -233,5 +251,5 @@ export function useProvinceData() {
       });
   }, []);
 
-  return { data, loading, error };
+  return { data, loading, error, updateBand };
 }

@@ -20,6 +20,8 @@ export interface Band {
     status: string;
   } | null;
   dbId?: number;
+  cheerCount?: number;
+  viewerHasCheered?: boolean;
 }
 
 export interface Venue {

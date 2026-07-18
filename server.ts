@@ -7,16 +7,77 @@ import fs from 'fs';
 import multer from 'multer';
 import bcrypt from 'bcryptjs';
 import { createServer as createViteServer } from 'vite';
+import { createPublicKey } from 'crypto';
 
 dotenv.config();
 
 const app = express();
 const PORT = 3000;
+const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+const DEFAULT_ADMIN_PASSWORD_HASH = '$2b$10$xVBmUPJph0jgqqkqnLIt8e.4EhwN4NYUj1wqEazquAsPWtEazLvDO';
+const DEFAULT_JWT_SECRET = 'super_secret_jwt_key_for_indie_rock_map';
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'admin';
 const ADMIN_DISPLAY_NAME = process.env.ADMIN_DISPLAY_NAME || 'Catbeer Admin';
-const ADMIN_PASSWORD_HASH = process.env.ADMIN_PASSWORD_HASH || '$2b$10$xVBmUPJph0jgqqkqnLIt8e.4EhwN4NYUj1wqEazquAsPWtEazLvDO'; // Default hash for 'bercat2026'
-const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_jwt_key_for_indie_rock_map';
+const ADMIN_PASSWORD_HASH = process.env.ADMIN_PASSWORD_HASH || DEFAULT_ADMIN_PASSWORD_HASH;
+const JWT_SECRET = process.env.JWT_SECRET || (IS_PRODUCTION ? '' : DEFAULT_JWT_SECRET);
+const USER_JWT_SECRET = process.env.USER_JWT_SECRET || (IS_PRODUCTION ? '' : JWT_SECRET);
+const APPLE_CLIENT_ID = process.env.APPLE_CLIENT_ID || '';
 
+const productionConfigurationErrors = () => {
+  if (!IS_PRODUCTION) return [];
+
+  const errors: string[] = [];
+  if (!JWT_SECRET || JWT_SECRET === DEFAULT_JWT_SECRET || JWT_SECRET.length < 32) {
+    errors.push('JWT_SECRET must be a unique production secret of at least 32 characters.');
+  }
+  if (!USER_JWT_SECRET || USER_JWT_SECRET === JWT_SECRET || USER_JWT_SECRET.length < 32) {
+    errors.push('USER_JWT_SECRET must be a separate production secret of at least 32 characters.');
+  }
+  if (!APPLE_CLIENT_ID) errors.push('APPLE_CLIENT_ID is required for Sign in with Apple.');
+  if (ADMIN_PASSWORD_HASH === DEFAULT_ADMIN_PASSWORD_HASH) {
+    errors.push('ADMIN_PASSWORD_HASH must not use the development fallback hash.');
+  }
+  return errors;
+};
+
+const productionErrors = productionConfigurationErrors();
+if (productionErrors.length) {
+  throw new Error(`Invalid production configuration:\n- ${productionErrors.join('\n- ')}`);
+}
+
+type RateLimitEntry = { count: number; resetAt: number };
+const rateLimit = (maxRequests: number, windowMs: number): express.RequestHandler => {
+  const requests = new Map<string, RateLimitEntry>();
+
+  return (req, res, next) => {
+    const now = Date.now();
+    const key = req.ip || req.socket.remoteAddress || 'unknown';
+    const existing = requests.get(key);
+    const entry = !existing || existing.resetAt <= now
+      ? { count: 0, resetAt: now + windowMs }
+      : existing;
+
+    entry.count += 1;
+    requests.set(key, entry);
+    if (entry.count > maxRequests) {
+      res.setHeader('Retry-After', Math.ceil((entry.resetAt - now) / 1000));
+      return res.status(429).json({ error: 'Too many requests. Please try again later.' });
+    }
+    next();
+  };
+};
+
+const adminLoginRateLimit = rateLimit(10, 10 * 60 * 1000);
+const appLoginRateLimit = rateLimit(10, 10 * 60 * 1000);
+const authenticatedMutationRateLimit = rateLimit(60, 60 * 1000);
+
+app.set('trust proxy', 1);
+app.disable('x-powered-by');
+app.use((_, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  next();
+});
 app.use(express.json());
 
 // Ensure uploads directory exists
@@ -95,7 +156,7 @@ const eventUpload = multer({
 });
 
 // Initialize SQLite Database
-const db = new Database('bands.db');
+const db = new Database(process.env.DATABASE_PATH || 'bands.db');
 
 // Create tables
 db.exec(`
@@ -213,6 +274,79 @@ db.exec(`
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   );
+
+  CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    display_name TEXT NOT NULL DEFAULT '猫啤乐迷',
+    status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'deleted')),
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS auth_identities (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    provider TEXT NOT NULL CHECK(provider IN ('apple', 'phone')),
+    provider_subject TEXT NOT NULL,
+    email TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(provider, provider_subject),
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS password_credentials (
+    user_id INTEGER PRIMARY KEY,
+    username TEXT NOT NULL UNIQUE,
+    username_normalized TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS posts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    slug TEXT NOT NULL UNIQUE,
+    content_type TEXT NOT NULL CHECK(content_type IN ('event', 'article', 'note')),
+    status TEXT NOT NULL DEFAULT 'draft' CHECK(status IN ('draft', 'published', 'archived')),
+    title TEXT NOT NULL,
+    summary TEXT NOT NULL DEFAULT '',
+    body TEXT NOT NULL DEFAULT '',
+    cover_image_url TEXT,
+    source_name TEXT,
+    external_url TEXT,
+    featured_event_id INTEGER,
+    city_zh TEXT,
+    tags_json TEXT NOT NULL DEFAULT '[]',
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    published_at TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(featured_event_id) REFERENCES featured_events(id) ON DELETE SET NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS user_saved_posts (
+    user_id INTEGER NOT NULL,
+    post_id INTEGER NOT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY(user_id, post_id),
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY(post_id) REFERENCES posts(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS band_cheers (
+    user_id INTEGER NOT NULL,
+    band_id INTEGER NOT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY(user_id, band_id),
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY(band_id) REFERENCES bands(id) ON DELETE CASCADE
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_posts_public_feed ON posts(status, published_at DESC, sort_order DESC);
+  CREATE INDEX IF NOT EXISTS idx_band_cheers_band_id ON band_cheers(band_id);
+  CREATE INDEX IF NOT EXISTS idx_user_saved_posts_user_id ON user_saved_posts(user_id, created_at DESC);
 `);
 
 // Add columns to existing tables if they don't exist (migration)
@@ -329,6 +463,129 @@ const authenticateToken = (req: express.Request, res: express.Response, next: ex
     (req as any).user = user;
     next();
   });
+};
+
+type AppUserToken = {
+  role: 'user';
+  userId: number;
+  username?: string;
+  displayName?: string;
+  onboarding?: boolean;
+};
+
+const getBearerToken = (req: express.Request) => {
+  const value = req.headers.authorization;
+  return value?.startsWith('Bearer ') ? value.slice('Bearer '.length) : null;
+};
+
+const readAppUserToken = (req: express.Request): AppUserToken | null => {
+  if (!USER_JWT_SECRET) return null;
+  const token = getBearerToken(req);
+  if (!token) return null;
+
+  try {
+    const payload = jwt.verify(token, USER_JWT_SECRET) as AppUserToken;
+    return payload.role === 'user' ? payload : null;
+  } catch {
+    return null;
+  }
+};
+
+const optionalAppUser = (req: express.Request, _res: express.Response, next: express.NextFunction) => {
+  const user = readAppUserToken(req);
+  (req as any).appUser = user && getPublicAppUser(user.userId) ? user : null;
+  next();
+};
+
+const requireAppUser = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  if (!USER_JWT_SECRET) {
+    return res.status(503).json({ error: 'Catbeer user authentication is not configured.' });
+  }
+  const user = readAppUserToken(req);
+  if (!user || user.onboarding || !getPublicAppUser(user.userId)) {
+    return res.status(401).json({ error: 'Catbeer user login required.' });
+  }
+  (req as any).appUser = user;
+  next();
+};
+
+const requireOnboardingOrAppUser = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  if (!USER_JWT_SECRET) {
+    return res.status(503).json({ error: 'Catbeer user authentication is not configured.' });
+  }
+  const user = readAppUserToken(req);
+  if (!user || !getPublicAppUser(user.userId)) {
+    return res.status(401).json({ error: 'Catbeer user login required.' });
+  }
+  (req as any).appUser = user;
+  next();
+};
+
+const normalizeUsername = (value: any) => String(value || '').trim().toLowerCase();
+
+const validateUsername = (username: string) => /^[a-z0-9_]{3,24}$/.test(username);
+
+const getPublicAppUser = (userId: number) => {
+  const user = db.prepare(`
+    SELECT users.id, users.display_name, users.status, password_credentials.username
+    FROM users
+    LEFT JOIN password_credentials ON password_credentials.user_id = users.id
+    WHERE users.id = ?
+    LIMIT 1
+  `).get(userId) as any;
+
+  if (!user || user.status !== 'active') return null;
+  return {
+    id: user.id,
+    displayName: user.display_name,
+    username: user.username || null
+  };
+};
+
+const issueAppUserToken = (userId: number, onboarding = false) => {
+  if (!USER_JWT_SECRET) throw new Error('Catbeer user authentication is not configured.');
+  const user = getPublicAppUser(userId);
+  if (!user) throw new Error('User account is unavailable.');
+  const payload: AppUserToken = {
+    role: 'user',
+    userId,
+    displayName: user.displayName,
+    username: user.username || undefined,
+    onboarding
+  };
+  return jwt.sign(payload, USER_JWT_SECRET, { expiresIn: onboarding ? '15m' : '30d' });
+};
+
+let appleJWKS: any[] | null = null;
+let appleJWKSExpiresAt = 0;
+
+const getAppleKey = async (keyId: string) => {
+  if (!appleJWKS || Date.now() >= appleJWKSExpiresAt) {
+    const response = await fetch('https://appleid.apple.com/auth/keys');
+    if (!response.ok) throw new Error('Unable to retrieve Apple signing keys.');
+    const payload = await response.json() as { keys?: any[] };
+    appleJWKS = payload.keys || [];
+    appleJWKSExpiresAt = Date.now() + 60 * 60 * 1000;
+  }
+  const key = appleJWKS.find((item) => item.kid === keyId);
+  if (!key) throw new Error('Apple signing key is unavailable.');
+  return createPublicKey({ key, format: 'jwk' });
+};
+
+const verifyAppleIdentityToken = async (identityToken: string) => {
+  if (!APPLE_CLIENT_ID) {
+    throw new Error('Sign in with Apple is not configured on this server.');
+  }
+  const [headerPart] = identityToken.split('.');
+  if (!headerPart) throw new Error('Invalid Apple identity token.');
+  const header = JSON.parse(Buffer.from(headerPart, 'base64url').toString('utf8')) as { kid?: string };
+  if (!header.kid) throw new Error('Apple identity token has no signing key.');
+  const key = await getAppleKey(header.kid);
+  return jwt.verify(identityToken, key, {
+    algorithms: ['RS256'],
+    issuer: 'https://appleid.apple.com',
+    audience: APPLE_CLIENT_ID
+  }) as jwt.JwtPayload;
 };
 
 const publicUserFromToken = (user: any) => ({
@@ -689,7 +946,7 @@ const normalizeAccountType = (value: any) => {
 };
 
 // API Routes
-app.post('/api/login', async (req, res) => {
+app.post('/api/login', adminLoginRateLimit, async (req, res) => {
   const { username, password } = req.body;
   const normalizedUsername = String(username || '').trim();
 
@@ -745,6 +1002,345 @@ app.post('/api/login', async (req, res) => {
 
 app.get('/api/me', authenticateToken, (req, res) => {
   res.json({ user: getCurrentPublicUser((req as any).user) });
+});
+
+const normalizePostTags = (value: any) => {
+  const source = Array.isArray(value) ? value : parseJsonArray(value);
+  return Array.from(new Set(source
+    .map((tag: any) => String(tag || '').trim())
+    .filter(Boolean)
+    .slice(0, 8)));
+};
+
+const toPublicPost = (post: any, includeEvent = true) => {
+  const tags = normalizePostTags(post.tags_json);
+  const result: any = {
+    id: post.id,
+    slug: post.slug,
+    contentType: post.content_type,
+    title: post.title,
+    summary: post.summary,
+    body: post.body,
+    coverImageURL: post.cover_image_url,
+    sourceName: post.source_name,
+    externalURL: post.external_url,
+    city: post.city_zh,
+    tags,
+    publishedAt: post.published_at,
+    viewerHasSaved: Boolean(post.viewer_has_saved)
+  };
+
+  if (includeEvent && post.featured_event_id) {
+    const event = db.prepare('SELECT * FROM featured_events WHERE id = ?').get(post.featured_event_id) as any;
+    result.event = populateEvent(event);
+  }
+
+  return result;
+};
+
+const readPostPayload = (body: any) => {
+  const contentType = ['event', 'article', 'note'].includes(body.contentType) ? body.contentType : 'note';
+  const status = ['draft', 'published', 'archived'].includes(body.status) ? body.status : 'draft';
+  const title = String(body.title || '').trim();
+  if (!title) throw new Error('Title is required.');
+
+  const rawSlug = String(body.slug || '').trim();
+  const slug = sanitizePathSegment(rawSlug || title, 'post');
+  const featuredEventId = body.featuredEventId ? Number(body.featuredEventId) : null;
+  if (featuredEventId && !db.prepare('SELECT id FROM featured_events WHERE id = ?').get(featuredEventId)) {
+    throw new Error('Linked event does not exist.');
+  }
+
+  return {
+    slug,
+    contentType,
+    status,
+    title,
+    summary: String(body.summary || '').trim(),
+    body: String(body.body || '').trim(),
+    coverImageURL: String(body.coverImageURL || '').trim() || null,
+    sourceName: String(body.sourceName || '').trim() || null,
+    externalURL: String(body.externalURL || '').trim() || null,
+    featuredEventId,
+    city: String(body.city || '').trim() || null,
+    tagsJSON: JSON.stringify(normalizePostTags(body.tags)),
+    sortOrder: Number.isFinite(Number(body.sortOrder)) ? Number(body.sortOrder) : 0,
+    publishedAt: body.publishedAt ? String(body.publishedAt) : null
+  };
+};
+
+app.post('/api/auth/apple', appLoginRateLimit, async (req, res) => {
+  if (!USER_JWT_SECRET) {
+    return res.status(503).json({ error: 'Catbeer user authentication is not configured.' });
+  }
+  try {
+    const identityToken = String(req.body?.identityToken || '');
+    if (!identityToken) return res.status(400).json({ error: 'Apple identity token is required.' });
+
+    const claims = await verifyAppleIdentityToken(identityToken);
+    const appleSubject = String(claims.sub || '');
+    if (!appleSubject) return res.status(400).json({ error: 'Apple identity token has no user subject.' });
+
+    const existingIdentity = db.prepare(`
+      SELECT user_id FROM auth_identities
+      WHERE provider = 'apple' AND provider_subject = ?
+      LIMIT 1
+    `).get(appleSubject) as any;
+
+    let userId = existingIdentity?.user_id as number | undefined;
+    if (!userId) {
+      const firstName = String(req.body?.givenName || '').trim();
+      const familyName = String(req.body?.familyName || '').trim();
+      const displayName = [familyName, firstName].filter(Boolean).join('') || '猫啤乐迷';
+      const result = db.transaction(() => {
+        const user = db.prepare(`
+          INSERT INTO users (display_name, updated_at)
+          VALUES (?, CURRENT_TIMESTAMP)
+        `).run(displayName);
+        db.prepare(`
+          INSERT INTO auth_identities (user_id, provider, provider_subject, email, updated_at)
+          VALUES (?, 'apple', ?, ?, CURRENT_TIMESTAMP)
+        `).run(user.lastInsertRowid, appleSubject, claims.email ? String(claims.email) : null);
+        return Number(user.lastInsertRowid);
+      })();
+      userId = result;
+    }
+
+    const hasCredentials = Boolean(db.prepare('SELECT 1 FROM password_credentials WHERE user_id = ?').get(userId));
+    const token = issueAppUserToken(userId, !hasCredentials);
+    res.json({
+      token,
+      needsCredentials: !hasCredentials,
+      user: getPublicAppUser(userId)
+    });
+  } catch (error: any) {
+    console.error('Sign in with Apple failed:', error.message);
+    res.status(401).json({ error: error.message || 'Unable to sign in with Apple.' });
+  }
+});
+
+app.post('/api/auth/credentials', appLoginRateLimit, requireOnboardingOrAppUser, async (req, res) => {
+  const appUser = (req as any).appUser as AppUserToken;
+  const username = normalizeUsername(req.body?.username);
+  const password = String(req.body?.password || '');
+  const displayName = String(req.body?.displayName || '').trim();
+
+  if (!validateUsername(username)) {
+    return res.status(400).json({ error: 'Username must be 3-24 characters: lowercase letters, numbers, or underscores.' });
+  }
+  if (password.length < 10) {
+    return res.status(400).json({ error: 'Password must be at least 10 characters.' });
+  }
+  if (db.prepare('SELECT 1 FROM password_credentials WHERE user_id = ?').get(appUser.userId)) {
+    return res.status(409).json({ error: 'This account already has web credentials.' });
+  }
+
+  try {
+    const passwordHash = await bcrypt.hash(password, 12);
+    db.transaction(() => {
+      db.prepare(`
+        INSERT INTO password_credentials (user_id, username, username_normalized, password_hash, updated_at)
+        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+      `).run(appUser.userId, username, username, passwordHash);
+      if (displayName) {
+        db.prepare('UPDATE users SET display_name = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(displayName, appUser.userId);
+      }
+    })();
+    const token = issueAppUserToken(appUser.userId);
+    res.status(201).json({ token, user: getPublicAppUser(appUser.userId) });
+  } catch (error: any) {
+    const message = error?.code?.startsWith('SQLITE_CONSTRAINT')
+      ? 'This username is already in use.'
+      : error.message || 'Unable to save credentials.';
+    res.status(400).json({ error: message });
+  }
+});
+
+app.post('/api/auth/password/login', appLoginRateLimit, async (req, res) => {
+  if (!USER_JWT_SECRET) {
+    return res.status(503).json({ error: 'Catbeer user authentication is not configured.' });
+  }
+  const username = normalizeUsername(req.body?.username);
+  const password = String(req.body?.password || '');
+  if (!username || !password) return res.status(400).json({ error: 'Username and password are required.' });
+
+  const credential = db.prepare(`
+    SELECT password_credentials.password_hash, users.id AS user_id
+    FROM password_credentials
+    JOIN users ON users.id = password_credentials.user_id
+    WHERE password_credentials.username_normalized = ? AND users.status = 'active'
+    LIMIT 1
+  `).get(username) as any;
+
+  if (!credential || !(await bcrypt.compare(password, credential.password_hash))) {
+    return res.status(401).json({ error: 'Invalid username or password.' });
+  }
+  res.json({ token: issueAppUserToken(credential.user_id), user: getPublicAppUser(credential.user_id) });
+});
+
+app.post('/api/auth/password/change', authenticatedMutationRateLimit, requireAppUser, async (req, res) => {
+  const appUser = (req as any).appUser as AppUserToken;
+  const currentPassword = String(req.body?.currentPassword || '');
+  const newPassword = String(req.body?.newPassword || '');
+  if (newPassword.length < 10) return res.status(400).json({ error: 'Password must be at least 10 characters.' });
+
+  const credential = db.prepare('SELECT password_hash FROM password_credentials WHERE user_id = ?').get(appUser.userId) as any;
+  if (!credential || !(await bcrypt.compare(currentPassword, credential.password_hash))) {
+    return res.status(401).json({ error: 'Current password is incorrect.' });
+  }
+  const hash = await bcrypt.hash(newPassword, 12);
+  db.prepare('UPDATE password_credentials SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?').run(hash, appUser.userId);
+  res.json({ success: true });
+});
+
+app.get('/api/account/me', requireAppUser, (req, res) => {
+  const appUser = (req as any).appUser as AppUserToken;
+  res.json({ user: getPublicAppUser(appUser.userId) });
+});
+
+app.delete('/api/account', requireAppUser, (req, res) => {
+  const appUser = (req as any).appUser as AppUserToken;
+  db.transaction(() => {
+    db.prepare('DELETE FROM user_saved_posts WHERE user_id = ?').run(appUser.userId);
+    db.prepare('DELETE FROM band_cheers WHERE user_id = ?').run(appUser.userId);
+    db.prepare('DELETE FROM password_credentials WHERE user_id = ?').run(appUser.userId);
+    db.prepare('DELETE FROM auth_identities WHERE user_id = ?').run(appUser.userId);
+    db.prepare("UPDATE users SET status = 'deleted', updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(appUser.userId);
+  })();
+  res.json({ success: true });
+});
+
+app.get('/api/feed', optionalAppUser, (req, res) => {
+  const appUser = (req as any).appUser as AppUserToken | null;
+  const contentType = ['event', 'article', 'note'].includes(String(req.query.type || '')) ? String(req.query.type) : null;
+  const limit = Math.max(1, Math.min(50, Number(req.query.limit) || 20));
+  const posts = db.prepare(`
+    SELECT posts.*, EXISTS(
+      SELECT 1 FROM user_saved_posts
+      WHERE user_saved_posts.user_id = ? AND user_saved_posts.post_id = posts.id
+    ) AS viewer_has_saved
+    FROM posts
+    WHERE posts.status = 'published'
+      AND (posts.published_at IS NULL OR datetime(posts.published_at) <= CURRENT_TIMESTAMP)
+      AND (? IS NULL OR posts.content_type = ?)
+    ORDER BY posts.sort_order DESC, posts.published_at DESC, posts.id DESC
+    LIMIT ?
+  `).all(appUser?.userId || -1, contentType, contentType, limit) as any[];
+  res.json({ posts: posts.map(post => toPublicPost(post)) });
+});
+
+app.get('/api/posts/:slugOrId', optionalAppUser, (req, res) => {
+  const appUser = (req as any).appUser as AppUserToken | null;
+  const post = db.prepare(`
+    SELECT posts.*, EXISTS(
+      SELECT 1 FROM user_saved_posts
+      WHERE user_saved_posts.user_id = ? AND user_saved_posts.post_id = posts.id
+    ) AS viewer_has_saved
+    FROM posts
+    WHERE posts.status = 'published'
+      AND (posts.published_at IS NULL OR datetime(posts.published_at) <= CURRENT_TIMESTAMP)
+      AND (posts.slug = ? OR posts.id = ?)
+    LIMIT 1
+  `).get(appUser?.userId || -1, req.params.slugOrId, req.params.slugOrId) as any;
+  if (!post) return res.status(404).json({ error: 'Post not found.' });
+  res.json({ post: toPublicPost(post) });
+});
+
+app.get('/api/account/bookmarks', requireAppUser, (req, res) => {
+  const appUser = (req as any).appUser as AppUserToken;
+  const posts = db.prepare(`
+    SELECT posts.*, 1 AS viewer_has_saved
+    FROM user_saved_posts
+    JOIN posts ON posts.id = user_saved_posts.post_id
+    WHERE user_saved_posts.user_id = ? AND posts.status = 'published'
+    ORDER BY user_saved_posts.created_at DESC
+  `).all(appUser.userId) as any[];
+  res.json({ posts: posts.map(post => toPublicPost(post)) });
+});
+
+app.post('/api/account/bookmarks/:postId', requireAppUser, (req, res) => {
+  const appUser = (req as any).appUser as AppUserToken;
+  const post = db.prepare("SELECT id FROM posts WHERE id = ? AND status = 'published'").get(req.params.postId) as any;
+  if (!post) return res.status(404).json({ error: 'Post not found.' });
+  db.prepare('INSERT OR IGNORE INTO user_saved_posts (user_id, post_id) VALUES (?, ?)').run(appUser.userId, post.id);
+  res.status(201).json({ saved: true });
+});
+
+app.delete('/api/account/bookmarks/:postId', requireAppUser, (req, res) => {
+  const appUser = (req as any).appUser as AppUserToken;
+  db.prepare('DELETE FROM user_saved_posts WHERE user_id = ? AND post_id = ?').run(appUser.userId, req.params.postId);
+  res.json({ saved: false });
+});
+
+app.get('/api/account/cheers', requireAppUser, (req, res) => {
+  const appUser = (req as any).appUser as AppUserToken;
+  const bands = db.prepare(`
+    SELECT bands.id, bands.band_id, bands.name, bands.name_zh, bands.city_zh, bands.image_url,
+      COUNT(all_cheers.user_id) AS cheer_count
+    FROM band_cheers AS viewer_cheers
+    JOIN bands ON bands.id = viewer_cheers.band_id
+    LEFT JOIN band_cheers AS all_cheers ON all_cheers.band_id = bands.id
+    WHERE viewer_cheers.user_id = ?
+    GROUP BY bands.id
+    ORDER BY viewer_cheers.created_at DESC, bands.id ASC
+  `).all(appUser.userId) as any[];
+  res.json({
+    bands: bands.map(band => ({
+      id: band.id,
+      bandID: band.band_id,
+      name: band.name,
+      nameZh: band.name_zh,
+      cityZh: band.city_zh,
+      imageURL: band.image_url,
+      cheerCount: Number(band.cheer_count || 0)
+    }))
+  });
+});
+
+app.get('/api/admin/posts', authenticateToken, requireAdmin, (_req, res) => {
+  const posts = db.prepare('SELECT * FROM posts ORDER BY updated_at DESC, id DESC').all() as any[];
+  res.json({ posts: posts.map(post => ({ ...toPublicPost(post, false), status: post.status, sortOrder: post.sort_order, featuredEventId: post.featured_event_id })) });
+});
+
+app.post('/api/admin/posts', authenticateToken, requireAdmin, (req, res) => {
+  try {
+    const post = readPostPayload(req.body);
+    const publishedAt = post.status === 'published' ? (post.publishedAt || new Date().toISOString()) : post.publishedAt;
+    const result = db.prepare(`
+      INSERT INTO posts (slug, content_type, status, title, summary, body, cover_image_url, source_name, external_url, featured_event_id, city_zh, tags_json, sort_order, published_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    `).run(post.slug, post.contentType, post.status, post.title, post.summary, post.body, post.coverImageURL, post.sourceName, post.externalURL, post.featuredEventId, post.city, post.tagsJSON, post.sortOrder, publishedAt);
+    res.status(201).json({ id: result.lastInsertRowid });
+  } catch (error: any) {
+    res.status(400).json({ error: error.message || 'Unable to create post.' });
+  }
+});
+
+app.put('/api/admin/posts/:id', authenticateToken, requireAdmin, (req, res) => {
+  try {
+    const post = readPostPayload(req.body);
+    const existing = db.prepare('SELECT id, published_at FROM posts WHERE id = ?').get(req.params.id) as any;
+    if (!existing) return res.status(404).json({ error: 'Post not found.' });
+    const publishedAt = post.status === 'published' ? (post.publishedAt || existing.published_at || new Date().toISOString()) : post.publishedAt;
+    db.prepare(`
+      UPDATE posts SET slug = ?, content_type = ?, status = ?, title = ?, summary = ?, body = ?, cover_image_url = ?, source_name = ?, external_url = ?, featured_event_id = ?, city_zh = ?, tags_json = ?, sort_order = ?, published_at = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(post.slug, post.contentType, post.status, post.title, post.summary, post.body, post.coverImageURL, post.sourceName, post.externalURL, post.featuredEventId, post.city, post.tagsJSON, post.sortOrder, publishedAt, req.params.id);
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(400).json({ error: error.message || 'Unable to update post.' });
+  }
+});
+
+app.delete('/api/admin/posts/:id', authenticateToken, requireAdmin, (req, res) => {
+  const post = db.prepare('SELECT cover_image_url FROM posts WHERE id = ?').get(req.params.id) as any;
+  if (!post) return res.status(404).json({ error: 'Post not found.' });
+  if (post.cover_image_url) deleteLocalImage(post.cover_image_url);
+  db.transaction(() => {
+    db.prepare('DELETE FROM user_saved_posts WHERE post_id = ?').run(req.params.id);
+    db.prepare('DELETE FROM posts WHERE id = ?').run(req.params.id);
+  })();
+  res.json({ success: true });
 });
 
 app.get('/api/labels/:username/archive', (req, res) => {
@@ -1088,16 +1684,49 @@ app.delete('/api/upload', authenticateToken, (req, res) => {
 });
 
 // Bands API
-app.get('/api/bands', (req, res) => {
-  const bands = (db.prepare('SELECT * FROM bands').all() as any[]).map(band => {
+app.get('/api/bands', optionalAppUser, (req, res) => {
+  const appUser = (req as any).appUser as AppUserToken | null;
+  const bands = (db.prepare(`
+    SELECT bands.*, COUNT(band_cheers.user_id) AS cheer_count,
+      EXISTS(
+        SELECT 1 FROM band_cheers AS current_user_cheers
+        WHERE current_user_cheers.band_id = bands.id AND current_user_cheers.user_id = ?
+      ) AS viewer_has_cheered
+    FROM bands
+    LEFT JOIN band_cheers ON band_cheers.band_id = bands.id
+    GROUP BY bands.id
+    ORDER BY bands.id ASC
+  `).all(appUser?.userId || -1) as any[]).map(band => {
     const label = getLabelAccount(band.label_account_id);
     return {
       ...band,
       labelAccountId: band.label_account_id,
-      label: toLabelSummary(label)
+      label: toLabelSummary(label),
+      cheerCount: Number(band.cheer_count || 0),
+      viewerHasCheered: Boolean(band.viewer_has_cheered)
     };
   });
   res.json(bands);
+});
+
+app.post('/api/bands/:id/cheers', requireAppUser, (req, res) => {
+  const appUser = (req as any).appUser as AppUserToken;
+  const band = db.prepare('SELECT id FROM bands WHERE id = ?').get(req.params.id) as any;
+  if (!band) return res.status(404).json({ error: 'Band not found.' });
+
+  db.prepare('INSERT OR IGNORE INTO band_cheers (user_id, band_id) VALUES (?, ?)').run(appUser.userId, band.id);
+  const cheerCount = Number((db.prepare('SELECT COUNT(*) AS count FROM band_cheers WHERE band_id = ?').get(band.id) as any).count);
+  res.status(201).json({ cheered: true, cheerCount });
+});
+
+app.delete('/api/bands/:id/cheers', requireAppUser, (req, res) => {
+  const appUser = (req as any).appUser as AppUserToken;
+  const band = db.prepare('SELECT id FROM bands WHERE id = ?').get(req.params.id) as any;
+  if (!band) return res.status(404).json({ error: 'Band not found.' });
+
+  db.prepare('DELETE FROM band_cheers WHERE user_id = ? AND band_id = ?').run(appUser.userId, band.id);
+  const cheerCount = Number((db.prepare('SELECT COUNT(*) AS count FROM band_cheers WHERE band_id = ?').get(band.id) as any).count);
+  res.json({ cheered: false, cheerCount });
 });
 
 app.post('/api/bands', authenticateToken, (req, res) => {

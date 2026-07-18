@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { X, Disc, Headphones, Music, BookHeart, Mail, MessageCircle, Copy, CheckCircle2 } from "lucide-react";
+import { X, Disc, Headphones, Music, BookHeart, Mail, MessageCircle, Copy, CheckCircle2, Beer } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { Band } from "../data";
 import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
@@ -7,18 +7,57 @@ import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
 interface BandModalProps {
   band: Band | null;
   onClose: () => void;
+  onBandUpdated?: (bandId: string, updates: Partial<Band>) => void;
 }
 
-const BandModal: React.FC<BandModalProps> = ({ band, onClose }) => {
+const BandModal: React.FC<BandModalProps> = ({ band, onClose, onBandUpdated }) => {
   const [showContact, setShowContact] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [cheerCount, setCheerCount] = useState(0);
+  const [hasCheered, setHasCheered] = useState(false);
+  const [isCheering, setIsCheering] = useState(false);
   useBodyScrollLock(!!band);
 
   // Reset showContact when band changes
   React.useEffect(() => {
     setShowContact(false);
     setCopied(false);
+    setCheerCount(band?.cheerCount || 0);
+    setHasCheered(Boolean(band?.viewerHasCheered));
   }, [band]);
+
+  const handleCheer = async () => {
+    if (!band?.dbId) return;
+    const token = localStorage.getItem('catbeerUserToken');
+    if (!token) {
+      window.location.href = `/user-login?next=${encodeURIComponent(window.location.pathname)}`;
+      return;
+    }
+
+    setIsCheering(true);
+    try {
+      const response = await fetch(`/api/bands/${band.dbId}/cheers`, {
+        method: hasCheered ? 'DELETE' : 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        if (response.status === 401) {
+          localStorage.removeItem('catbeerUserToken');
+          window.location.href = `/user-login?next=${encodeURIComponent(window.location.pathname)}`;
+          return;
+        }
+        throw new Error(data.error || '干杯失败');
+      }
+      setHasCheered(Boolean(data.cheered));
+      setCheerCount(Number(data.cheerCount || 0));
+      onBandUpdated?.(band.id, { viewerHasCheered: Boolean(data.cheered), cheerCount: Number(data.cheerCount || 0) });
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsCheering(false);
+    }
+  };
 
   const handleCopy = async (e: React.MouseEvent, text: string) => {
     e.stopPropagation();
@@ -112,6 +151,20 @@ const BandModal: React.FC<BandModalProps> = ({ band, onClose }) => {
                       {band.name}
                     </p>
                   </div>
+                  <button
+                    type="button"
+                    onClick={handleCheer}
+                    disabled={isCheering}
+                    className={`mb-1 inline-flex h-11 shrink-0 items-center gap-2 rounded-full border px-4 text-sm font-medium transition-colors disabled:opacity-60 ${
+                      hasCheered
+                        ? 'border-[#ffb400]/60 bg-[#ffb400] text-black'
+                        : 'border-white/25 bg-black/35 text-white hover:border-[#ffb400]/70 hover:text-[#ffd470]'
+                    }`}
+                    aria-label={hasCheered ? `取消为${band.name_zh}干杯` : `为${band.name_zh}干杯`}
+                  >
+                    <Beer size={17} fill={hasCheered ? 'currentColor' : 'none'} />
+                    <span>{cheerCount}</span>
+                  </button>
                 </div>
               </div>
             </div>
