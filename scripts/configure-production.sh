@@ -49,7 +49,7 @@ printf 'Administrator username [%s]: ' "$admin_username"
 read -r entered_admin_username
 admin_username="${entered_admin_username:-$admin_username}"
 
-read -r -s -p 'Set a new administrator password (12 characters minimum): ' admin_password
+read -r -s -p 'Set a new administrator password (8 characters minimum): ' admin_password
 printf '\n'
 read -r -s -p 'Confirm the administrator password: ' admin_password_confirm
 printf '\n'
@@ -58,8 +58,8 @@ if [ "$admin_password" != "$admin_password_confirm" ]; then
   echo 'Passwords do not match. No files were changed.' >&2
   exit 1
 fi
-if [ "${#admin_password}" -lt 12 ]; then
-  echo 'Administrator password must be at least 12 characters. No files were changed.' >&2
+if [ "${#admin_password}" -lt 8 ]; then
+  echo 'Administrator password must be at least 8 characters. No files were changed.' >&2
   exit 1
 fi
 
