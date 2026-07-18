@@ -143,7 +143,7 @@ export default function SiteNav() {
               alt=""
               className="h-9 w-auto shrink-0 object-contain md:h-12"
             />
-            <span className="flex min-w-0 items-center gap-2 md:gap-3">
+            <span className="flex min-w-0 translate-y-[3px] items-end gap-2 md:gap-3">
               <img
                 src="/brand/indie-rock-map-title-white.png"
                 alt="Indie Rock Map"
@@ -152,7 +152,7 @@ export default function SiteNav() {
               <img
                 src="/brand/catbeer-records-orange.png"
                 alt="By Catbeer Records"
-                className="h-2.5 w-auto shrink-0 object-contain md:h-3.5"
+                className="h-2.5 w-auto shrink-0 translate-y-[2px] object-contain md:h-3.5"
               />
             </span>
           </span>
