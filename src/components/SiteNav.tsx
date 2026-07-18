@@ -3,6 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import { Menu, Music2, X } from "lucide-react";
 
 type NavUser = {
+  session: "map" | "app";
   role?: string;
   username?: string;
   displayName?: string;
@@ -14,41 +15,53 @@ const baseNavItems = [
   { to: "/events", label: "演出档案", match: (path: string) => path.startsWith("/events") || path.startsWith("/labels") }
 ];
 
-const getStoredUser = (): NavUser | null => {
-  if (typeof window === "undefined") return null;
-  const token = localStorage.getItem("adminToken");
-  if (!token) return null;
+const decodeToken = (token: string): Omit<NavUser, "session"> | null => {
   try {
     const payload = token.split(".")[1] || "";
     const normalizedPayload = payload.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(payload.length / 4) * 4, "=");
     return JSON.parse(atob(normalizedPayload));
-  } catch (err) {
+  } catch {
     return null;
   }
 };
 
-const fetchCurrentUser = async () => {
-  const token = localStorage.getItem("adminToken");
+const getStoredUser = (): NavUser | null => {
+  if (typeof window === "undefined") return null;
+  const mapUser = localStorage.getItem("adminToken");
+  if (mapUser) {
+    const payload = decodeToken(mapUser);
+    if (payload) return { ...payload, session: "map" };
+  }
+  const appUser = localStorage.getItem("catbeerUserToken");
+  if (appUser) {
+    const payload = decodeToken(appUser);
+    if (payload) return { ...payload, session: "app" };
+  }
+  return null;
+};
+
+const fetchCurrentUser = async (session: NavUser["session"]) => {
+  const token = localStorage.getItem(session === "map" ? "adminToken" : "catbeerUserToken");
   if (!token) return null;
 
-  const res = await fetch("/api/me", {
+  const res = await fetch(session === "map" ? "/api/me" : "/api/account/me", {
     headers: { Authorization: `Bearer ${token}` }
   });
 
   if (!res.ok) {
-    localStorage.removeItem("adminToken");
+    localStorage.removeItem(session === "map" ? "adminToken" : "catbeerUserToken");
     return null;
   }
 
   const data = await res.json();
-  return data.user as NavUser;
+  return { ...data.user, session } as NavUser;
 };
 
 export default function SiteNav() {
   const { pathname } = useLocation();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [user, setUser] = useState<NavUser | null>(() => getStoredUser());
-  const navItems = user
+  const navItems = user?.session === "map"
     ? [
       ...baseNavItems,
       { to: "/admin", label: "数据管理", match: (path: string) => path === "/admin" },
@@ -56,11 +69,9 @@ export default function SiteNav() {
         ? [{ to: "/admin/posts", label: "内容流", match: (path: string) => path.startsWith("/admin/posts") }]
         : [])
     ]
-    : [
-      ...baseNavItems,
-      { to: "/user-login", label: "乐迷登录", match: (path: string) => path.startsWith("/user-login") },
-      { to: "/login", label: "合作方登录", match: (path: string) => path.startsWith("/login") }
-    ];
+    : user
+      ? baseNavItems
+      : [...baseNavItems, { to: "/login", label: "登录", match: (path: string) => path.startsWith("/login") || path.startsWith("/user-login") }];
 
   useEffect(() => {
     setIsMenuOpen(false);
@@ -72,7 +83,7 @@ export default function SiteNav() {
       const storedUser = getStoredUser();
       setUser(storedUser);
       if (!storedUser) return;
-      fetchCurrentUser()
+      fetchCurrentUser(storedUser.session)
         .then(nextUser => {
           if (!cancelled) setUser(nextUser);
         })
@@ -83,19 +94,23 @@ export default function SiteNav() {
     syncUser();
     window.addEventListener("storage", syncUser);
     window.addEventListener("authchange", syncUser);
+    window.addEventListener("catbeeruserchange", syncUser);
     window.addEventListener("focus", syncUser);
     return () => {
       cancelled = true;
       window.removeEventListener("storage", syncUser);
       window.removeEventListener("authchange", syncUser);
+      window.removeEventListener("catbeeruserchange", syncUser);
       window.removeEventListener("focus", syncUser);
     };
   }, []);
 
   const handleLogout = () => {
     localStorage.removeItem("adminToken");
+    localStorage.removeItem("catbeerUserToken");
     setUser(null);
     window.dispatchEvent(new Event("authchange"));
+    window.dispatchEvent(new Event("catbeeruserchange"));
   };
 
   const displayName = user?.displayName || user?.username || "";
@@ -154,7 +169,7 @@ export default function SiteNav() {
           })}
           {user && (
             <div className="ml-1 flex items-center gap-3 border-l border-white/[0.08] pl-5">
-              <Link to="/admin" className="flex items-center gap-2 text-white/76 transition-colors hover:text-white">
+              <Link to={user.session === "map" ? "/admin" : "/"} className="flex items-center gap-2 text-white/76 transition-colors hover:text-white">
                 {avatar("h-7 w-7")}
                 <span className="max-w-28 truncate text-sm font-medium">{displayName}</span>
               </Link>

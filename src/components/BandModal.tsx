@@ -30,7 +30,7 @@ const BandModal: React.FC<BandModalProps> = ({ band, onClose, onBandUpdated }) =
     if (!band?.dbId) return;
     const token = localStorage.getItem('catbeerUserToken');
     if (!token) {
-      window.location.href = `/user-login?next=${encodeURIComponent(window.location.pathname)}`;
+      window.location.href = `/login?next=${encodeURIComponent(window.location.pathname)}`;
       return;
     }
 
@@ -44,7 +44,7 @@ const BandModal: React.FC<BandModalProps> = ({ band, onClose, onBandUpdated }) =
       if (!response.ok) {
         if (response.status === 401) {
           localStorage.removeItem('catbeerUserToken');
-          window.location.href = `/user-login?next=${encodeURIComponent(window.location.pathname)}`;
+          window.location.href = `/login?next=${encodeURIComponent(window.location.pathname)}`;
           return;
         }
         throw new Error(data.error || '干杯失败');

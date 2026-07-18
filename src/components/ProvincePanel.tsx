@@ -1,5 +1,5 @@
 import React from "react";
-import { X, MapPin, Music, Building2, Users, Mic2, Coffee, DollarSign, ChevronRight, Beer } from "lucide-react";
+import { X, MapPin, Building2, Users, Mic2, Coffee, DollarSign, ChevronRight, Beer } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { Province, Band, Venue, RehearsalRoom, Spot } from "../data";
 
@@ -225,19 +225,16 @@ const ProvincePanel: React.FC<ProvincePanelProps> = ({ province, onClose, onBand
                           {/* Content */}
                           <div className="relative z-20 p-4">
                             <div className="flex justify-between items-start">
-                              <div className="w-2/3">
+                              <div className="min-w-0 flex-1 pr-3">
                                 <h4 className="text-lg font-medium text-white group-hover:text-[#ff4e00] transition-colors drop-shadow-md">
                                   {band.name_zh}
                                 </h4>
                                 <p className="text-xs text-gray-400 mt-1 drop-shadow-md">{band.name}</p>
                               </div>
-                              <div className="flex items-center gap-2 text-xs text-[#ffd470] drop-shadow-md">
+                              <div className="shrink-0 text-xs text-[#ffd470] drop-shadow-md">
                                 <span className="inline-flex items-center gap-1 rounded-full border border-[#ffb400]/25 bg-black/35 px-2 py-1 backdrop-blur-sm">
                                   <Beer size={13} fill={band.viewerHasCheered ? 'currentColor' : 'none'} />
                                   {band.cheerCount || 0}
-                                </span>
-                                <span className="rounded-full bg-[#ff4e00]/20 p-2 text-[#ff4e00] opacity-0 transition-opacity backdrop-blur-sm group-hover:opacity-100">
-                                  <Music size={16} />
                                 </span>
                               </div>
                             </div>
