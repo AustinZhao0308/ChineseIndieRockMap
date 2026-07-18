@@ -140,7 +140,7 @@ export default function SiteNav() {
           <img
             src="/brand/indie-rock-map-white.png"
             alt="Indie Rock Map by Catbeer Records"
-            className="h-8 w-auto max-w-[11rem] object-contain object-left md:h-10 md:max-w-[15rem]"
+            className="h-10 w-auto max-w-[13rem] object-contain object-left md:h-12 md:max-w-[18rem]"
           />
         </Link>
 
