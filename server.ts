@@ -375,10 +375,19 @@ try { db.exec('ALTER TABLE accounts ADD COLUMN notes TEXT;'); } catch (e) {}
 try { db.exec('ALTER TABLE accounts ADD COLUMN created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP;'); } catch (e) {}
 try { db.exec('ALTER TABLE accounts ADD COLUMN updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP;'); } catch (e) {}
 
-db.prepare(`
-  INSERT OR IGNORE INTO admin_users (username, display_name, password_hash, status, updated_at)
-  VALUES (?, ?, ?, 'active', CURRENT_TIMESTAMP)
-`).run(ADMIN_USERNAME, ADMIN_DISPLAY_NAME, ADMIN_PASSWORD_HASH);
+db.transaction(() => {
+  if (ADMIN_PASSWORD_HASH !== DEFAULT_ADMIN_PASSWORD_HASH) {
+    db.prepare(`
+      UPDATE admin_users
+      SET password_hash = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE password_hash = ?
+    `).run(ADMIN_PASSWORD_HASH, DEFAULT_ADMIN_PASSWORD_HASH);
+  }
+  db.prepare(`
+    INSERT OR IGNORE INTO admin_users (username, display_name, password_hash, status, updated_at)
+    VALUES (?, ?, ?, 'active', CURRENT_TIMESTAMP)
+  `).run(ADMIN_USERNAME, ADMIN_DISPLAY_NAME, ADMIN_PASSWORD_HASH);
+})();
 
 // Seed initial data if empty
 const countBands = db.prepare('SELECT COUNT(*) as count FROM bands').get() as { count: number };
