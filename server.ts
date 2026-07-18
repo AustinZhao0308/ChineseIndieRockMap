@@ -530,13 +530,28 @@ const requireOnboardingOrAppUser = (req: express.Request, res: express.Response,
   next();
 };
 
-const normalizeUsername = (value: any) => String(value || '').trim().toLowerCase();
+const normalizeUsername = (value: any) => String(value || '').trim().toLocaleLowerCase('zh-CN');
 
-const validateUsername = (username: string) => /^[a-z0-9_]{3,24}$/.test(username);
+// User-facing nicknames double as login names. Keep the character set broad enough
+// for Chinese names while excluding whitespace and punctuation that complicate login.
+const validateUsername = (username: string) => /^[\p{L}\p{N}_-]{2,24}$/u.test(username);
+
+const usernameIsReservedForMapAccount = (username: string) => Boolean(
+  db.prepare('SELECT 1 FROM admin_users WHERE lower(username) = ? LIMIT 1').get(username) ||
+  db.prepare('SELECT 1 FROM accounts WHERE lower(username) = ? LIMIT 1').get(username)
+);
 
 const getPublicAppUser = (userId: number) => {
   const user = db.prepare(`
-    SELECT users.id, users.display_name, users.status, password_credentials.username
+    SELECT
+      users.id,
+      users.display_name,
+      users.status,
+      password_credentials.username,
+      EXISTS(
+        SELECT 1 FROM auth_identities
+        WHERE auth_identities.user_id = users.id AND auth_identities.provider = 'apple'
+      ) AS has_apple_identity
     FROM users
     LEFT JOIN password_credentials ON password_credentials.user_id = users.id
     WHERE users.id = ?
@@ -547,7 +562,8 @@ const getPublicAppUser = (userId: number) => {
   return {
     id: user.id,
     displayName: user.display_name,
-    username: user.username || null
+    username: user.username || null,
+    hasAppleIdentity: Boolean(user.has_apple_identity)
   };
 };
 
@@ -1135,16 +1151,19 @@ app.post('/api/auth/credentials', appLoginRateLimit, requireOnboardingOrAppUser,
   const displayName = String(req.body?.displayName || '').trim();
 
   if (!validateUsername(username)) {
-    return res.status(400).json({ error: 'Username must be 3-24 characters: lowercase letters, numbers, or underscores.' });
+    return res.status(400).json({ error: 'Nickname must be 2-24 characters and use letters, numbers, underscores, or hyphens.' });
   }
-  if (password.length < 10) {
-    return res.status(400).json({ error: 'Password must be at least 10 characters.' });
+  if (password.length < 8) {
+    return res.status(400).json({ error: 'Password must be at least 8 characters.' });
   }
   if (db.prepare('SELECT 1 FROM password_credentials WHERE user_id = ?').get(appUser.userId)) {
     return res.status(409).json({ error: 'This account already has web credentials.' });
   }
 
   try {
+    if (usernameIsReservedForMapAccount(username)) {
+      return res.status(409).json({ error: 'This nickname is already in use.' });
+    }
     const passwordHash = await bcrypt.hash(password, 12);
     db.transaction(() => {
       db.prepare(`
@@ -1161,6 +1180,45 @@ app.post('/api/auth/credentials', appLoginRateLimit, requireOnboardingOrAppUser,
     const message = error?.code?.startsWith('SQLITE_CONSTRAINT')
       ? 'This username is already in use.'
       : error.message || 'Unable to save credentials.';
+    res.status(400).json({ error: message });
+  }
+});
+
+app.post('/api/auth/password/register', appLoginRateLimit, async (req, res) => {
+  if (!USER_JWT_SECRET) {
+    return res.status(503).json({ error: 'Catbeer user authentication is not configured.' });
+  }
+
+  const username = normalizeUsername(req.body?.username);
+  const password = String(req.body?.password || '');
+  if (!validateUsername(username)) {
+    return res.status(400).json({ error: 'Nickname must be 2-24 characters and use letters, numbers, underscores, or hyphens.' });
+  }
+  if (password.length < 8) {
+    return res.status(400).json({ error: 'Password must be at least 8 characters.' });
+  }
+  if (usernameIsReservedForMapAccount(username)) {
+    return res.status(409).json({ error: 'This nickname is already in use.' });
+  }
+
+  try {
+    const passwordHash = await bcrypt.hash(password, 12);
+    const userId = db.transaction(() => {
+      const user = db.prepare(`
+        INSERT INTO users (display_name, updated_at)
+        VALUES (?, CURRENT_TIMESTAMP)
+      `).run(username);
+      db.prepare(`
+        INSERT INTO password_credentials (user_id, username, username_normalized, password_hash, updated_at)
+        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+      `).run(user.lastInsertRowid, username, username, passwordHash);
+      return Number(user.lastInsertRowid);
+    })();
+    res.status(201).json({ token: issueAppUserToken(userId), user: getPublicAppUser(userId) });
+  } catch (error: any) {
+    const message = error?.code?.startsWith('SQLITE_CONSTRAINT')
+      ? 'This nickname is already in use.'
+      : error.message || 'Unable to create account.';
     res.status(400).json({ error: message });
   }
 });
@@ -1191,7 +1249,7 @@ app.post('/api/auth/password/change', authenticatedMutationRateLimit, requireApp
   const appUser = (req as any).appUser as AppUserToken;
   const currentPassword = String(req.body?.currentPassword || '');
   const newPassword = String(req.body?.newPassword || '');
-  if (newPassword.length < 10) return res.status(400).json({ error: 'Password must be at least 10 characters.' });
+  if (newPassword.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters.' });
 
   const credential = db.prepare('SELECT password_hash FROM password_credentials WHERE user_id = ?').get(appUser.userId) as any;
   if (!credential || !(await bcrypt.compare(currentPassword, credential.password_hash))) {
@@ -1205,6 +1263,37 @@ app.post('/api/auth/password/change', authenticatedMutationRateLimit, requireApp
 app.get('/api/account/me', requireAppUser, (req, res) => {
   const appUser = (req as any).appUser as AppUserToken;
   res.json({ user: getPublicAppUser(appUser.userId) });
+});
+
+app.post('/api/auth/apple/bind', authenticatedMutationRateLimit, requireAppUser, async (req, res) => {
+  const appUser = (req as any).appUser as AppUserToken;
+  try {
+    const identityToken = String(req.body?.identityToken || '');
+    if (!identityToken) return res.status(400).json({ error: 'Apple identity token is required.' });
+
+    const claims = await verifyAppleIdentityToken(identityToken);
+    const appleSubject = String(claims.sub || '');
+    if (!appleSubject) return res.status(400).json({ error: 'Apple identity token has no user subject.' });
+
+    const existing = db.prepare(`
+      SELECT user_id FROM auth_identities
+      WHERE provider = 'apple' AND provider_subject = ?
+      LIMIT 1
+    `).get(appleSubject) as any;
+    if (existing && existing.user_id !== appUser.userId) {
+      return res.status(409).json({ error: 'This Apple account is already linked to another Catbeer account.' });
+    }
+    if (!existing) {
+      db.prepare(`
+        INSERT INTO auth_identities (user_id, provider, provider_subject, email, updated_at)
+        VALUES (?, 'apple', ?, ?, CURRENT_TIMESTAMP)
+      `).run(appUser.userId, appleSubject, claims.email ? String(claims.email) : null);
+    }
+    res.json({ user: getPublicAppUser(appUser.userId) });
+  } catch (error: any) {
+    console.error('Apple account binding failed:', error.message);
+    res.status(401).json({ error: error.message || 'Unable to bind Apple account.' });
+  }
 });
 
 app.delete('/api/account', requireAppUser, (req, res) => {

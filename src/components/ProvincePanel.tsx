@@ -7,13 +7,14 @@ interface ProvincePanelProps {
   province: Province | null;
   onClose: () => void;
   onBandClick: (band: Band) => void;
+  onBandCheer: (band: Band) => void;
   onVenueClick: (venue: Venue) => void;
   onRehearsalRoomClick: (room: RehearsalRoom) => void;
   onSpotClick: (spot: Spot) => void;
 }
 
 
-const ProvincePanel: React.FC<ProvincePanelProps> = ({ province, onClose, onBandClick, onVenueClick, onRehearsalRoomClick, onSpotClick }) => {
+const ProvincePanel: React.FC<ProvincePanelProps> = ({ province, onClose, onBandClick, onBandCheer, onVenueClick, onRehearsalRoomClick, onSpotClick }) => {
   const [isMobile, setIsMobile] = React.useState(
     typeof window !== "undefined" ? window.innerWidth < 768 : false
   );
@@ -232,10 +233,22 @@ const ProvincePanel: React.FC<ProvincePanelProps> = ({ province, onClose, onBand
                                 <p className="text-xs text-gray-400 mt-1 drop-shadow-md">{band.name}</p>
                               </div>
                               <div className="shrink-0 text-xs text-[#ffd470] drop-shadow-md">
-                                <span className="inline-flex items-center gap-1 rounded-full border border-[#ffb400]/25 bg-black/35 px-2 py-1 backdrop-blur-sm">
+                                <button
+                                  type="button"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    onBandCheer(band);
+                                  }}
+                                  className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 backdrop-blur-sm transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ffd470] ${
+                                    band.viewerHasCheered
+                                      ? 'border-[#ffb400]/60 bg-[#ffb400] text-black'
+                                      : 'border-[#ffb400]/25 bg-black/35 hover:border-[#ffb400]/70 hover:bg-black/55'
+                                  }`}
+                                  aria-label={band.viewerHasCheered ? `取消为${band.name_zh}干杯` : `为${band.name_zh}干杯`}
+                                >
                                   <Beer size={13} fill={band.viewerHasCheered ? 'currentColor' : 'none'} />
                                   {band.cheerCount || 0}
-                                </span>
+                                </button>
                               </div>
                             </div>
                             <div className="mt-3">

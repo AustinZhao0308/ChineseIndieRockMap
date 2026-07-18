@@ -14,6 +14,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [mode, setMode] = useState<"login" | "register">(searchParams.get("mode") === "register" ? "register" : "login");
   const next = searchParams.get("next") || "/";
 
   const requestLogin = async (path: string) => {
@@ -31,6 +32,20 @@ export default function LoginPage() {
     setIsSubmitting(true);
 
     try {
+      if (mode === "register") {
+        const registration = await requestLogin("/api/auth/password/register");
+        if (registration.response.ok && registration.data.token) {
+          localStorage.removeItem("adminToken");
+          localStorage.setItem("catbeerUserToken", registration.data.token);
+          window.dispatchEvent(new Event("catbeeruserchange"));
+          window.dispatchEvent(new Event("authchange"));
+          navigate(next, { replace: true });
+          return;
+        }
+        setError(registration.data.error || "注册失败，请稍后再试。");
+        return;
+      }
+
       const appLogin = await requestLogin("/api/auth/password/login");
       if (appLogin.response.ok && appLogin.data.token) {
         localStorage.removeItem("adminToken");
@@ -74,20 +89,20 @@ export default function LoginPage() {
               <KeyRound size={20} />
             </div>
             <div>
-              <h1 className="text-2xl font-serif">登录</h1>
-              <p className="mt-1 text-sm text-white/45">使用你的用户名和密码继续</p>
+              <h1 className="text-2xl font-serif">{mode === "register" ? "注册账号" : "登录"}</h1>
+              <p className="mt-1 text-sm text-white/45">{mode === "register" ? "一个昵称与密码，通行网页地图和 App" : "使用你的昵称和密码继续"}</p>
             </div>
           </div>
 
           <form onSubmit={submit} className="mt-8">
             <label className="block">
-              <span className="text-xs uppercase text-white/40">Username</span>
+              <span className="text-xs uppercase text-white/40">Nickname</span>
               <input
                 value={username}
                 onChange={event => setUsername(event.target.value)}
                 autoCapitalize="none"
                 autoComplete="username"
-                placeholder="输入用户名"
+                placeholder="输入昵称"
                 className="mt-2 h-12 w-full rounded-lg border border-white/10 bg-black/45 px-4 text-white outline-none transition-colors placeholder:text-white/24 focus:border-[#ff4e00]/70"
               />
             </label>
@@ -97,17 +112,24 @@ export default function LoginPage() {
                 type="password"
                 value={password}
                 onChange={event => setPassword(event.target.value)}
-                autoComplete="current-password"
-                placeholder="输入密码"
+                autoComplete={mode === "register" ? "new-password" : "current-password"}
+                placeholder={mode === "register" ? "至少 8 位密码" : "输入密码"}
                 className="mt-2 h-12 w-full rounded-lg border border-white/10 bg-black/45 px-4 text-white outline-none transition-colors placeholder:text-white/24 focus:border-[#ff4e00]/70"
               />
             </label>
             {error && <p className="mt-4 text-sm text-red-300">{error}</p>}
             <button type="submit" disabled={isSubmitting} className="mt-6 inline-flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-white text-sm font-semibold text-black transition-colors hover:bg-white/88 disabled:cursor-not-allowed disabled:opacity-60">
-              {isSubmitting ? "登录中..." : "登录"}
+              {isSubmitting ? (mode === "register" ? "注册中..." : "登录中...") : (mode === "register" ? "注册并登录" : "登录")}
               <ArrowRight size={16} />
             </button>
           </form>
+          <button
+            type="button"
+            onClick={() => { setMode(mode === "login" ? "register" : "login"); setError(""); }}
+            className="mt-5 w-full text-center text-sm text-white/55 transition-colors hover:text-white"
+          >
+            {mode === "login" ? "还没有账号？注册一个" : "已有账号？去登录"}
+          </button>
         </section>
       </main>
     </div>

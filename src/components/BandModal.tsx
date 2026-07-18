@@ -8,9 +8,10 @@ interface BandModalProps {
   band: Band | null;
   onClose: () => void;
   onBandUpdated?: (bandId: string, updates: Partial<Band>) => void;
+  onRequireSignIn?: (band: Band) => void;
 }
 
-const BandModal: React.FC<BandModalProps> = ({ band, onClose, onBandUpdated }) => {
+const BandModal: React.FC<BandModalProps> = ({ band, onClose, onBandUpdated, onRequireSignIn }) => {
   const [showContact, setShowContact] = useState(false);
   const [copied, setCopied] = useState(false);
   const [cheerCount, setCheerCount] = useState(0);
@@ -30,7 +31,7 @@ const BandModal: React.FC<BandModalProps> = ({ band, onClose, onBandUpdated }) =
     if (!band?.dbId) return;
     const token = localStorage.getItem('catbeerUserToken');
     if (!token) {
-      window.location.href = `/login?next=${encodeURIComponent(window.location.pathname)}`;
+      onRequireSignIn?.(band);
       return;
     }
 
@@ -44,7 +45,7 @@ const BandModal: React.FC<BandModalProps> = ({ band, onClose, onBandUpdated }) =
       if (!response.ok) {
         if (response.status === 401) {
           localStorage.removeItem('catbeerUserToken');
-          window.location.href = `/login?next=${encodeURIComponent(window.location.pathname)}`;
+          onRequireSignIn?.(band);
           return;
         }
         throw new Error(data.error || '干杯失败');

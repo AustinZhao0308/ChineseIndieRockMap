@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
+import { Beer, X } from "lucide-react";
 import ChinaMap from "../components/ChinaMap";
 import ProvincePanel from "../components/ProvincePanel";
 import BandModal from "../components/BandModal";
@@ -27,6 +28,7 @@ export default function MapPage() {
   const [featuredEvent, setFeaturedEvent] = useState<any>(null);
   const [featuredEventError, setFeaturedEventError] = useState<string | null>(null);
   const [isAdBannerVisible, setIsAdBannerVisible] = useState(true);
+  const [cheerPromptBand, setCheerPromptBand] = useState<Band | null>(null);
 
   useEffect(() => {
     fetch('/api/featured_events/active')
@@ -54,6 +56,42 @@ export default function MapPage() {
   const handleBandClick = (band: Band) => {
     setSelectedBand(band);
   };
+
+  const handleBandCheer = async (band: Band) => {
+    if (!band.dbId) return;
+    const token = localStorage.getItem('catbeerUserToken');
+    if (!token) {
+      setCheerPromptBand(band);
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/bands/${band.dbId}/cheers`, {
+        method: band.viewerHasCheered ? 'DELETE' : 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        if (response.status === 401) {
+          localStorage.removeItem('catbeerUserToken');
+          setCheerPromptBand(band);
+          return;
+        }
+        throw new Error(data.error || '干杯失败');
+      }
+      updateBand(band.id, {
+        viewerHasCheered: Boolean(data.cheered),
+        cheerCount: Number(data.cheerCount || 0)
+      });
+      setSelectedBand(current => current?.id === band.id
+        ? { ...current, viewerHasCheered: Boolean(data.cheered), cheerCount: Number(data.cheerCount || 0) }
+        : current);
+    } catch (error) {
+      console.error('Unable to update cheer:', error);
+    }
+  };
+
+  const loginNext = `${location.pathname}${location.search}`;
 
   const handleVenueClick = (venue: Venue) => {
     setSelectedVenue(venue);
@@ -136,6 +174,7 @@ export default function MapPage() {
         province={selectedProvince} 
         onClose={handleClosePanel} 
         onBandClick={handleBandClick} 
+        onBandCheer={handleBandCheer}
         onVenueClick={handleVenueClick}
         onRehearsalRoomClick={handleRehearsalRoomClick}
         onSpotClick={handleSpotClick}
@@ -149,7 +188,29 @@ export default function MapPage() {
           updateBand(bandId, updates);
           setSelectedBand(current => current?.id === bandId ? { ...current, ...updates } : current);
         }}
+        onRequireSignIn={setCheerPromptBand}
       />
+
+      {cheerPromptBand && (
+        <div className="fixed inset-0 z-[80] grid place-items-center bg-black/65 p-5 backdrop-blur-sm">
+          <div role="dialog" aria-modal="true" aria-labelledby="cheer-login-title" className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#171313] p-6 text-white shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#ffb400] text-black">
+                <Beer size={20} fill="currentColor" />
+              </div>
+              <button type="button" onClick={() => setCheerPromptBand(null)} className="rounded-full p-1 text-white/50 transition-colors hover:bg-white/10 hover:text-white" aria-label="关闭">
+                <X size={20} />
+              </button>
+            </div>
+            <h2 id="cheer-login-title" className="mt-5 text-xl font-semibold">先登录，再为 {cheerPromptBand.name_zh} 干杯</h2>
+            <p className="mt-2 text-sm leading-6 text-white/55">注册一个昵称和密码，即可在地图与 Catbeer 猫啤 App 使用同一账户。</p>
+            <div className="mt-6 grid grid-cols-2 gap-3">
+              <button type="button" onClick={() => navigate(`/login?mode=register&next=${encodeURIComponent(loginNext)}`)} className="h-11 rounded-lg bg-white text-sm font-semibold text-black transition-colors hover:bg-white/85">注册账号</button>
+              <button type="button" onClick={() => navigate(`/login?next=${encodeURIComponent(loginNext)}`)} className="h-11 rounded-lg border border-white/15 text-sm font-semibold transition-colors hover:bg-white/10">去登录</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Venue Modal */}
       <VenueModal 
