@@ -31,6 +31,8 @@ export default function MapPage() {
   const [cheerPromptBand, setCheerPromptBand] = useState<Band | null>(null);
 
   useEffect(() => {
+    if (isEmbedded) return;
+
     fetch('/api/featured_events/active')
       .then(res => {
         if (!res.ok) throw new Error(`Featured Event API failed: ${res.status}`);
@@ -150,7 +152,17 @@ export default function MapPage() {
 
   return (
     <div className="w-full h-[100dvh] overflow-hidden font-sans relative" style={{ background: isLight ? "#f6f3ed" : "#0a0502" }}>
-      <div className={`absolute left-5 right-5 z-10 pointer-events-none sm:left-6 sm:right-6 md:left-10 md:right-auto lg:left-12 xl:left-14 ${isEmbedded ? 'top-[calc(1rem+env(safe-area-inset-top))] md:top-5' : 'top-[calc(4.05rem+env(safe-area-inset-top))] md:top-[4.9rem]'}`}>
+      {isEmbedded && (
+        <div className="absolute left-4 top-[calc(0.7rem+env(safe-area-inset-top))] z-20 flex items-center gap-2.5 sm:left-5">
+          <img src="/brand/indie-rock-map-mark-orange.png" alt="" className="h-9 w-auto shrink-0 object-contain" />
+          <span className="flex items-end gap-2 translate-y-[2px]">
+            <img src="/brand/indie-rock-map-title-white.png" alt="Indie Rock Map" className="h-4 w-auto object-contain" />
+            <img src="/brand/catbeer-records-orange.png" alt="By Catbeer Records" className="h-2 w-auto translate-y-[1px] object-contain" />
+          </span>
+        </div>
+      )}
+
+      {!isEmbedded && <div className="absolute left-5 right-5 z-10 pointer-events-none sm:left-6 sm:right-6 md:left-10 md:right-auto lg:left-12 xl:left-14 top-[calc(4.05rem+env(safe-area-inset-top))] md:top-[4.9rem]">
         <div className={`inline-flex max-w-full items-center gap-2 rounded-full border px-3 py-2 text-[11px] backdrop-blur-xl md:px-4 md:text-xs ${isLight ? 'border-black/10 bg-white/72 text-black/58' : 'border-white/[0.08] bg-black/28 text-white/58'}`}>
           <span>
             已收录 <span className="font-semibold text-[#ff6a2b]">{totalBands}</span> 支乐队
@@ -159,7 +171,7 @@ export default function MapPage() {
           <span className="hidden md:inline">点击高亮省份探索当地音乐现场</span>
           <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#ff4e00] shadow-[0_0_14px_rgba(255,78,0,0.72)]" />
         </div>
-      </div>
+      </div>}
 
       {/* Main Map */}
       <ChinaMap 
@@ -231,7 +243,7 @@ export default function MapPage() {
       />
 
       {/* Ad Banner */}
-      {featuredEvent && isAdBannerVisible && (
+      {!isEmbedded && featuredEvent && isAdBannerVisible && (
         <AdBanner 
           isPanelOpen={!!selectedProvinceId} 
           onClick={() => navigate(`/events/${featuredEvent.slug || featuredEvent.id}`)} 
@@ -243,7 +255,7 @@ export default function MapPage() {
       {/* Feedback Menu */}
       <FeedbackMenu 
         isPanelOpen={!!selectedProvinceId}
-        hasBanner={!!featuredEvent && isAdBannerVisible}
+        hasBanner={!isEmbedded && !!featuredEvent && isAdBannerVisible}
       />
     </div>
   );
