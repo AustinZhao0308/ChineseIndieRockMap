@@ -1177,7 +1177,7 @@ app.post('/api/auth/credentials', appLoginRateLimit, requireOnboardingOrAppUser,
       }
     })();
     const token = issueAppUserToken(appUser.userId);
-    res.status(201).json({ token, user: getPublicAppUser(appUser.userId) });
+    res.status(201).json({ token, needsCredentials: false, user: getPublicAppUser(appUser.userId) });
   } catch (error: any) {
     const message = error?.code?.startsWith('SQLITE_CONSTRAINT')
       ? 'This username is already in use.'
@@ -1216,7 +1216,7 @@ app.post('/api/auth/password/register', appLoginRateLimit, async (req, res) => {
       `).run(user.lastInsertRowid, username, username, passwordHash);
       return Number(user.lastInsertRowid);
     })();
-    res.status(201).json({ token: issueAppUserToken(userId), user: getPublicAppUser(userId) });
+    res.status(201).json({ token: issueAppUserToken(userId), needsCredentials: false, user: getPublicAppUser(userId) });
   } catch (error: any) {
     const message = error?.code?.startsWith('SQLITE_CONSTRAINT')
       ? 'This nickname is already in use.'
@@ -1244,7 +1244,7 @@ app.post('/api/auth/password/login', appLoginRateLimit, async (req, res) => {
   if (!credential || !(await bcrypt.compare(password, credential.password_hash))) {
     return res.status(401).json({ error: 'Invalid username or password.' });
   }
-  res.json({ token: issueAppUserToken(credential.user_id), user: getPublicAppUser(credential.user_id) });
+  res.json({ token: issueAppUserToken(credential.user_id), needsCredentials: false, user: getPublicAppUser(credential.user_id) });
 });
 
 app.post('/api/auth/password/change', authenticatedMutationRateLimit, requireAppUser, async (req, res) => {
