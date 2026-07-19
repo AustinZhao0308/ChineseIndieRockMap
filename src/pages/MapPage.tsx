@@ -47,6 +47,20 @@ export default function MapPage() {
       });
   }, []);
 
+  useEffect(() => {
+    if (!isEmbedded) return;
+
+    const bridge = (window as typeof window & {
+      webkit?: {
+        messageHandlers?: {
+          mapPanelState?: { postMessage: (payload: { isOpen: boolean }) => void };
+        };
+      };
+    }).webkit?.messageHandlers?.mapPanelState;
+
+    bridge?.postMessage({ isOpen: Boolean(selectedProvinceId) });
+  }, [isEmbedded, selectedProvinceId]);
+
   const handleProvinceClick = (provinceId: string) => {
     setSelectedProvinceId(provinceId);
   };
@@ -153,11 +167,11 @@ export default function MapPage() {
   return (
     <div className="w-full h-[100dvh] overflow-hidden font-sans relative" style={{ background: isLight ? "#f6f3ed" : "#0a0502" }}>
       {isEmbedded && (
-        <div className="absolute left-4 top-[calc(0.7rem+env(safe-area-inset-top))] z-20 flex items-center gap-2.5 sm:left-5">
-          <img src="/brand/indie-rock-map-mark-orange.png" alt="" className="h-9 w-auto shrink-0 object-contain" />
-          <span className="flex items-end gap-2 translate-y-[2px]">
-            <img src="/brand/indie-rock-map-title-white.png" alt="Indie Rock Map" className="h-4 w-auto object-contain" />
-            <img src="/brand/catbeer-records-orange.png" alt="By Catbeer Records" className="h-2 w-auto translate-y-[1px] object-contain" />
+        <div className="absolute left-5 top-[calc(0.85rem+env(safe-area-inset-top))] z-20 flex items-center gap-3 sm:left-6">
+          <img src="/brand/indie-rock-map-mark-orange.png" alt="" className="h-11 w-auto shrink-0 object-contain" />
+          <span className="flex items-end gap-2.5 translate-y-[2px]">
+            <img src="/brand/indie-rock-map-title-white.png" alt="Indie Rock Map" className="h-5 w-auto object-contain" />
+            <img src="/brand/catbeer-records-orange.png" alt="By Catbeer Records" className="h-2.5 w-auto translate-y-[1px] object-contain" />
           </span>
         </div>
       )}
