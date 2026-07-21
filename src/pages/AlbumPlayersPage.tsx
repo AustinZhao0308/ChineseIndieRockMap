@@ -49,7 +49,6 @@ export default function AlbumPlayersPage() {
               <span className="font-mono uppercase tracking-[0.2em]">Album Player Gallery</span>
             </div>
             <h1 className="mt-3 font-serif text-4xl leading-tight sm:text-5xl">专辑播放器</h1>
-            <p className="mt-3 max-w-xl text-sm leading-6 text-white/55">每张卡片先是一张专辑，再通往它独有的播放器网站。</p>
           </div>
           <label className="relative block w-full md:w-80">
             <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/35" size={16} />

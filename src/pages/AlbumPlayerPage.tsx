@@ -38,8 +38,7 @@ export default function AlbumPlayerPage() {
         src={player.site_url}
         title={`${player.title} player`}
         className="absolute inset-0 h-full w-full border-0 bg-white"
-        sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-presentation"
-        allow="autoplay; encrypted-media; fullscreen"
+        allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
         referrerPolicy="strict-origin-when-cross-origin"
       />
       <Link to="/players" className="absolute left-4 top-[calc(1rem+env(safe-area-inset-top))] z-30 grid h-11 w-11 place-items-center rounded-full border border-white/20 bg-black/35 text-white/90 shadow-[0_8px_24px_rgba(0,0,0,0.28)] backdrop-blur-xl transition-colors hover:border-white/50 hover:bg-black/55" aria-label="返回 Gallery" title="返回 Gallery">
