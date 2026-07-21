@@ -12,7 +12,8 @@ type NavUser = {
 
 const baseNavItems = [
   { to: "/", label: "地图", match: (path: string) => path === "/" },
-  { to: "/events", label: "演出档案", match: (path: string) => path.startsWith("/events") || path.startsWith("/labels") }
+  { to: "/events", label: "演出档案", match: (path: string) => path.startsWith("/events") || path.startsWith("/labels") },
+  { to: "/players", label: "专辑播放器", match: (path: string) => path.startsWith("/players") }
 ];
 
 const decodeToken = (token: string): Omit<NavUser, "session"> | null => {

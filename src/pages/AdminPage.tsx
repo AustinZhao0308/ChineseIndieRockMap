@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Navigate, useLocation, useSearchParams } from 'react-router-dom';
-import { Code2, KeyRound, Plus, Trash2, Edit2, Music, MapPin, X, Calendar, Star, Mic2, Coffee, Search, Upload, Image as ImageIcon, HardDrive, Link as LinkIcon, Users, Languages } from 'lucide-react';
+import { Code2, KeyRound, Plus, Trash2, Edit2, Music, MapPin, X, Calendar, Star, Mic2, Coffee, Search, Upload, Image as ImageIcon, HardDrive, Link as LinkIcon, Users, Languages, Disc3 } from 'lucide-react';
 import BulkImportModal from '../components/BulkImportModal';
 import ImageAssetPicker from '../components/ImageAssetPicker';
+import AlbumPlayersAdminPanel from '../components/AlbumPlayersAdminPanel';
 
 type EventTicketForm = {
   label: string;
@@ -240,7 +241,7 @@ const cleanQrCodesForSave = (qrCodes: EventQrCodeForm[]) => {
     .filter(qrCode => qrCode.title || qrCode.image_url);
 };
 
-const adminTabs = ['bands', 'venues', 'events', 'rehearsal_rooms', 'spots', 'accounts', 'assets', 'settings'] as const;
+const adminTabs = ['bands', 'venues', 'events', 'rehearsal_rooms', 'spots', 'players', 'accounts', 'assets', 'settings'] as const;
 type AdminTab = typeof adminTabs[number];
 type CurrentUser = {
   role: 'admin' | 'label' | 'artist';
@@ -825,6 +826,8 @@ export default function AdminPage() {
         setImageAssetSummary(data.summary || emptyAssetSummary);
         return;
       }
+
+      if (activeTab === 'players') return;
 
       if (activeTab === 'events') {
         const [eventsData, bandsData, venuesData, accountsData] = await Promise.all([
@@ -1605,6 +1608,7 @@ export default function AdminPage() {
       events: 'eventEntity',
       rehearsal_rooms: 'rehearsalRoom',
       spots: 'spot',
+      players: 'album player',
       accounts: 'account',
       assets: 'imageAssets',
       settings: 'settings'
@@ -1696,6 +1700,12 @@ export default function AdminPage() {
           {isAdmin && (
             <>
               <button
+                onClick={() => { setActiveTab('players'); resetForm(); }}
+                className={`flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-colors ${activeTab === 'players' ? 'bg-[#ff4e00] text-white' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}
+              >
+                <Disc3 size={18} /> 专辑播放器
+              </button>
+              <button
                 onClick={() => { setActiveTab('accounts'); resetForm(); }}
                 className={`flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-colors ${activeTab === 'accounts' ? 'bg-[#ff4e00] text-white' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}
               >
@@ -1717,7 +1727,9 @@ export default function AdminPage() {
           )}
         </div>
 
-        {activeTab === 'settings' ? (
+        {activeTab === 'players' ? (
+          <AlbumPlayersAdminPanel token={token || ''} />
+        ) : activeTab === 'settings' ? (
           <div className="bg-[#1a1a1a] p-6 rounded-2xl border border-white/10 max-w-md">
             <h2 className="text-xl mb-6 font-medium flex items-center gap-2">
               <KeyRound size={20} className="text-[#ff4e00]" />

@@ -344,9 +344,26 @@ db.exec(`
     FOREIGN KEY(band_id) REFERENCES bands(id) ON DELETE CASCADE
   );
 
+  CREATE TABLE IF NOT EXISTS album_players (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    slug TEXT NOT NULL UNIQUE,
+    title TEXT NOT NULL,
+    artist TEXT NOT NULL DEFAULT '',
+    description TEXT NOT NULL DEFAULT '',
+    github_url TEXT NOT NULL,
+    site_url TEXT NOT NULL,
+    cover_image_url TEXT,
+    style_label TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'draft' CHECK(status IN ('draft', 'published', 'archived')),
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  );
+
   CREATE INDEX IF NOT EXISTS idx_posts_public_feed ON posts(status, published_at DESC, sort_order DESC);
   CREATE INDEX IF NOT EXISTS idx_band_cheers_band_id ON band_cheers(band_id);
   CREATE INDEX IF NOT EXISTS idx_user_saved_posts_user_id ON user_saved_posts(user_id, created_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_album_players_public ON album_players(status, sort_order DESC, created_at DESC);
 `);
 
 // Add columns to existing tables if they don't exist (migration)
@@ -388,6 +405,31 @@ db.transaction(() => {
     VALUES (?, ?, ?, 'active', CURRENT_TIMESTAMP)
   `).run(ADMIN_USERNAME, ADMIN_DISPLAY_NAME, ADMIN_PASSWORD_HASH);
 })();
+
+const sampleAlbumPlayer = {
+  slug: 'mrg32k3a-gameboy',
+  title: 'mrg32k3a gameboy',
+  artist: 'owen1820939655',
+  description: 'A Game Boy inspired album-player website, published from GitHub Pages.',
+  githubUrl: 'https://github.com/owen1820939655/mrg32k3a-gameboy',
+  siteUrl: 'https://owen1820939655.github.io/mrg32k3a-gameboy/',
+  styleLabel: 'Game Boy',
+  status: 'published'
+};
+
+db.prepare(`
+  INSERT OR IGNORE INTO album_players (slug, title, artist, description, github_url, site_url, style_label, status)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+`).run(
+  sampleAlbumPlayer.slug,
+  sampleAlbumPlayer.title,
+  sampleAlbumPlayer.artist,
+  sampleAlbumPlayer.description,
+  sampleAlbumPlayer.githubUrl,
+  sampleAlbumPlayer.siteUrl,
+  sampleAlbumPlayer.styleLabel,
+  sampleAlbumPlayer.status
+);
 
 // Seed initial data if empty
 const countBands = db.prepare('SELECT COUNT(*) as count FROM bands').get() as { count: number };
@@ -870,6 +912,16 @@ const collectImageReferences = () => {
           field: `stops[${stopIndex}].recap_photos[${photoIndex}].image_url`
         });
       });
+    });
+  });
+
+  const albumPlayers = db.prepare('SELECT id, title, cover_image_url FROM album_players').all() as any[];
+  albumPlayers.forEach(player => {
+    addImageReference(refs, player.cover_image_url, {
+      type: 'Album Player',
+      id: player.id,
+      title: player.title || `Album Player #${player.id}`,
+      field: 'cover_image_url'
     });
   });
 
@@ -2009,6 +2061,110 @@ app.delete('/api/featured_events/:id', authenticateToken, (req, res) => {
       }
     });
     db.prepare('DELETE FROM featured_events WHERE id = ?').run(req.params.id);
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+const normalizeAlbumPlayerSlug = (value: any) => sanitizePathSegment(value, 'album-player');
+
+const parseHttpUrl = (value: any, fieldName: string) => {
+  const text = String(value || '').trim();
+  try {
+    const url = new URL(text);
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') throw new Error();
+    return url.toString();
+  } catch {
+    throw new Error(`${fieldName} must be a valid http(s) URL.`);
+  }
+};
+
+const normalizeAlbumPlayerPayload = (body: any) => {
+  const title = String(body.title || '').trim();
+  const githubUrl = parseHttpUrl(body.github_url, 'GitHub URL');
+  const siteUrl = parseHttpUrl(body.site_url, 'Player site URL');
+  if (!title) throw new Error('Title is required.');
+  if (new URL(githubUrl).hostname !== 'github.com') throw new Error('GitHub URL must point to github.com.');
+  return {
+    slug: normalizeAlbumPlayerSlug(body.slug || title),
+    title,
+    artist: String(body.artist || '').trim(),
+    description: String(body.description || '').trim(),
+    githubUrl,
+    siteUrl,
+    coverImageUrl: String(body.cover_image_url || '').trim() || null,
+    styleLabel: String(body.style_label || '').trim(),
+    status: ['draft', 'published', 'archived'].includes(body.status) ? body.status : 'draft',
+    sortOrder: Number.isFinite(Number(body.sort_order)) ? Number(body.sort_order) : 0
+  };
+};
+
+// Album Players API
+app.get('/api/album_players', (req, res) => {
+  const includeUnpublished = req.headers.authorization
+    ? (() => {
+        try {
+          const token = getBearerToken(req);
+          return token ? (jwt.verify(token, JWT_SECRET) as any)?.role === 'admin' : false;
+        } catch {
+          return false;
+        }
+      })()
+    : false;
+  const players = includeUnpublished
+    ? db.prepare('SELECT * FROM album_players ORDER BY sort_order DESC, created_at DESC').all()
+    : db.prepare(`
+        SELECT id, slug, title, artist, description, site_url, cover_image_url, style_label, status, sort_order, created_at, updated_at
+        FROM album_players
+        WHERE status = 'published'
+        ORDER BY sort_order DESC, created_at DESC
+      `).all();
+  res.json(players);
+});
+
+app.get('/api/album_players/:slugOrId', (req, res) => {
+  const { slugOrId } = req.params;
+  const player = db.prepare(`
+    SELECT id, slug, title, artist, description, site_url, cover_image_url, style_label, status, sort_order, created_at, updated_at
+    FROM album_players
+    WHERE status = 'published' AND (slug = ? OR id = ?)
+    LIMIT 1
+  `).get(slugOrId, slugOrId);
+  if (!player) return res.status(404).json({ error: 'Album player not found' });
+  res.json(player);
+});
+
+app.post('/api/album_players', authenticateToken, requireAdmin, (req, res) => {
+  try {
+    const player = normalizeAlbumPlayerPayload(req.body);
+    const result = db.prepare(`
+      INSERT INTO album_players (slug, title, artist, description, github_url, site_url, cover_image_url, style_label, status, sort_order, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    `).run(player.slug, player.title, player.artist, player.description, player.githubUrl, player.siteUrl, player.coverImageUrl, player.styleLabel, player.status, player.sortOrder);
+    res.json({ id: result.lastInsertRowid });
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.put('/api/album_players/:id', authenticateToken, requireAdmin, (req, res) => {
+  try {
+    const player = normalizeAlbumPlayerPayload(req.body);
+    db.prepare(`
+      UPDATE album_players
+      SET slug = ?, title = ?, artist = ?, description = ?, github_url = ?, site_url = ?, cover_image_url = ?, style_label = ?, status = ?, sort_order = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(player.slug, player.title, player.artist, player.description, player.githubUrl, player.siteUrl, player.coverImageUrl, player.styleLabel, player.status, player.sortOrder, req.params.id);
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.delete('/api/album_players/:id', authenticateToken, requireAdmin, (req, res) => {
+  try {
+    db.prepare('DELETE FROM album_players WHERE id = ?').run(req.params.id);
     res.json({ success: true });
   } catch (error: any) {
     res.status(400).json({ error: error.message });
