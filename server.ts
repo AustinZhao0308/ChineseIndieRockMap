@@ -82,6 +82,7 @@ app.use(express.json());
 
 // Ensure uploads directory exists
 const uploadsDir = path.join(process.cwd(), 'uploads');
+const albumPlayerProjectsDir = path.join(process.cwd(), 'album-player-projects');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
@@ -2074,6 +2075,19 @@ const getGithubRepositoryStorage = async (githubUrl: string) => {
   return result;
 };
 
+const deleteAlbumPlayerLocalResources = (player: { slug: string; cover_image_url?: string | null }) => {
+  const projectDirectory = path.resolve(albumPlayerProjectsDir, sanitizePathSegment(player.slug, 'album-player'));
+  const projectRoot = `${path.resolve(albumPlayerProjectsDir)}${path.sep}`;
+  if (projectDirectory.startsWith(projectRoot) && fs.existsSync(projectDirectory)) {
+    fs.rmSync(projectDirectory, { recursive: true, force: true });
+  }
+
+  const normalizedCoverUrl = normalizeUploadUrl(player.cover_image_url);
+  if (normalizedCoverUrl && !collectImageReferences().has(normalizedCoverUrl)) {
+    deleteLocalImage(normalizedCoverUrl);
+  }
+};
+
 const parseHttpUrl = (value: any, fieldName: string) => {
   const text = String(value || '').trim();
   try {
@@ -2180,7 +2194,10 @@ app.put('/api/album_players/:id', authenticateToken, requireAdmin, (req, res) =>
 
 app.delete('/api/album_players/:id', authenticateToken, requireAdmin, (req, res) => {
   try {
+    const player = db.prepare('SELECT slug, cover_image_url FROM album_players WHERE id = ?').get(req.params.id) as { slug: string; cover_image_url?: string | null } | undefined;
+    if (!player) return res.status(404).json({ error: 'Album player not found' });
     db.prepare('DELETE FROM album_players WHERE id = ?').run(req.params.id);
+    deleteAlbumPlayerLocalResources(player);
     res.json({ success: true });
   } catch (error: any) {
     res.status(400).json({ error: error.message });
