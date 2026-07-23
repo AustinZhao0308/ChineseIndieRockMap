@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
 import { Disc3, Search } from "lucide-react";
 
 type AlbumPlayer = {
@@ -8,6 +7,7 @@ type AlbumPlayer = {
   title: string;
   artist: string;
   description: string;
+  site_url: string;
   cover_image_url?: string | null;
   style_label: string;
 };
@@ -73,7 +73,7 @@ export default function AlbumPlayersPage() {
           <div className="grid grid-cols-[repeat(auto-fill,minmax(170px,220px))] gap-4">
             {filteredPlayers.map(player => (
               <article key={player.id} className="group overflow-hidden border border-white/10 bg-[#100c09] transition-colors hover:border-[#ff4e00]/60">
-                <Link to={`/players/${player.slug}`} className="block">
+                <a href={player.site_url} className="block">
                   <div className="relative aspect-square overflow-hidden bg-[#b2c6a2]">
                     {player.cover_image_url ? (
                       <img src={player.cover_image_url} alt={`${player.title} cover`} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" referrerPolicy="no-referrer" />
@@ -81,9 +81,9 @@ export default function AlbumPlayersPage() {
                       <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(20,37,20,0.14)_1px,transparent_1px),linear-gradient(0deg,rgba(20,37,20,0.14)_1px,transparent_1px)] bg-[size:12px_12px]" />
                     )}
                   </div>
-                </Link>
+                </a>
                 <div className="p-3.5">
-                  <h2 className="truncate font-serif text-lg leading-tight"><Link to={`/players/${player.slug}`} className="transition-colors hover:text-[#ffb18a]">{player.title}</Link></h2>
+                  <h2 className="truncate font-serif text-lg leading-tight"><a href={player.site_url} className="transition-colors hover:text-[#ffb18a]">{player.title}</a></h2>
                   {player.artist && <p className="mt-1 truncate text-xs text-white/55">{player.artist}</p>}
                 </div>
               </article>

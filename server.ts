@@ -406,31 +406,6 @@ db.transaction(() => {
   `).run(ADMIN_USERNAME, ADMIN_DISPLAY_NAME, ADMIN_PASSWORD_HASH);
 })();
 
-const sampleAlbumPlayer = {
-  slug: 'mrg32k3a-gameboy',
-  title: 'mrg32k3a gameboy',
-  artist: 'owen1820939655',
-  description: 'A Game Boy inspired album-player website, published from GitHub Pages.',
-  githubUrl: 'https://github.com/owen1820939655/mrg32k3a-gameboy',
-  siteUrl: 'https://owen1820939655.github.io/mrg32k3a-gameboy/',
-  styleLabel: 'Game Boy',
-  status: 'published'
-};
-
-db.prepare(`
-  INSERT OR IGNORE INTO album_players (slug, title, artist, description, github_url, site_url, style_label, status)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-`).run(
-  sampleAlbumPlayer.slug,
-  sampleAlbumPlayer.title,
-  sampleAlbumPlayer.artist,
-  sampleAlbumPlayer.description,
-  sampleAlbumPlayer.githubUrl,
-  sampleAlbumPlayer.siteUrl,
-  sampleAlbumPlayer.styleLabel,
-  sampleAlbumPlayer.status
-);
-
 // Seed initial data if empty
 const countBands = db.prepare('SELECT COUNT(*) as count FROM bands').get() as { count: number };
 if (countBands.count === 0) {
@@ -2068,6 +2043,36 @@ app.delete('/api/featured_events/:id', authenticateToken, (req, res) => {
 });
 
 const normalizeAlbumPlayerSlug = (value: any) => sanitizePathSegment(value, 'album-player');
+const albumPlayerStorageCache = new Map<string, { bytes: number; fileCount: number; checkedAt: string; approximate: boolean; expiresAt: number }>();
+const ALBUM_PLAYER_STORAGE_CACHE_MS = 6 * 60 * 60 * 1000;
+
+const getGithubRepositoryStorage = async (githubUrl: string) => {
+  const cached = albumPlayerStorageCache.get(githubUrl);
+  if (cached && cached.expiresAt > Date.now()) return cached;
+
+  const match = githubUrl.match(/^https?:\/\/github\.com\/([^/]+)\/([^/?#]+)\/?(?:[?#].*)?$/i);
+  if (!match) throw new Error('GitHub repository URL is invalid.');
+  const [, owner, repository] = match;
+  const headers = { Accept: 'application/vnd.github+json', 'User-Agent': 'ChineseIndieRockMap' };
+  const repositoryResponse = await fetch(`https://api.github.com/repos/${owner}/${repository}`, { headers });
+  if (!repositoryResponse.ok) throw new Error(`GitHub repository lookup failed (${repositoryResponse.status}).`);
+  const repositoryData = await repositoryResponse.json() as { default_branch?: string };
+  if (!repositoryData.default_branch) throw new Error('GitHub repository has no default branch.');
+
+  const treeResponse = await fetch(`https://api.github.com/repos/${owner}/${repository}/git/trees/${encodeURIComponent(repositoryData.default_branch)}?recursive=1`, { headers });
+  if (!treeResponse.ok) throw new Error(`GitHub file listing failed (${treeResponse.status}).`);
+  const treeData = await treeResponse.json() as { truncated?: boolean; tree?: Array<{ type?: string; size?: number }> };
+  const bytes = (treeData.tree || []).reduce((total, entry) => total + (entry.type === 'blob' ? Number(entry.size || 0) : 0), 0);
+  const result = {
+    bytes,
+    fileCount: (treeData.tree || []).filter(entry => entry.type === 'blob').length,
+    checkedAt: new Date().toISOString(),
+    approximate: Boolean(treeData.truncated),
+    expiresAt: Date.now() + ALBUM_PLAYER_STORAGE_CACHE_MS
+  };
+  albumPlayerStorageCache.set(githubUrl, result);
+  return result;
+};
 
 const parseHttpUrl = (value: any, fieldName: string) => {
   const text = String(value || '').trim();
@@ -2133,6 +2138,17 @@ app.get('/api/album_players/:slugOrId', (req, res) => {
   `).get(slugOrId, slugOrId);
   if (!player) return res.status(404).json({ error: 'Album player not found' });
   res.json(player);
+});
+
+app.get('/api/album_players/:id/storage', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const player = db.prepare('SELECT github_url FROM album_players WHERE id = ?').get(req.params.id) as { github_url?: string } | undefined;
+    if (!player?.github_url) return res.status(404).json({ error: 'Album player not found' });
+    const usage = await getGithubRepositoryStorage(player.github_url);
+    res.json({ bytes: usage.bytes, file_count: usage.fileCount, checked_at: usage.checkedAt, approximate: usage.approximate });
+  } catch (error: any) {
+    res.status(502).json({ error: error.message || 'Unable to calculate repository storage.' });
+  }
 });
 
 app.post('/api/album_players', authenticateToken, requireAdmin, (req, res) => {

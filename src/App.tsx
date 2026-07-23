@@ -12,7 +12,6 @@ import ContentAdminPage from "./pages/ContentAdminPage";
 import ContentEditorPage from "./pages/ContentEditorPage";
 import ContentPreviewPage from "./pages/ContentPreviewPage";
 import AlbumPlayersPage from "./pages/AlbumPlayersPage";
-import AlbumPlayerPage from "./pages/AlbumPlayerPage";
 
 export default function App() {
   return (
@@ -25,17 +24,15 @@ export default function App() {
 function AppRoutes() {
   const location = useLocation();
   const isEmbedded = new URLSearchParams(location.search).get("embed") === "ios";
-  const isPlayerImmersiveView = /^\/players\/[^/]+$/.test(location.pathname);
 
   return (
     <>
-      {!isEmbedded && !isPlayerImmersiveView && <SiteNav />}
+      {!isEmbedded && <SiteNav />}
       <Routes>
         <Route path="/" element={<MapPage />} />
         <Route path="/events" element={<EventsArchivePage />} />
         <Route path="/events/:slug" element={<EventPage />} />
         <Route path="/players" element={<AlbumPlayersPage />} />
-        <Route path="/players/:slug" element={<AlbumPlayerPage />} />
         <Route path="/labels/:username" element={<LabelArchivePage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/user-login" element={<UserLoginPage />} />

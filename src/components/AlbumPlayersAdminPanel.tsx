@@ -17,6 +17,7 @@ type AlbumPlayer = {
 };
 
 type FormState = Omit<AlbumPlayer, "id">;
+type StorageUsage = { bytes: number; file_count: number; approximate: boolean; error?: string };
 
 const emptyForm = (): FormState => ({ slug: "", title: "", artist: "", description: "", github_url: "", site_url: "", cover_image_url: "", style_label: "", status: "draft", sort_order: 0 });
 
@@ -27,6 +28,7 @@ const inferPagesUrl = (githubUrl: string) => {
 
 export default function AlbumPlayersAdminPanel({ token }: { token: string }) {
   const [players, setPlayers] = useState<AlbumPlayer[]>([]);
+  const [storageUsage, setStorageUsage] = useState<Record<number, StorageUsage>>({});
   const [form, setForm] = useState<FormState>(emptyForm);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
@@ -42,6 +44,17 @@ export default function AlbumPlayersAdminPanel({ token }: { token: string }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to load players");
       setPlayers(data);
+      const usageEntries = await Promise.all(data.map(async (player: AlbumPlayer) => {
+        try {
+          const usageRes = await fetch(`/api/album_players/${player.id}/storage`, { headers: { Authorization: `Bearer ${token}` } });
+          const usage = await usageRes.json();
+          if (!usageRes.ok) throw new Error(usage.error || "计算失败");
+          return [player.id, usage] as const;
+        } catch (error) {
+          return [player.id, { bytes: 0, file_count: 0, approximate: false, error: error instanceof Error ? error.message : "计算失败" }] as const;
+        }
+      }));
+      setStorageUsage(Object.fromEntries(usageEntries));
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Failed to load players");
     } finally {
@@ -141,12 +154,17 @@ export default function AlbumPlayersAdminPanel({ token }: { token: string }) {
         <button type="submit" className="inline-flex h-10 items-center gap-2 bg-[#ff4e00] px-4 text-sm font-medium text-white hover:bg-[#ff6a2b]"><Plus size={16} /> {editingId ? "保存修改" : "添加到 Gallery"}</button>
       </form>
     </section>
-    <section className="border border-white/10 bg-[#1a1a1a] p-5 md:p-6"><div className="mb-5 flex items-center justify-between"><h2 className="text-lg font-medium">当前播放器</h2><span className="text-sm text-white/42">{players.length}</span></div>{loading ? <p className="py-8 text-center text-sm text-white/45">Loading...</p> : <div className="space-y-3">{players.map(player => <article key={player.id} className="border border-white/10 bg-black/25 p-4"><div className="flex gap-3"><div className="min-w-0 flex-1"><div className="flex items-center gap-2"><h3 className="truncate font-medium">{player.title}</h3><span className={`shrink-0 px-1.5 py-0.5 text-[10px] ${player.status === "published" ? "bg-green-500/15 text-green-300" : "bg-white/10 text-white/50"}`}>{player.status === "published" ? "已发布" : player.status === "draft" ? "草稿" : "已归档"}</span></div><p className="mt-1 truncate text-xs text-white/45">{player.artist || "未注明作者"}{player.style_label ? ` · ${player.style_label}` : ""}</p><a href={player.site_url} target="_blank" rel="noreferrer" className="mt-3 inline-flex max-w-full items-center gap-1 truncate text-xs text-[#ffb18a] hover:text-white"><ExternalLink size={12} /> <span className="truncate">打开播放器</span></a></div><div className="flex gap-1"><button type="button" onClick={() => edit(player)} className="grid h-8 w-8 place-items-center border border-white/10 text-white/55 hover:text-white" aria-label="编辑"><Edit2 size={14} /></button>{deletingId === player.id ? <div className="flex gap-1"><button type="button" onClick={() => remove(player.id)} className="h-8 bg-red-500 px-2 text-xs text-white">删除</button><button type="button" onClick={() => setDeletingId(null)} className="grid h-8 w-8 place-items-center border border-white/10 text-white/55" aria-label="取消删除"><X size={14} /></button></div> : <button type="button" onClick={() => setDeletingId(player.id)} className="grid h-8 w-8 place-items-center border border-white/10 text-red-300 hover:bg-red-500/10" aria-label="删除"><Trash2 size={14} /></button>}</div></div></article>)}{players.length === 0 && <p className="py-8 text-center text-sm text-white/45">还没有播放器。</p>}</div>}</section>
+    <section className="border border-white/10 bg-[#1a1a1a] p-5 md:p-6"><div className="mb-5 flex items-center justify-between"><h2 className="text-lg font-medium">当前播放器</h2><span className="text-sm text-white/42">{players.length}</span></div>{loading ? <p className="py-8 text-center text-sm text-white/45">Loading...</p> : <div className="space-y-3">{players.map(player => { const usage = storageUsage[player.id]; return <article key={player.id} className="border border-white/10 bg-black/25 p-4"><div className="flex gap-3"><div className="min-w-0 flex-1"><div className="flex items-center gap-2"><h3 className="truncate font-medium">{player.title}</h3><span className={`shrink-0 px-1.5 py-0.5 text-[10px] ${player.status === "published" ? "bg-green-500/15 text-green-300" : "bg-white/10 text-white/50"}`}>{player.status === "published" ? "已发布" : player.status === "draft" ? "草稿" : "已归档"}</span></div><p className="mt-1 truncate text-xs text-white/45">{player.artist || "未注明作者"}{player.style_label ? ` · ${player.style_label}` : ""}</p><p className="mt-1 text-xs text-white/38">{usage ? usage.error ? `仓库大小：${usage.error}` : `仓库大小：${formatStorage(usage.bytes)}${usage.approximate ? "+" : ""} · ${usage.file_count} 个文件` : "仓库大小：计算中..."}</p><a href={player.site_url} target="_blank" rel="noreferrer" className="mt-3 inline-flex max-w-full items-center gap-1 truncate text-xs text-[#ffb18a] hover:text-white"><ExternalLink size={12} /> <span className="truncate">打开播放器</span></a></div><div className="flex gap-1"><button type="button" onClick={() => edit(player)} className="grid h-8 w-8 place-items-center border border-white/10 text-white/55 hover:text-white" aria-label="编辑"><Edit2 size={14} /></button>{deletingId === player.id ? <div className="flex gap-1"><button type="button" onClick={() => remove(player.id)} className="h-8 bg-red-500 px-2 text-xs text-white">删除</button><button type="button" onClick={() => setDeletingId(null)} className="grid h-8 w-8 place-items-center border border-white/10 text-white/55" aria-label="取消删除"><X size={14} /></button></div> : <button type="button" onClick={() => setDeletingId(player.id)} className="grid h-8 w-8 place-items-center border border-white/10 text-red-300 hover:bg-red-500/10" aria-label="删除"><Trash2 size={14} /></button>}</div></div></article>; })}{players.length === 0 && <p className="py-8 text-center text-sm text-white/45">还没有播放器。</p>}</div>}</section>
     <ImageAssetPicker isOpen={isImagePickerOpen} token={token} onClose={() => setIsImagePickerOpen(false)} onSelect={url => setForm(current => ({ ...current, cover_image_url: url }))} />
   </div>;
 }
 
 const inputClass = "mt-1.5 w-full border border-white/10 bg-black/45 px-3 py-2.5 text-sm text-white outline-none placeholder:text-white/25 focus:border-[#ff4e00]/70";
+
+const formatStorage = (bytes: number) => {
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(bytes >= 100 * 1024 * 1024 ? 0 : 1)} MB`;
+};
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return <label className="block text-xs text-white/55"><span>{label}</span>{children}</label>;
