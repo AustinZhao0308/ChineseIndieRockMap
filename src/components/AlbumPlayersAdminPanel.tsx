@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Disc3, Edit2, ExternalLink, Image as ImageIcon, Plus, Trash2, Upload, X } from "lucide-react";
+import { Disc3, Edit2, ExternalLink, Image as ImageIcon, Plus, RefreshCw, Trash2, Upload, X } from "lucide-react";
 import ImageAssetPicker from "./ImageAssetPicker";
 
 type AlbumPlayer = {
@@ -17,14 +17,9 @@ type AlbumPlayer = {
 };
 
 type FormState = Omit<AlbumPlayer, "id">;
-type StorageUsage = { bytes: number; file_count: number; approximate: boolean; error?: string };
+type StorageUsage = { bytes: number; file_count: number; synced: boolean; error?: string };
 
 const emptyForm = (): FormState => ({ slug: "", title: "", artist: "", description: "", github_url: "", site_url: "", cover_image_url: "", style_label: "", status: "draft", sort_order: 0 });
-
-const inferPagesUrl = (githubUrl: string) => {
-  const match = githubUrl.trim().match(/^https?:\/\/github\.com\/([^/]+)\/([^/#?]+)\/?(?:[#?].*)?$/i);
-  return match ? `https://${match[1]}.github.io/${match[2]}/` : "";
-};
 
 export default function AlbumPlayersAdminPanel({ token }: { token: string }) {
   const [players, setPlayers] = useState<AlbumPlayer[]>([]);
@@ -36,6 +31,7 @@ export default function AlbumPlayersAdminPanel({ token }: { token: string }) {
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [isImagePickerOpen, setIsImagePickerOpen] = useState(false);
   const [isUploadingCover, setIsUploadingCover] = useState(false);
+  const [syncingId, setSyncingId] = useState<number | null>(null);
 
   const loadPlayers = async () => {
     setLoading(true);
@@ -51,7 +47,7 @@ export default function AlbumPlayersAdminPanel({ token }: { token: string }) {
           if (!usageRes.ok) throw new Error(usage.error || "计算失败");
           return [player.id, usage] as const;
         } catch (error) {
-          return [player.id, { bytes: 0, file_count: 0, approximate: false, error: error instanceof Error ? error.message : "计算失败" }] as const;
+          return [player.id, { bytes: 0, file_count: 0, synced: false, error: error instanceof Error ? error.message : "计算失败" }] as const;
         }
       }));
       setStorageUsage(Object.fromEntries(usageEntries));
@@ -64,9 +60,7 @@ export default function AlbumPlayersAdminPanel({ token }: { token: string }) {
 
   useEffect(() => { loadPlayers(); }, [token]);
 
-  const setGithubUrl = (github_url: string) => {
-    setForm(current => ({ ...current, github_url, site_url: current.site_url || inferPagesUrl(github_url) }));
-  };
+  const setGithubUrl = (github_url: string) => setForm(current => ({ ...current, github_url }));
 
   const reset = () => { setEditingId(null); setForm(emptyForm()); };
 
@@ -122,6 +116,22 @@ export default function AlbumPlayersAdminPanel({ token }: { token: string }) {
     loadPlayers();
   };
 
+  const syncProject = async (id: number) => {
+    setSyncingId(id);
+    setMessage(null);
+    try {
+      const res = await fetch(`/api/album_players/${id}/sync`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "同步失败");
+      setMessage("本地仓库已同步");
+      await loadPlayers();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "同步失败");
+    } finally {
+      setSyncingId(null);
+    }
+  };
+
   return <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
     <section className="border border-white/10 bg-[#1a1a1a] p-5 md:p-7">
       <div className="mb-6 flex items-center justify-between gap-4"><div><h2 className="flex items-center gap-2 text-xl font-medium"><Disc3 size={20} className="text-[#ff4e00]" /> {editingId ? "编辑专辑播放器" : "添加专辑播放器"}</h2><p className="mt-1 text-sm text-white/45">先配置专辑信息，播放器站点是它的播放入口。</p></div>{editingId && <button type="button" onClick={reset} className="grid h-8 w-8 place-items-center border border-white/10 text-white/55 hover:text-white" aria-label="取消编辑"><X size={16} /></button>}</div>
@@ -146,7 +156,7 @@ export default function AlbumPlayersAdminPanel({ token }: { token: string }) {
           </div>
         </Field>
         <Field label="页面路径 slug"><input value={form.slug} onChange={event => setForm({ ...form, slug: event.target.value })} className={inputClass} placeholder="留空时由名称生成" /></Field>
-        <div className="border-t border-white/10 pt-4"><p className="mb-3 text-xs font-medium uppercase tracking-[0.12em] text-white/42">播放器站点</p><div className="space-y-4"><Field label="GitHub 仓库链接"><input required type="url" value={form.github_url} onChange={event => setGithubUrl(event.target.value)} className={inputClass} placeholder="https://github.com/owner/repository" /></Field><Field label="部署后的播放器链接"><input required type="url" value={form.site_url} onChange={event => setForm({ ...form, site_url: event.target.value })} className={inputClass} placeholder="https://owner.github.io/repository/" /><p className="pt-1 text-xs leading-5 text-white/38">填写 GitHub 链接时会自动推导 GitHub Pages 地址，仍可改成 Vercel、Netlify 或自定义域名。</p></Field></div></div>
+        <div className="border-t border-white/10 pt-4"><p className="mb-3 text-xs font-medium uppercase tracking-[0.12em] text-white/42">播放器项目</p><div className="space-y-4"><Field label="GitHub 仓库链接"><input required type="url" value={form.github_url} onChange={event => setGithubUrl(event.target.value)} className={inputClass} placeholder="https://github.com/owner/repository" /><p className="pt-1 text-xs leading-5 text-white/38">保存时会拉取仓库到服务器；根目录需包含 HTML 入口文件，优先使用 index.html。</p></Field></div></div>
         <div className="grid gap-4 md:grid-cols-2"><Field label="风格标签"><input value={form.style_label} onChange={event => setForm({ ...form, style_label: event.target.value })} className={inputClass} placeholder="例如 Game Boy" /></Field><Field label="排序（数值大者靠前）"><input type="number" value={form.sort_order} onChange={event => setForm({ ...form, sort_order: Number(event.target.value) })} className={inputClass} /></Field></div>
         <Field label="简介"><textarea value={form.description} onChange={event => setForm({ ...form, description: event.target.value })} className={`${inputClass} min-h-24 resize-y`} placeholder="简短介绍这个独立播放器。" /></Field>
         <Field label="发布状态"><select value={form.status} onChange={event => setForm({ ...form, status: event.target.value as FormState["status"] })} className={inputClass}><option value="draft">草稿</option><option value="published">已发布</option><option value="archived">已归档</option></select></Field>
@@ -154,7 +164,7 @@ export default function AlbumPlayersAdminPanel({ token }: { token: string }) {
         <button type="submit" className="inline-flex h-10 items-center gap-2 bg-[#ff4e00] px-4 text-sm font-medium text-white hover:bg-[#ff6a2b]"><Plus size={16} /> {editingId ? "保存修改" : "添加到 Gallery"}</button>
       </form>
     </section>
-    <section className="border border-white/10 bg-[#1a1a1a] p-5 md:p-6"><div className="mb-5 flex items-center justify-between"><h2 className="text-lg font-medium">当前播放器</h2><span className="text-sm text-white/42">{players.length}</span></div>{loading ? <p className="py-8 text-center text-sm text-white/45">Loading...</p> : <div className="space-y-3">{players.map(player => { const usage = storageUsage[player.id]; return <article key={player.id} className="border border-white/10 bg-black/25 p-4"><div className="flex gap-3"><div className="min-w-0 flex-1"><div className="flex items-center gap-2"><h3 className="truncate font-medium">{player.title}</h3><span className={`shrink-0 px-1.5 py-0.5 text-[10px] ${player.status === "published" ? "bg-green-500/15 text-green-300" : "bg-white/10 text-white/50"}`}>{player.status === "published" ? "已发布" : player.status === "draft" ? "草稿" : "已归档"}</span></div><p className="mt-1 truncate text-xs text-white/45">{player.artist || "未注明作者"}{player.style_label ? ` · ${player.style_label}` : ""}</p><p className="mt-1 text-xs text-white/38">{usage ? usage.error ? `仓库大小：${usage.error}` : `仓库大小：${formatStorage(usage.bytes)}${usage.approximate ? "+" : ""} · ${usage.file_count} 个文件` : "仓库大小：计算中..."}</p><a href={player.site_url} target="_blank" rel="noreferrer" className="mt-3 inline-flex max-w-full items-center gap-1 truncate text-xs text-[#ffb18a] hover:text-white"><ExternalLink size={12} /> <span className="truncate">打开播放器</span></a></div><div className="flex gap-1"><button type="button" onClick={() => edit(player)} className="grid h-8 w-8 place-items-center border border-white/10 text-white/55 hover:text-white" aria-label="编辑"><Edit2 size={14} /></button>{deletingId === player.id ? <div className="flex gap-1"><button type="button" onClick={() => remove(player.id)} className="h-8 bg-red-500 px-2 text-xs text-white">删除</button><button type="button" onClick={() => setDeletingId(null)} className="grid h-8 w-8 place-items-center border border-white/10 text-white/55" aria-label="取消删除"><X size={14} /></button></div> : <button type="button" onClick={() => setDeletingId(player.id)} className="grid h-8 w-8 place-items-center border border-white/10 text-red-300 hover:bg-red-500/10" aria-label="删除"><Trash2 size={14} /></button>}</div></div></article>; })}{players.length === 0 && <p className="py-8 text-center text-sm text-white/45">还没有播放器。</p>}</div>}</section>
+    <section className="border border-white/10 bg-[#1a1a1a] p-5 md:p-6"><div className="mb-5 flex items-center justify-between"><h2 className="text-lg font-medium">当前播放器</h2><span className="text-sm text-white/42">{players.length}</span></div>{loading ? <p className="py-8 text-center text-sm text-white/45">Loading...</p> : <div className="space-y-3">{players.map(player => { const usage = storageUsage[player.id]; return <article key={player.id} className="border border-white/10 bg-black/25 p-4"><div className="flex gap-3"><div className="min-w-0 flex-1"><div className="flex items-center gap-2"><h3 className="truncate font-medium">{player.title}</h3><span className={`shrink-0 px-1.5 py-0.5 text-[10px] ${player.status === "published" ? "bg-green-500/15 text-green-300" : "bg-white/10 text-white/50"}`}>{player.status === "published" ? "已发布" : player.status === "draft" ? "草稿" : "已归档"}</span></div><p className="mt-1 truncate text-xs text-white/45">{player.artist || "未注明作者"}{player.style_label ? ` · ${player.style_label}` : ""}</p><p className="mt-1 text-xs text-white/38">{usage ? usage.error ? `本地仓库：${usage.error}` : usage.synced ? `本地占用：${formatStorage(usage.bytes)} · ${usage.file_count} 个文件` : "本地仓库未同步" : "本地占用：计算中..."}</p>{usage?.synced && <a href={player.site_url} target="_blank" rel="noreferrer" className="mt-3 inline-flex max-w-full items-center gap-1 truncate text-xs text-[#ffb18a] hover:text-white"><ExternalLink size={12} /> <span className="truncate">打开本地播放器</span></a>}</div><div className="flex gap-1"><button type="button" onClick={() => syncProject(player.id)} disabled={syncingId === player.id} className="grid h-8 w-8 place-items-center border border-white/10 text-white/55 hover:text-white disabled:opacity-40" aria-label="同步本地仓库" title="同步本地仓库"><RefreshCw size={14} className={syncingId === player.id ? "animate-spin" : ""} /></button><button type="button" onClick={() => edit(player)} className="grid h-8 w-8 place-items-center border border-white/10 text-white/55 hover:text-white" aria-label="编辑"><Edit2 size={14} /></button>{deletingId === player.id ? <div className="flex gap-1"><button type="button" onClick={() => remove(player.id)} className="h-8 bg-red-500 px-2 text-xs text-white">删除</button><button type="button" onClick={() => setDeletingId(null)} className="grid h-8 w-8 place-items-center border border-white/10 text-white/55" aria-label="取消删除"><X size={14} /></button></div> : <button type="button" onClick={() => setDeletingId(player.id)} className="grid h-8 w-8 place-items-center border border-white/10 text-red-300 hover:bg-red-500/10" aria-label="删除"><Trash2 size={14} /></button>}</div></div></article>; })}{players.length === 0 && <p className="py-8 text-center text-sm text-white/45">还没有播放器。</p>}</div>}</section>
     <ImageAssetPicker isOpen={isImagePickerOpen} token={token} onClose={() => setIsImagePickerOpen(false)} onSelect={url => setForm(current => ({ ...current, cover_image_url: url }))} />
   </div>;
 }

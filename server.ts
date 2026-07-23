@@ -8,6 +8,8 @@ import multer from 'multer';
 import bcrypt from 'bcryptjs';
 import { createServer as createViteServer } from 'vite';
 import { createPublicKey } from 'crypto';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
 
 dotenv.config();
 
@@ -83,12 +85,22 @@ app.use(express.json());
 // Ensure uploads directory exists
 const uploadsDir = path.join(process.cwd(), 'uploads');
 const albumPlayerProjectsDir = path.join(process.cwd(), 'album-player-projects');
+const execFileAsync = promisify(execFile);
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
+}
+if (!fs.existsSync(albumPlayerProjectsDir)) {
+  fs.mkdirSync(albumPlayerProjectsDir, { recursive: true });
 }
 
 // Serve uploaded files statically
 app.use('/uploads', express.static(uploadsDir));
+app.use('/player-sites', (req, res, next) => {
+  if (req.path.split('/').some(segment => segment === '.git' || segment.startsWith('.'))) {
+    return res.status(404).end();
+  }
+  next();
+}, express.static(albumPlayerProjectsDir, { dotfiles: 'deny', fallthrough: false, index: false }));
 
 const sanitizePathSegment = (value: any, fallback: string) => {
   const segment = String(value || '')
@@ -2044,41 +2056,74 @@ app.delete('/api/featured_events/:id', authenticateToken, (req, res) => {
 });
 
 const normalizeAlbumPlayerSlug = (value: any) => sanitizePathSegment(value, 'album-player');
-const albumPlayerStorageCache = new Map<string, { bytes: number; fileCount: number; checkedAt: string; approximate: boolean; expiresAt: number }>();
-const ALBUM_PLAYER_STORAGE_CACHE_MS = 6 * 60 * 60 * 1000;
+const getAlbumPlayerProjectDirectory = (slug: string) => {
+  const directory = path.resolve(albumPlayerProjectsDir, normalizeAlbumPlayerSlug(slug));
+  const root = `${path.resolve(albumPlayerProjectsDir)}${path.sep}`;
+  if (!directory.startsWith(root)) throw new Error('Invalid album player project path.');
+  return directory;
+};
 
-const getGithubRepositoryStorage = async (githubUrl: string) => {
-  const cached = albumPlayerStorageCache.get(githubUrl);
-  if (cached && cached.expiresAt > Date.now()) return cached;
+const getAlbumPlayerEntryFile = (directory: string) => {
+  const rootHtmlFiles = fs.readdirSync(directory, { withFileTypes: true })
+    .filter(entry => entry.isFile() && entry.name.toLowerCase().endsWith('.html'))
+    .map(entry => entry.name)
+    .sort((a, b) => a.localeCompare(b));
+  const entryFile = rootHtmlFiles.find(file => file.toLowerCase() === 'index.html') || rootHtmlFiles[0];
+  if (!entryFile) throw new Error('GitHub repository root must contain an HTML entry file.');
+  return entryFile;
+};
 
-  const match = githubUrl.match(/^https?:\/\/github\.com\/([^/]+)\/([^/?#]+)\/?(?:[?#].*)?$/i);
-  if (!match) throw new Error('GitHub repository URL is invalid.');
-  const [, owner, repository] = match;
-  const headers = { Accept: 'application/vnd.github+json', 'User-Agent': 'ChineseIndieRockMap' };
-  const repositoryResponse = await fetch(`https://api.github.com/repos/${owner}/${repository}`, { headers });
-  if (!repositoryResponse.ok) throw new Error(`GitHub repository lookup failed (${repositoryResponse.status}).`);
-  const repositoryData = await repositoryResponse.json() as { default_branch?: string };
-  if (!repositoryData.default_branch) throw new Error('GitHub repository has no default branch.');
+const getLocalAlbumPlayerUrl = (slug: string, entryFile: string) => `/player-sites/${encodeURIComponent(normalizeAlbumPlayerSlug(slug))}/${encodeURIComponent(entryFile)}`;
 
-  const treeResponse = await fetch(`https://api.github.com/repos/${owner}/${repository}/git/trees/${encodeURIComponent(repositoryData.default_branch)}?recursive=1`, { headers });
-  if (!treeResponse.ok) throw new Error(`GitHub file listing failed (${treeResponse.status}).`);
-  const treeData = await treeResponse.json() as { truncated?: boolean; tree?: Array<{ type?: string; size?: number }> };
-  const bytes = (treeData.tree || []).reduce((total, entry) => total + (entry.type === 'blob' ? Number(entry.size || 0) : 0), 0);
-  const result = {
-    bytes,
-    fileCount: (treeData.tree || []).filter(entry => entry.type === 'blob').length,
-    checkedAt: new Date().toISOString(),
-    approximate: Boolean(treeData.truncated),
-    expiresAt: Date.now() + ALBUM_PLAYER_STORAGE_CACHE_MS
-  };
-  albumPlayerStorageCache.set(githubUrl, result);
-  return result;
+const getLocalAlbumPlayerStorage = (slug: string) => {
+  const directory = getAlbumPlayerProjectDirectory(slug);
+  if (!fs.existsSync(directory)) return { bytes: 0, fileCount: 0, synced: false };
+
+  const collect = (currentDirectory: string): { bytes: number; fileCount: number } => fs.readdirSync(currentDirectory, { withFileTypes: true })
+    .reduce((total, entry) => {
+      const entryPath = path.join(currentDirectory, entry.name);
+      if (entry.isDirectory()) {
+        const nested = collect(entryPath);
+        return { bytes: total.bytes + nested.bytes, fileCount: total.fileCount + nested.fileCount };
+      }
+      if (entry.isFile()) return { bytes: total.bytes + fs.statSync(entryPath).size, fileCount: total.fileCount + 1 };
+      return total;
+    }, { bytes: 0, fileCount: 0 });
+
+  return { ...collect(directory), synced: true };
+};
+
+const replaceLocalAlbumPlayerProject = async (slug: string, githubUrl: string) => {
+  const projectDirectory = getAlbumPlayerProjectDirectory(slug);
+  const temporaryDirectory = path.join(albumPlayerProjectsDir, `.${normalizeAlbumPlayerSlug(slug)}-${Date.now()}-${Math.round(Math.random() * 1e9)}`);
+  const backupDirectory = `${projectDirectory}.backup-${Date.now()}`;
+
+  try {
+    await execFileAsync('git', ['clone', '--depth', '1', githubUrl, temporaryDirectory], { timeout: 120000, maxBuffer: 1024 * 1024 });
+    const entryFile = getAlbumPlayerEntryFile(temporaryDirectory);
+
+    if (fs.existsSync(projectDirectory)) fs.renameSync(projectDirectory, backupDirectory);
+    try {
+      fs.renameSync(temporaryDirectory, projectDirectory);
+    } catch (error) {
+      if (fs.existsSync(backupDirectory)) fs.renameSync(backupDirectory, projectDirectory);
+      throw error;
+    }
+    try {
+      if (fs.existsSync(backupDirectory)) fs.rmSync(backupDirectory, { recursive: true, force: true });
+    } catch (cleanupError) {
+      console.warn(`Unable to remove previous album player project at ${backupDirectory}:`, cleanupError);
+    }
+    return { entryFile, siteUrl: getLocalAlbumPlayerUrl(slug, entryFile) };
+  } catch (error: any) {
+    if (fs.existsSync(temporaryDirectory)) fs.rmSync(temporaryDirectory, { recursive: true, force: true });
+    throw new Error(error?.stderr?.trim() || error?.message || 'Unable to clone the GitHub repository.');
+  }
 };
 
 const deleteAlbumPlayerLocalResources = (player: { slug: string; cover_image_url?: string | null }) => {
-  const projectDirectory = path.resolve(albumPlayerProjectsDir, sanitizePathSegment(player.slug, 'album-player'));
-  const projectRoot = `${path.resolve(albumPlayerProjectsDir)}${path.sep}`;
-  if (projectDirectory.startsWith(projectRoot) && fs.existsSync(projectDirectory)) {
+  const projectDirectory = getAlbumPlayerProjectDirectory(player.slug);
+  if (fs.existsSync(projectDirectory)) {
     fs.rmSync(projectDirectory, { recursive: true, force: true });
   }
 
@@ -2102,7 +2147,6 @@ const parseHttpUrl = (value: any, fieldName: string) => {
 const normalizeAlbumPlayerPayload = (body: any) => {
   const title = String(body.title || '').trim();
   const githubUrl = parseHttpUrl(body.github_url, 'GitHub URL');
-  const siteUrl = parseHttpUrl(body.site_url, 'Player site URL');
   if (!title) throw new Error('Title is required.');
   if (new URL(githubUrl).hostname !== 'github.com') throw new Error('GitHub URL must point to github.com.');
   return {
@@ -2111,7 +2155,6 @@ const normalizeAlbumPlayerPayload = (body: any) => {
     artist: String(body.artist || '').trim(),
     description: String(body.description || '').trim(),
     githubUrl,
-    siteUrl,
     coverImageUrl: String(body.cover_image_url || '').trim() || null,
     styleLabel: String(body.style_label || '').trim(),
     status: ['draft', 'published', 'archived'].includes(body.status) ? body.status : 'draft',
@@ -2156,37 +2199,61 @@ app.get('/api/album_players/:slugOrId', (req, res) => {
 
 app.get('/api/album_players/:id/storage', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const player = db.prepare('SELECT github_url FROM album_players WHERE id = ?').get(req.params.id) as { github_url?: string } | undefined;
-    if (!player?.github_url) return res.status(404).json({ error: 'Album player not found' });
-    const usage = await getGithubRepositoryStorage(player.github_url);
-    res.json({ bytes: usage.bytes, file_count: usage.fileCount, checked_at: usage.checkedAt, approximate: usage.approximate });
+    const player = db.prepare('SELECT slug FROM album_players WHERE id = ?').get(req.params.id) as { slug?: string } | undefined;
+    if (!player?.slug) return res.status(404).json({ error: 'Album player not found' });
+    const usage = getLocalAlbumPlayerStorage(player.slug);
+    res.json({ bytes: usage.bytes, file_count: usage.fileCount, synced: usage.synced });
   } catch (error: any) {
-    res.status(502).json({ error: error.message || 'Unable to calculate repository storage.' });
+    res.status(500).json({ error: error.message || 'Unable to calculate local project storage.' });
   }
 });
 
-app.post('/api/album_players', authenticateToken, requireAdmin, (req, res) => {
+app.post('/api/album_players', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const player = normalizeAlbumPlayerPayload(req.body);
+    const existing = db.prepare('SELECT id FROM album_players WHERE slug = ?').get(player.slug);
+    if (existing) throw new Error('An album player already uses this slug.');
+    const syncedProject = await replaceLocalAlbumPlayerProject(player.slug, player.githubUrl);
     const result = db.prepare(`
       INSERT INTO album_players (slug, title, artist, description, github_url, site_url, cover_image_url, style_label, status, sort_order, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-    `).run(player.slug, player.title, player.artist, player.description, player.githubUrl, player.siteUrl, player.coverImageUrl, player.styleLabel, player.status, player.sortOrder);
+    `).run(player.slug, player.title, player.artist, player.description, player.githubUrl, syncedProject.siteUrl, player.coverImageUrl, player.styleLabel, player.status, player.sortOrder);
     res.json({ id: result.lastInsertRowid });
   } catch (error: any) {
     res.status(400).json({ error: error.message });
   }
 });
 
-app.put('/api/album_players/:id', authenticateToken, requireAdmin, (req, res) => {
+app.put('/api/album_players/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const player = normalizeAlbumPlayerPayload(req.body);
+    const existing = db.prepare('SELECT slug FROM album_players WHERE id = ?').get(req.params.id) as { slug?: string } | undefined;
+    if (!existing?.slug) return res.status(404).json({ error: 'Album player not found' });
+    const slugConflict = db.prepare('SELECT id FROM album_players WHERE slug = ? AND id != ?').get(player.slug, req.params.id);
+    if (slugConflict) throw new Error('An album player already uses this slug.');
+    const syncedProject = await replaceLocalAlbumPlayerProject(player.slug, player.githubUrl);
     db.prepare(`
       UPDATE album_players
       SET slug = ?, title = ?, artist = ?, description = ?, github_url = ?, site_url = ?, cover_image_url = ?, style_label = ?, status = ?, sort_order = ?, updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
-    `).run(player.slug, player.title, player.artist, player.description, player.githubUrl, player.siteUrl, player.coverImageUrl, player.styleLabel, player.status, player.sortOrder, req.params.id);
+    `).run(player.slug, player.title, player.artist, player.description, player.githubUrl, syncedProject.siteUrl, player.coverImageUrl, player.styleLabel, player.status, player.sortOrder, req.params.id);
+    if (existing.slug !== player.slug) {
+      const previousProjectDirectory = getAlbumPlayerProjectDirectory(existing.slug);
+      if (fs.existsSync(previousProjectDirectory)) fs.rmSync(previousProjectDirectory, { recursive: true, force: true });
+    }
     res.json({ success: true });
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.post('/api/album_players/:id/sync', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const player = db.prepare('SELECT slug, github_url FROM album_players WHERE id = ?').get(req.params.id) as { slug?: string; github_url?: string } | undefined;
+    if (!player?.slug || !player.github_url) return res.status(404).json({ error: 'Album player not found' });
+    const syncedProject = await replaceLocalAlbumPlayerProject(player.slug, player.github_url);
+    db.prepare('UPDATE album_players SET site_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(syncedProject.siteUrl, req.params.id);
+    res.json({ success: true, site_url: syncedProject.siteUrl });
   } catch (error: any) {
     res.status(400).json({ error: error.message });
   }
