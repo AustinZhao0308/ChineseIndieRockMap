@@ -25,6 +25,7 @@ export default function ContentPreviewPage() {
 
   const status = statusMeta[postStatus(post)];
   const paragraphs = post.body.split(/\n\s*\n/).map(text => text.trim()).filter(Boolean);
+  const hasRichBody = /<\/?[a-z][^>]*>/i.test(post.body);
 
   return (
     <main className="min-h-[100dvh] bg-[#0a0502] pb-16 pt-[calc(5.2rem+env(safe-area-inset-top))] text-white sm:px-8 md:pt-28">
@@ -36,7 +37,7 @@ export default function ContentPreviewPage() {
             <h1 className="mt-5 max-w-3xl text-[38px] font-serif leading-[1.2] md:text-6xl">{post.title}</h1>
             <p className="mt-6 max-w-2xl text-[17px] leading-8 text-white/62">{post.summary}</p>
             {post.coverImageURL && <img src={post.coverImageURL} alt="" className="mt-9 aspect-[16/9] w-full border border-white/10 object-cover" />}
-            <div className="mt-10 max-w-2xl space-y-7 text-[16px] leading-8 text-white/78">{paragraphs.length ? paragraphs.map((paragraph, index) => <p key={index}>{paragraph}</p>) : <p className="text-white/30">正文还没有内容。</p>}</div>
+            <div className="mt-10 max-w-2xl text-[16px] leading-8 text-white/78">{post.body.trim() ? hasRichBody ? <div className="rich-content" dangerouslySetInnerHTML={{ __html: post.body }} /> : <div className="space-y-7">{paragraphs.map((paragraph, index) => <p key={index}>{paragraph}</p>)}</div> : <p className="text-white/30">正文还没有内容。</p>}</div>
             {post.externalURL && <a href={post.externalURL} target="_blank" rel="noreferrer" className="mt-10 inline-flex items-center gap-2 border-b border-[#ff4e00]/60 pb-1 text-sm text-[#ffb18a] transition-colors hover:text-white">查看原文 <ExternalLink size={14} /></a>}
           </article>
           <aside className="h-fit border-t border-white/[0.09] pt-5 text-sm lg:sticky lg:top-28"><p className="text-xs font-mono uppercase tracking-[0.12em] text-white/32">预览信息</p><dl className="mt-5 space-y-5 text-white/55"><div><dt className="mb-1 text-[11px] text-white/30">来源</dt><dd>{post.sourceName || "Catbeer 编辑部"}</dd></div><div className="flex gap-2"><CalendarDays size={15} className="mt-0.5 text-[#ff8a57]" /><div><dt className="text-[11px] text-white/30">发布时间</dt><dd className="mt-1">{formatPostDate(post.publishedAt, true)}</dd></div></div>{post.city && <div className="flex gap-2"><MapPin size={15} className="mt-0.5 text-[#ff8a57]" /><div><dt className="text-[11px] text-white/30">城市</dt><dd className="mt-1">{post.city}</dd></div></div>}{post.tags.length > 0 && <div className="flex gap-2"><Tag size={15} className="mt-0.5 text-[#ff8a57]" /><div className="flex flex-wrap gap-1.5">{post.tags.map(tag => <span key={tag} className="border border-white/10 px-1.5 py-0.5 text-xs text-white/55">{tag}</span>)}</div></div>}</dl></aside>

@@ -17,11 +17,115 @@
   .editor-utility {
     @apply inline-flex h-8 items-center justify-center gap-1.5 border border-white/10 text-xs text-white/58 transition-colors hover:bg-white/[0.06] hover:text-white;
   }
+
+  .rich-editor-shell {
+    @apply mt-3 border border-white/[0.1] bg-black/[0.12] focus-within:border-[#ff4e00]/60;
+  }
+
+  .rich-editor-toolbar {
+    @apply flex min-h-11 flex-wrap items-center gap-1 border-b border-white/[0.08] bg-white/[0.025] px-2 py-1.5;
+  }
+
+  .rich-editor-group {
+    @apply flex items-center gap-0.5 border-r border-white/[0.08] pr-1.5 last:border-r-0 last:pr-0;
+  }
+
+  .rich-editor-button {
+    @apply grid h-7 w-7 place-items-center text-white/55 transition-colors hover:bg-white/[0.08] hover:text-white;
+  }
+
+  .rich-editor-color {
+    @apply h-4 w-4 rounded-full border border-white/20 transition-transform hover:scale-110;
+  }
+
+  .rich-editor-content {
+    @apply min-h-[360px] px-4 py-4 text-[16px] leading-8 text-white/82 outline-none;
+  }
 }
 
 html, body {
   background-color: #0a0502;
   color: #ffffff;
+}
+
+.rich-editor-content:empty::before {
+  color: rgb(255 255 255 / 0.22);
+  content: attr(data-placeholder);
+  pointer-events: none;
+}
+
+.rich-content > :first-child {
+  margin-top: 0;
+}
+
+.rich-content > :last-child {
+  margin-bottom: 0;
+}
+
+.rich-content p,
+.rich-content ul,
+.rich-content ol,
+.rich-content blockquote,
+.rich-content hr,
+.rich-content h2,
+.rich-content h3,
+.rich-content img {
+  margin: 0 0 1.5rem;
+}
+
+.rich-content h2 {
+  color: #fff;
+  font-family: var(--font-serif);
+  font-size: 1.6rem;
+  font-weight: 600;
+  line-height: 1.4;
+  margin-top: 2.5rem;
+}
+
+.rich-content h3 {
+  color: #fff;
+  font-size: 1.1rem;
+  font-weight: 600;
+  line-height: 1.5;
+  margin-top: 2rem;
+}
+
+.rich-content ul,
+.rich-content ol {
+  padding-left: 1.5rem;
+}
+
+.rich-content ul {
+  list-style: disc;
+}
+
+.rich-content ol {
+  list-style: decimal;
+}
+
+.rich-content blockquote {
+  border-left: 2px solid #ff4e00;
+  color: rgb(255 255 255 / 0.62);
+  margin-left: 0;
+  padding-left: 1rem;
+}
+
+.rich-content hr {
+  border: 0;
+  border-top: 1px solid rgb(255 255 255 / 0.14);
+}
+
+.rich-content a {
+  color: #ffb18a;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.rich-content img {
+  border: 1px solid rgb(255 255 255 / 0.1);
+  display: block;
+  height: auto;
+  max-width: 100%;
 }
 
 @theme {

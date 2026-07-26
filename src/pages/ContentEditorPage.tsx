@@ -2,7 +2,9 @@ import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Check, ChevronDown, ExternalLink, Eye, ImagePlus, LibraryBig, LoaderCircle, Save, Send, Settings2, Upload, X } from "lucide-react";
 import ImageAssetPicker from "../components/ImageAssetPicker";
+import RichTextEditor, { RichTextEditorHandle } from "../components/RichTextEditor";
 import { ContentType, EventOption, Post, PostDraft, contentTypeMeta, dateTimeInputValue, emptyDraft, serializeDraft, tokenHeaders } from "../lib/content";
+import { compressImageForUpload } from "../lib/imageCompression";
 
 const validType = (value: string | null): value is ContentType => value === "event" || value === "article" || value === "note";
 const toISODate = (value: string) => value ? new Date(value).toISOString() : null;
@@ -21,8 +23,12 @@ export default function ContentEditorPage() {
   const [savedState, setSavedState] = useState<"idle" | "local" | "saved">("idle");
   const [error, setError] = useState("");
   const [isAssetPickerOpen, setIsAssetPickerOpen] = useState(false);
+  const [imageTarget, setImageTarget] = useState<"cover" | "body">("cover");
   const [isPublishing, setIsPublishing] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
   const uploadRef = useRef<HTMLInputElement>(null);
+  const bodyUploadRef = useRef<HTMLInputElement>(null);
+  const bodyEditorRef = useRef<RichTextEditorHandle>(null);
   const isNew = !id;
   const localDraftKey = useMemo(() => isNew ? `catbeer-content-composer:${copyID || requestedType}` : `catbeer-content-composer:${id}`, [copyID, id, isNew, requestedType]);
 
@@ -78,7 +84,6 @@ export default function ContentEditorPage() {
   const validate = (nextDraft: PostDraft) => {
     if (!nextDraft.title.trim()) return "请先填写标题。";
     if (!nextDraft.summary.trim()) return "请为信息流填写一段摘要。";
-    if (nextDraft.contentType === "article" && !nextDraft.externalURL?.trim()) return "网页文章需要填写原文链接。";
     if (nextDraft.contentType === "event" && !nextDraft.featuredEventId) return "演出内容需要关联一条已有演出档案。";
     return "";
   };
@@ -121,21 +126,25 @@ export default function ContentEditorPage() {
     }
   };
 
-  const uploadCover = async (event: ChangeEvent<HTMLInputElement>) => {
+  const uploadImage = async (event: ChangeEvent<HTMLInputElement>, target: "cover" | "body") => {
     const file = event.target.files?.[0];
     if (!file) return;
     setError("");
-    const payload = new FormData();
-    payload.append("image", file);
+    setIsUploadingImage(true);
     try {
+      const compressedFile = await compressImageForUpload(file);
+      const payload = new FormData();
+      payload.append("image", compressedFile);
       const response = await fetch("/api/upload", { method: "POST", headers: tokenHeaders(), body: payload });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "封面上传失败");
-      updateDraft({ coverImageURL: data.url });
+      if (target === "cover") updateDraft({ coverImageURL: data.url });
+      else bodyEditorRef.current?.insertImage(data.url);
     } catch (uploadError) {
-      setError(uploadError instanceof Error ? uploadError.message : "封面上传失败");
+      setError(uploadError instanceof Error ? uploadError.message : "图片上传失败");
     } finally {
       event.target.value = "";
+      setIsUploadingImage(false);
     }
   };
 
@@ -174,8 +183,8 @@ export default function ContentEditorPage() {
 
           <div className="mt-8">
             <input value={draft.title} onChange={event => updateDraft({ title: event.target.value })} placeholder="写下一个清晰、有画面的标题" className="w-full bg-transparent text-[30px] font-serif leading-[1.22] text-white outline-none placeholder:text-white/20 md:text-[42px]" />
-            <textarea value={draft.summary} onChange={event => updateDraft({ summary: event.target.value })} placeholder="摘要会出现在首页信息流中，建议用一两句话说清这条内容。" className="mt-5 min-h-20 w-full resize-y border-y border-white/[0.07] bg-transparent py-4 text-[15px] leading-7 text-white/72 outline-none placeholder:text-white/26 focus:border-[#ff4e00]/50" />
-            <textarea value={draft.body} onChange={event => updateDraft({ body: event.target.value })} placeholder="开始写正文。空行会作为段落间隔，保留你自己的语气与节奏。" className="mt-7 min-h-[360px] w-full resize-y bg-transparent text-[16px] leading-8 text-white/82 outline-none placeholder:text-white/22" />
+            <div className="mt-5 border-y border-white/[0.07] py-4"><label className="editor-label" htmlFor="content-summary">摘要</label><p className="mt-1 text-xs leading-5 text-white/36">展示在首页信息流和内容卡片中，建议用一两句话交代人物、场景或最值得点开的信息。</p><textarea id="content-summary" value={draft.summary} onChange={event => updateDraft({ summary: event.target.value })} placeholder="例如：一场在上海发生的深夜演出，和三支值得提前认识的乐队。" className="mt-3 min-h-20 w-full resize-y bg-transparent text-[15px] leading-7 text-white/72 outline-none placeholder:text-white/26" /></div>
+            <div className="mt-7"><p className="editor-label">正文</p><p className="mt-1 text-xs leading-5 text-white/36">可设置字重、颜色、标题、列表和引用；插入图片会自动压缩并归入图片素材库。</p><RichTextEditor ref={bodyEditorRef} value={draft.body} onChange={body => updateDraft({ body })} onUploadImage={() => bodyUploadRef.current?.click()} onOpenAssets={() => { setImageTarget("body"); setIsAssetPickerOpen(true); }} /><input ref={bodyUploadRef} type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" onChange={event => void uploadImage(event, "body")} className="hidden" /></div>
           </div>
         </section>
 
@@ -187,8 +196,8 @@ export default function ContentEditorPage() {
               <div className="mt-2 overflow-hidden border border-white/10 bg-white/[0.035]">
                 {draft.coverImageURL ? <div className="group relative aspect-[16/10]"><img src={draft.coverImageURL} alt="内容封面" className="h-full w-full object-cover" /><button type="button" onClick={() => updateDraft({ coverImageURL: "" })} title="移除封面" className="absolute right-2 top-2 grid h-7 w-7 place-items-center bg-black/65 text-white/75 opacity-0 transition-opacity group-hover:opacity-100"><X size={14} /></button></div> : <button type="button" onClick={() => uploadRef.current?.click()} className="grid aspect-[16/10] w-full place-items-center text-center text-xs text-white/36 transition-colors hover:bg-white/[0.04] hover:text-white/72"><span><ImagePlus size={18} className="mx-auto mb-2" />上传一张封面</span></button>}
               </div>
-              <input ref={uploadRef} type="file" accept="image/*" onChange={uploadCover} className="hidden" />
-              <div className="mt-2 grid grid-cols-2 gap-2"><button type="button" onClick={() => uploadRef.current?.click()} className="editor-utility"><Upload size={13} />上传</button><button type="button" onClick={() => setIsAssetPickerOpen(true)} className="editor-utility"><LibraryBig size={13} />素材库</button></div>
+              <input ref={uploadRef} type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" onChange={event => void uploadImage(event, "cover")} className="hidden" />
+              <div className="mt-2 grid grid-cols-2 gap-2"><button type="button" disabled={isUploadingImage} onClick={() => uploadRef.current?.click()} className="editor-utility disabled:opacity-45"><Upload size={13} />{isUploadingImage ? "处理中" : "上传"}</button><button type="button" onClick={() => { setImageTarget("cover"); setIsAssetPickerOpen(true); }} className="editor-utility"><LibraryBig size={13} />素材库</button></div>
               <input value={draft.coverImageURL || ""} onChange={event => updateDraft({ coverImageURL: event.target.value })} placeholder="或粘贴图片地址" className="editor-input mt-2" />
             </section>
 
@@ -196,7 +205,7 @@ export default function ContentEditorPage() {
               <label className="block"><span className="editor-label">城市</span><input value={draft.city || ""} onChange={event => updateDraft({ city: event.target.value })} placeholder="上海 / 武汉" className="editor-input" /></label>
               <label className="block"><span className="editor-label">标签</span><input value={tagsInput} onChange={event => setTagsInput(event.target.value)} placeholder="演出, 后朋克, 推荐" className="editor-input" /></label>
               <label className="block"><span className="editor-label">来源</span><input value={draft.sourceName || ""} onChange={event => updateDraft({ sourceName: event.target.value })} placeholder={draft.contentType === "note" ? "Catbeer 编辑部" : "媒体或创作者名称"} className="editor-input" /></label>
-              <label className="block"><span className="editor-label">原文链接{draft.contentType === "article" && <b className="ml-1 font-normal text-[#ff8a57]">必填</b>}</span><input value={draft.externalURL || ""} onChange={event => updateDraft({ externalURL: event.target.value })} placeholder="https://" className="editor-input" /></label>
+              <label className="block"><span className="editor-label">原文链接（可选）</span><input value={draft.externalURL || ""} onChange={event => updateDraft({ externalURL: event.target.value })} placeholder="https://" className="editor-input" /></label>
             </section>
 
             <section className="border-t border-white/[0.08] pt-5">
@@ -214,7 +223,7 @@ export default function ContentEditorPage() {
       {error && <p className="fixed bottom-5 left-1/2 z-50 w-[min(92vw,480px)] -translate-x-1/2 border border-red-400/25 bg-[#2e100e] px-4 py-3 text-sm text-red-100 shadow-2xl shadow-black/60">{error}</p>}
 
       {isPublishing && <div className="fixed inset-0 z-50 flex items-end bg-black/70 p-0 backdrop-blur-sm sm:items-center sm:justify-center sm:p-6"><div className="w-full border border-white/10 bg-[#160d0a] shadow-2xl shadow-black/65 sm:max-w-md"><div className="flex items-center justify-between border-b border-white/[0.08] px-5 py-4"><div><h2 className="text-base font-medium">发布设置</h2><p className="mt-1 text-xs text-white/40">确认信息流的可见时间与排序。</p></div><button type="button" onClick={() => setIsPublishing(false)} title="关闭发布设置" className="grid h-8 w-8 place-items-center text-white/50 hover:bg-white/[0.07] hover:text-white"><X size={16} /></button></div><div className="space-y-5 px-5 py-5"><label className="block"><span className="editor-label">发布时间</span><input type="datetime-local" value={scheduleValue} onChange={event => updateDraft({ publishedAt: toISODate(event.target.value) })} className="editor-input" /><span className="mt-2 block text-[11px] leading-5 text-white/35">留空即立即发布；选择未来时间将自动进入定时发布。</span></label><div className="border border-[#ff4e00]/20 bg-[#ff4e00]/[0.06] px-3 py-3 text-xs leading-5 text-white/62">发布后会进入公开信息流。草稿与定时内容不会在公开接口中展示。</div></div><div className="flex items-center justify-between border-t border-white/[0.08] px-5 py-4"><button type="button" onClick={() => void save("draft")} className="text-sm text-white/55 hover:text-white">保存草稿</button><button type="button" disabled={saving} onClick={() => void save("publish")} className="inline-flex h-9 items-center gap-2 bg-[#ff4e00] px-4 text-sm font-semibold disabled:opacity-45">{saving ? <LoaderCircle size={15} className="animate-spin" /> : <Check size={15} />}确认发布</button></div></div></div>}
-      <ImageAssetPicker isOpen={isAssetPickerOpen} token={localStorage.getItem("adminToken") || ""} onClose={() => setIsAssetPickerOpen(false)} onSelect={url => updateDraft({ coverImageURL: url })} />
+      <ImageAssetPicker isOpen={isAssetPickerOpen} token={localStorage.getItem("adminToken") || ""} onClose={() => setIsAssetPickerOpen(false)} onSelect={url => imageTarget === "cover" ? updateDraft({ coverImageURL: url }) : bodyEditorRef.current?.insertImage(url)} />
     </main>
   );
 }

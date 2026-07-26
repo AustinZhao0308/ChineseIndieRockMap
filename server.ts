@@ -10,6 +10,7 @@ import { createServer as createViteServer } from 'vite';
 import { createPublicKey } from 'crypto';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
+import sanitizeHtml from 'sanitize-html';
 
 dotenv.config();
 
@@ -913,6 +914,26 @@ const collectImageReferences = () => {
     });
   });
 
+  const posts = db.prepare('SELECT id, title, cover_image_url, body FROM posts').all() as any[];
+  posts.forEach(post => {
+    addImageReference(refs, post.cover_image_url, {
+      type: 'Post Cover',
+      id: post.id,
+      title: post.title || `Post #${post.id}`,
+      field: 'cover_image_url'
+    });
+
+    const imagePattern = /<img\b[^>]*\bsrc=["']([^"']+)["'][^>]*>/gi;
+    for (const match of String(post.body || '').matchAll(imagePattern)) {
+      addImageReference(refs, match[1], {
+        type: 'Post Body',
+        id: post.id,
+        title: post.title || `Post #${post.id}`,
+        field: 'body'
+      });
+    }
+  });
+
   return refs;
 };
 
@@ -1077,6 +1098,37 @@ const normalizePostTags = (value: any) => {
     .slice(0, 8)));
 };
 
+const sanitizePostBody = (value: any) => {
+  const cleaned = sanitizeHtml(String(value || ''), {
+    allowedTags: ['p', 'br', 'strong', 'b', 'em', 'i', 'u', 'h2', 'h3', 'ul', 'ol', 'li', 'blockquote', 'hr', 'a', 'img', 'span', 'div'],
+    allowedAttributes: {
+      a: ['href', 'target', 'rel'],
+      img: ['src', 'alt'],
+      span: ['style'],
+      div: ['style'],
+      p: ['style'],
+      h2: ['style'],
+      h3: ['style'],
+      li: ['style'],
+      blockquote: ['style']
+    },
+    allowedSchemes: ['http', 'https', 'mailto'],
+    allowedStyles: {
+      '*': {
+        color: [/^#[0-9a-f]{3,8}$/i, /^rgb\((?:\d{1,3},\s*){2}\d{1,3}\)$/i]
+      }
+    },
+    transformTags: {
+      a: (tagName, attribs) => ({
+        tagName,
+        attribs: { href: attribs.href || '', target: '_blank', rel: 'noreferrer noopener' }
+      })
+    }
+  });
+
+  return cleaned.replace(/<img\b[^>]*\bsrc="([^"]+)"[^>]*>/gi, (tag, source) => normalizeUploadUrl(source) ? tag : '');
+};
+
 const toPublicPost = (post: any, includeEvent = true) => {
   const tags = normalizePostTags(post.tags_json);
   const result: any = {
@@ -1085,7 +1137,7 @@ const toPublicPost = (post: any, includeEvent = true) => {
     contentType: post.content_type,
     title: post.title,
     summary: post.summary,
-    body: post.body,
+    body: sanitizePostBody(post.body),
     coverImageURL: post.cover_image_url,
     sourceName: post.source_name,
     externalURL: post.external_url,
@@ -1124,7 +1176,7 @@ const readPostPayload = (body: any) => {
     status,
     title,
     summary: String(body.summary || '').trim(),
-    body: String(body.body || '').trim(),
+    body: sanitizePostBody(body.body),
     coverImageURL: String(body.coverImageURL || '').trim() || null,
     sourceName: String(body.sourceName || '').trim() || null,
     externalURL: String(body.externalURL || '').trim() || null,
@@ -1479,13 +1531,24 @@ app.put('/api/admin/posts/:id', authenticateToken, requireAdmin, (req, res) => {
 });
 
 app.delete('/api/admin/posts/:id', authenticateToken, requireAdmin, (req, res) => {
-  const post = db.prepare('SELECT cover_image_url FROM posts WHERE id = ?').get(req.params.id) as any;
+  const post = db.prepare('SELECT cover_image_url, body FROM posts WHERE id = ?').get(req.params.id) as any;
   if (!post) return res.status(404).json({ error: 'Post not found.' });
-  if (post.cover_image_url) deleteLocalImage(post.cover_image_url);
+  const imageUrls = new Set<string>();
+  const coverImage = normalizeUploadUrl(post.cover_image_url);
+  if (coverImage) imageUrls.add(coverImage);
+  const imagePattern = /<img\b[^>]*\bsrc=["']([^"']+)["'][^>]*>/gi;
+  for (const match of String(post.body || '').matchAll(imagePattern)) {
+    const imageUrl = normalizeUploadUrl(match[1]);
+    if (imageUrl) imageUrls.add(imageUrl);
+  }
   db.transaction(() => {
     db.prepare('DELETE FROM user_saved_posts WHERE post_id = ?').run(req.params.id);
     db.prepare('DELETE FROM posts WHERE id = ?').run(req.params.id);
   })();
+  const remainingReferences = collectImageReferences();
+  imageUrls.forEach(imageUrl => {
+    if (!remainingReferences.has(imageUrl)) deleteLocalImage(imageUrl);
+  });
   res.json({ success: true });
 });
 
