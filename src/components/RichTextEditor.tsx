@@ -85,7 +85,21 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(fun
         {toolbarButton("清除格式", () => command("removeFormat"), <RemoveFormatting size={15} />)}
       </div>
       <div className="rich-editor-group">
-        {toolbarButton("小标题", () => command("formatBlock", "h2"), <span className="font-serif text-sm font-semibold">H2</span>)}
+        <select
+          aria-label="段落样式"
+          defaultValue="p"
+          onMouseDown={rememberSelection}
+          onChange={event => {
+            command("formatBlock", event.target.value);
+            event.currentTarget.value = "p";
+          }}
+          className="rich-editor-format"
+        >
+          <option value="p">正文</option>
+          <option value="h1">H1 标题</option>
+          <option value="h2">H2 小标题</option>
+          <option value="h3">H3 小标题</option>
+        </select>
         {toolbarButton("无序列表", () => command("insertUnorderedList"), <List size={15} />)}
         {toolbarButton("有序列表", () => command("insertOrderedList"), <ListOrdered size={15} />)}
         {toolbarButton("引用", () => command("formatBlock", "blockquote"), <Quote size={15} />)}

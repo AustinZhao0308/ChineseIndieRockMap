@@ -38,6 +38,15 @@
     @apply h-4 w-4 rounded-full border border-white/20 transition-transform hover:scale-110;
   }
 
+  .rich-editor-format {
+    @apply h-7 bg-transparent px-1.5 text-xs text-white/62 outline-none transition-colors hover:bg-white/[0.08] hover:text-white;
+  }
+
+  .rich-editor-format option {
+    background: #1a0d09;
+    color: #fff;
+  }
+
   .rich-editor-content {
     @apply min-h-[360px] px-4 py-4 text-[16px] leading-8 text-white/82 outline-none;
   }
